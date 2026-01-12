@@ -1,0 +1,12 @@
+# Ralph AI Gitignore
+ralph.log
+__pycache__/
+*.pyc
+.DS_Store
+.env
+ralph_ui/requirements.txt.installed
+tmp/
+*.swp
+memory/context.json
+RALPH_PROGRESS.md
+.ai_memory/
