@@ -6,5 +6,5 @@
 
 # OPERATING PROTOCOLS
 1. Prioritize **LocalDocs** for project-specific context.
-2. If a conflict arises between files, `STATUS.md` is the "source of truth."
-3. Always check `TOOLS.md` before suggesting a shell command.
+2. If a conflict arises between files, `docs/STATUS.md` is the "source of truth."
+3. Always check `docs/TOOLS.md` before suggesting a shell command.
