@@ -18,31 +18,40 @@ from git_manager import git
 from web import web
 from vision import vision
 from swarm_dispatcher import dispatcher
+from memory import Memory
 
 class ToolRegistry:
     def __init__(self):
         self._tools: Dict[str, Callable] = {}
         self._descriptions: Dict[str, str] = {}
         self.executor = Executor()
-        
+        self.memory = Memory()
+
         # Register core tools
         self.register("read_file", self.read_file, "Reads content of a file.")
         self.register("write_file", self.write_file, "Writes content to a file.")
         self.register("list_dir", self.list_dir, "Lists files in a directory.")
         self.register("run_shell", self.run_shell, "Executes a shell command.")
-        
+
+        # Register Memory tools (for persistent knowledge)
+        self.register("memory_save", self.memory.save, "Saves a fact to memory. Args: fact (str), tag (str, optional)")
+        self.register("memory_get", self.memory.get, "Retrieves facts by tag. Args: tag (str)")
+        self.register("memory_search", self.memory.search, "Semantic search for similar facts. Args: query (str)")
+        self.register("memory_remember", self.memory.remember, "Saves a fact with tag. Args: fact (str), tag (str)")
+        self.register("memory_recall", self.memory.recall, "Retrieves facts by tag. Args: tag (str)")
+
         # Register Git tools
         self.register("git_commit", git.commit_all, "Stages and commits all changes.")
         self.register("git_branch", git.create_branch, "Creates a new branch.")
         self.register("git_revert", git.revert_last_commit, "Reverts the last commit.")
-        
+
         # Register Web tools
         self.register("web_search", web.search, "Searches the web for a query.")
         self.register("read_url", web.fetch_page, "Reads the content of a URL.")
-        
+
         # Register Vision tools
         self.register("analyze_image", vision.analyze_image, "Analyzes an image file. Args: image_path, prompt")
-        
+
         # Register Swarm tools
         self.register("dispatch_swarm", dispatcher.dispatch, "Spawns parallel Ralph instances for subtasks. Args: [list_of_tasks]")
 

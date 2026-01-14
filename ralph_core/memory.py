@@ -58,6 +58,21 @@ class Memory:
         # ALSO save to Vector DB
         vector_memory.add(fact, {"tag": tag, "source": "manual_memory"})
 
+    def save(self, fact: str, tag: str = "general") -> None:
+        """Alias for remember() - saves a fact to long-term memory.
+
+        This alias exists because LLMs often guess 'save' as the method name.
+        """
+        self.remember(fact, tag)
+
+    def get(self, tag: str) -> str:
+        """Alias for recall() - retrieves facts by tag."""
+        return self.recall(tag)
+
+    def search(self, query: str) -> str:
+        """Alias for recall_similar() - semantic search for facts."""
+        return self.recall_similar(query)
+
     def recall(self, tag: str) -> str:
         """Retrieves facts matching a tag."""
         file_path = os.path.join(self.memory_dir, f"{tag}.md")
