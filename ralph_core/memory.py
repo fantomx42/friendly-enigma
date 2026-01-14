@@ -5,9 +5,16 @@ Handles persistence of state (Context) and knowledge (Facts).
 
 import json
 import os
+import sys
 import glob
 from typing import Dict, Optional
-from .vector_db import vector_memory
+
+# Ensure ralph_core is in path for absolute imports
+_ralph_core_path = os.path.dirname(os.path.abspath(__file__))
+if _ralph_core_path not in sys.path:
+    sys.path.insert(0, _ralph_core_path)
+
+from vector_db import vector_memory
 
 class Memory:
     def __init__(self, root_dir: str = "."):
