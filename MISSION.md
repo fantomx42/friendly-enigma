@@ -1,6 +1,7 @@
 # SWARM CONFIGURATION
-- **ORCHESTRATOR:** Ralph (DeepSeek-R1-14B)
-- **DESIGNER:** Jules (via Gemini CLI)
+- **ORCHESTRATOR:** Ralph (DeepSeek-R1-14B) - `ralph_core/agents/orchestrator/`
+- **ENGINEER:** Qwen (Qwen2.5-Coder-14B) - `ralph_core/agents/engineer/`
+- **DESIGNER:** Mistral (Mistral-Nemo-12B) - `ralph_core/agents/designer/`
 - **ENVIRONMENT:** CachyOS / Arch Linux
 - **HARDWARE:** Ryzen 5800X3D + RX 9070 XT
 

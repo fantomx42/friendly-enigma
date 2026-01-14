@@ -3,108 +3,110 @@ swarm.py
 
 The Core Swarm Interface for the Ralph Protocol.
 This module abstracts the multi-model architecture into a single callable interface.
+Now delegates to specific agent modules in ralph_core/agents/.
 
-Roles:
-- Orchestrator (DeepSeek-R1-14B): Strategic planning and reasoning.
-- Engineer (Qwen2.5-Coder-14B): Code implementation and technical execution.
-- Designer (Mistral-Nemo-12B): Critique, architectural review, and safety.
+Architecture (3-Tier Hierarchical Swarm):
+    1. Translator - Human input → Structured TaskSpec
+    2. Middle Management - Engineer ↔ Designer (bidirectional)
+    3. LLM ASICs - Ultra-small specialists for micro-tasks
+
+Message Flow:
+    Orchestrator --[WORK_REQUEST]--> Engineer
+    Engineer --[CODE_OUTPUT]--> Designer
+    Designer --[REVISION_REQUEST]--> Engineer (if quality insufficient)
+    Designer --[COMPLETE]--> Orchestrator (when satisfied)
 """
 
-import requests
-import json
-import subprocess
-from typing import Dict, Any
+# ============================================
+# Core Agent Functions (Original)
+# ============================================
+from agents.orchestrator.agent import think, decompose, create_work_request
+from agents.orchestrator.agent import handle_message as orchestrator_handle_message
+from agents.engineer.agent import code
+from agents.designer.agent import review, verify
+from agents.reflector.agent import reflect
+from agents.debugger.agent import diagnose
+from agents.estimator.agent import estimate_task
+from agents.common.llm import call_model
+from agents.common.config import MODELS
 
-# --- Configuration ---
-MODELS = {
-    "orchestrator": "deepseek-r1:14b",
-    "engineer": "qwen2.5-coder:14b",
-    "designer": "mistral-nemo:12b"
-}
+# ============================================
+# New: Translator Agent (Tier 1)
+# ============================================
+try:
+    from agents.translator.agent import translate, TaskSpec
+except ImportError:
+    translate = None
+    TaskSpec = None
 
-OLLAMA_API = "http://localhost:11434/api/generate"
+# ============================================
+# New: Bidirectional Agent Functions
+# ============================================
+from agents.engineer.agent import code_with_revision, code_with_asic
+from agents.designer.agent import review_with_feedback, evaluate_options
 
-# --- Core Interface ---
+# Message handlers (for message-driven pipeline)
+from agents.engineer.agent import handle_message as engineer_handle_message
+from agents.designer.agent import handle_message as designer_handle_message
 
-def call_model(role: str, prompt: str, stream: bool = False) -> str:
-    """
-    Generic handler to call a specific role in the swarm.
-    """
-    model_name = MODELS.get(role)
-    if not model_name:
-        raise ValueError(f"Unknown role: {role}")
-
-    try:
-        response = requests.post(
-            OLLAMA_API,
-            json={
-                "model": model_name,
-                "prompt": prompt,
-                "stream": stream,
-                "options": {
-                    "temperature": 0.7 if role == "orchestrator" else 0.2  # Low temp for coding
-                }
-            },
-            timeout=600  # DeepSeek reasoning can take time
-        )
-        if response.status_code == 404:
-            return f"Error: Model {model_name} not found. Run 'ollama pull {model_name}'"
-        
-        response.raise_for_status()
-        
-        if stream:
-            # TODO: Implement generator for streaming if needed
-            return "Streaming not yet implemented in swarm.py"
-        
-        return response.json().get("response", "").strip()
-
-    except Exception as e:
-        return f"CRITICAL SWARM ERROR ({role}): {str(e)}"
-
-# --- Specialized Functions ---
-
-def think(context: str, goal: str) -> str:
-    """
-    The Orchestrator's step. Produces a logical plan/reasoning trace.
-    """
-    prompt = (
-        f"CONTEXT:\n{context}\n\n"
-        f"GOAL: {goal}\n\n"
-        f"You are the Orchestrator. Plan the solution. "
-        f"Note: You have an ENGINEER who can write code and an EXECUTOR who can run shell commands. "
-        f"Plan to use <execute>command</execute> to verify your work."
+# ============================================
+# New: ASIC System (Tier 3)
+# ============================================
+try:
+    from asic import (
+        spawn_asic, spawn_asic_parallel,
+        ASIC_REGISTRY, list_available_asics,
+        asic_handle_message, ASIC_HANDLERS,
     )
-    return call_model("orchestrator", prompt)
+except ImportError:
+    spawn_asic = None
+    spawn_asic_parallel = None
+    ASIC_REGISTRY = {}
+    list_available_asics = lambda: []
+    asic_handle_message = None
+    ASIC_HANDLERS = {}
 
-def code(plan: str, context: str) -> str:
-    """
-    The Engineer's step. Produces executable code based on the plan.
-    """
-    prompt = (
-        f"PLAN:\n{plan}\n\n"
-        f"CONTEXT:\n{context}\n\n"
-        f"You are the Engineer. Implement the plan. "
-        f"RULES:\n"
-        f"1. To CREATE a file, use this format:\n"
-        f"```python:path/to/filename.py\ncode_here\n```\n"
-        f"2. DO NOT write a python script to create other files. Output the file content directly.\n"
-        f"3. To RUN a command (like installing deps or testing), use:\n"
-        f"<execute>command_here</execute>\n"
-    )
-    return call_model("engineer", prompt)
+# ============================================
+# New: Message Bus Protocol
+# ============================================
+try:
+    from protocols import Message, MessageType, MessageBus
+    from protocols.bus import get_bus, reset_bus
+except ImportError:
+    Message = None
+    MessageType = None
+    MessageBus = None
+    get_bus = None
+    reset_bus = None
 
-def review(code: str, plan: str) -> str:
-    """
-    The Designer's step. Critiques and polishes the output.
-    """
-    prompt = (
-        f"PLAN:\n{plan}\n\n"
-        f"CODE:\n{code}\n\n"
-        f"You are the Designer. Review the work. "
-        f"CRITICAL: The system only saves files that YOU output in your review. "
-        f"You MUST reproduce the full code blocks for every file, even if they are correct.\n"
-        f"Format: ```python:filename.py\n...```\n"
-        f"If a command was executed, check its output. "
-        f"Only output <promise>COMPLETE</promise> if the objective is met AND verified."
-    )
-    return call_model("designer", prompt)
+# ============================================
+# Exports
+# ============================================
+__all__ = [
+    # Original functions
+    "think", "decompose", "code", "review", "verify",
+    "reflect", "diagnose", "estimate_task",
+    "call_model", "MODELS",
+
+    # Translator (Tier 1)
+    "translate", "TaskSpec",
+
+    # Bidirectional functions
+    "code_with_revision", "code_with_asic",
+    "review_with_feedback", "evaluate_options",
+
+    # Message handlers (all three agents)
+    "orchestrator_handle_message",
+    "engineer_handle_message",
+    "designer_handle_message",
+    "create_work_request",
+
+    # ASIC System (Tier 3)
+    "spawn_asic", "spawn_asic_parallel",
+    "ASIC_REGISTRY", "list_available_asics",
+    "asic_handle_message", "ASIC_HANDLERS",
+
+    # Message Bus
+    "Message", "MessageType", "MessageBus",
+    "get_bus", "reset_bus",
+]

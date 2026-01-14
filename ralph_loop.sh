@@ -1,8 +1,52 @@
 #!/bin/bash
 # ralph_loop.sh - The Outer Control Loop for the Ralph Protocol
-# Usage: ./ralph_loop.sh "Your Objective"
+# Usage: ./ralph_loop.sh [--sandbox] "Your Objective"
 
-OBJECTIVE="$1"
+# Argument Parsing
+SANDBOX_MODE=0
+OBJECTIVE=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --sandbox)
+      SANDBOX_MODE=1
+      shift # past argument
+      ;;
+    -*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      OBJECTIVE="$1"
+      shift # past argument
+      ;;
+  esac
+done
+
+if [ -z "$OBJECTIVE" ]; then
+    echo "Usage: ./ralph_loop.sh [--sandbox] \"Your Objective\""
+    exit 1
+fi
+
+# Sandbox Initialization
+if [ $SANDBOX_MODE -eq 1 ]; then
+    echo "🛡️  SANDBOX MODE ACTIVE"
+    echo "Starting Docker Container..."
+    
+    # Check if docker is installed
+    if ! command -v docker &> /dev/null; then
+        echo "Error: Docker not found. Cannot run in sandbox mode."
+        exit 1
+    fi
+    
+    # Start Container
+    (cd sandbox && docker-compose up -d)
+    
+    export RALPH_SANDBOX=1
+else
+    export RALPH_SANDBOX=0
+fi
+
 MAX_ITERATIONS=10
 ITERATION=1
 PROGRESS_FILE="RALPH_PROGRESS.md"

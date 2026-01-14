@@ -7,6 +7,7 @@ import json
 import os
 import glob
 from typing import Dict, Optional
+from .vector_db import vector_memory
 
 class Memory:
     def __init__(self, root_dir: str = "."):
@@ -46,6 +47,9 @@ class Memory:
         mode = 'a' if os.path.exists(file_path) else 'w'
         with open(file_path, mode) as f:
             f.write(f"\n{fact}\n")
+            
+        # ALSO save to Vector DB
+        vector_memory.add(fact, {"tag": tag, "source": "manual_memory"})
 
     def recall(self, tag: str) -> str:
         """Retrieves facts matching a tag."""
@@ -54,16 +58,57 @@ class Memory:
             with open(file_path, 'r') as f:
                 return f.read().strip()
         return ""
+    
+    def recall_similar(self, query: str) -> str:
+        """Retrieves semantically similar facts/lessons."""
+        results = vector_memory.search(query)
+        if not results:
+            return ""
+        
+        summary = "--- RELEVANT MEMORIES ---\n"
+        for r in results:
+            doc = r['document']
+            summary += f"- [{r['score']:.2f}] {doc['text']} (Tag: {doc['metadata'].get('tag', 'unknown')})\n"
+        return summary
 
     def retrieve_full_state(self) -> str:
         """Returns a summary of current context and available memory tags."""
         self.load_context()
+        lessons = self.get_lessons()
         
         # List available memories
         memories = [os.path.basename(f) for f in glob.glob(os.path.join(self.memory_dir, "*.md"))]
         
         summary = (
             f"=== CURRENT CONTEXT ===\n{json.dumps(self.context, indent=2)}\n\n"
+            f"=== LEARNED LESSONS ===\n{json.dumps(lessons, indent=2)}\n\n"
             f"=== AVAILABLE MEMORIES ===\n{', '.join(memories)}"
         )
         return summary
+
+    def get_lessons(self) -> list:
+        """Retrieves the list of learned lessons (Global)."""
+        global_lessons_file = os.path.expanduser("~/.ralph/global_memory/lessons.json")
+        if os.path.exists(global_lessons_file):
+            try:
+                with open(global_lessons_file, 'r') as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                return []
+        return []
+
+    def add_lesson(self, lesson: str) -> None:
+        """Adds a new lesson to the global database."""
+        lessons = self.get_lessons()
+        if lesson not in lessons:
+            lessons.append(lesson)
+            
+            global_lessons_file = os.path.expanduser("~/.ralph/global_memory/lessons.json")
+            os.makedirs(os.path.dirname(global_lessons_file), exist_ok=True)
+            
+            with open(global_lessons_file, 'w') as f:
+                json.dump(lessons, f, indent=2)
+            
+            # Index lesson in Vector DB (Global Scope)
+            vector_memory.add(lesson, {"tag": "lesson", "source": "reflector"}, scope="global")
+

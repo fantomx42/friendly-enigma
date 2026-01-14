@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  ralph-sandbox:
+    build: .
+    container_name: ralph_sandbox
+    volumes:
+      - ../:/app
+    working_dir: /app
+    restart: always

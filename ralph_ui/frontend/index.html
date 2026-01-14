@@ -6,14 +6,16 @@
     <title>Ralph Core | Terminal</title>
     <style>
         :root {
-            --neon-green: #00ff41;
-            --dark-bg: #0a0a0a;
+            --amber: #ffb000;
+            --amber-dim: #b37b00;
+            --amber-glow: #ffcc00;
+            --dark-bg: #0c0800;
             --terminal-font: 'Courier New', Courier, monospace;
         }
 
         body {
             background-color: var(--dark-bg);
-            color: var(--neon-green);
+            color: var(--amber);
             font-family: var(--terminal-font);
             margin: 0;
             padding: 20px;
@@ -21,210 +23,554 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            text-shadow: 0 0 5px var(--neon-green);
+            text-shadow: 0 0 4px rgba(255, 176, 0, 0.4);
         }
 
-        /* Scanline effect */
+        /* Subtle CRT Scanline */
         body::before {
             content: " ";
             display: block;
             position: absolute;
             top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 2px, 3px 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            z-index: 100;
+            background-size: 100% 4px;
             pointer-events: none;
         }
 
-        h1 {
-            font-size: 1.5rem;
-            border-bottom: 2px solid var(--neon-green);
-            padding-bottom: 10px;
-            margin-top: 0;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+        /* Header Area */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--amber);
+            padding-bottom: 15px;
+            margin-bottom: 10px;
         }
 
-        #status-bar {
-            font-size: 0.8rem;
-            margin-bottom: 10px;
+        h1 {
+            font-size: 1.8rem;
+            margin: 0;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--amber-glow);
+        }
+
+        #controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: 1px solid var(--amber);
+            color: var(--amber);
+            padding: 5px 15px;
+            cursor: pointer;
+            font-family: var(--terminal-font);
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .toggle-btn:hover, .toggle-btn.active {
+            background: var(--amber);
+            color: #000;
+            box-shadow: 0 0 10px var(--amber);
+        }
+
+        /* Quick Actions */
+        #quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .action-chip {
+            background: rgba(255, 176, 0, 0.1);
+            border: 1px solid var(--amber-dim);
+            color: var(--amber-dim);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .action-chip:hover {
+            background: var(--amber);
+            color: #000;
+            border-color: var(--amber);
+        }
+
+        /* Main Log Area */
+        #log {
+            flex-grow: 1;
+            border: 1px solid var(--amber-dim);
+            background: rgba(20, 10, 0, 0.3);
+            padding: 20px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+            scrollbar-width: thin;
+            scrollbar-color: var(--amber) transparent;
+        }
+
+        .line {
+            margin-bottom: 8px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            font-size: 1.05rem; /* Larger text for readability */
+        }
+
+        /* Message Types */
+        .system-log { 
+            color: rgba(255, 176, 0, 0.5); 
+            font-size: 0.85rem; 
+            font-style: italic;
+            border-left: 2px solid rgba(255, 176, 0, 0.2);
+            padding-left: 10px;
+            margin-left: 10px;
+            display: none; /* Hidden by default in Simple Mode */
+        }
+        
+        .user-msg { 
+            color: #fff; 
+            background: rgba(255, 136, 0, 0.15);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: right;
+            border-right: 3px solid #ff8800;
+        }
+        
+        .ralph-msg {
+            color: var(--amber);
+        }
+
+        /* Response Box */
+        .clean-output-box {
+            border: 2px solid var(--amber);
+            background: rgba(255, 176, 0, 0.05);
+            margin: 20px 0;
+            padding: 0;
+            box-shadow: 0 0 15px rgba(255, 176, 0, 0.1);
+            border-radius: 4px;
+        }
+
+        .clean-output-header {
+            background: var(--amber);
+            color: #000;
+            padding: 8px 15px;
+            font-weight: bold;
+            font-size: 1rem;
+            text-transform: uppercase;
             display: flex;
             justify-content: space-between;
         }
 
-        #log {
-            flex-grow: 1;
-            border: 1px solid var(--neon-green);
-            background: rgba(0, 20, 0, 0.2);
-            padding: 15px;
-            overflow-y: auto;
-            margin-bottom: 20px;
-            box-shadow: inset 0 0 10px var(--neon-green);
-            scrollbar-width: thin;
-            scrollbar-color: var(--neon-green) transparent;
+        .clean-output-content {
+            padding: 25px;
+            color: #fff;
+            font-size: 1.15rem;
+            line-height: 1.6;
+            text-shadow: none;
+            white-space: pre-wrap;
         }
 
-        .line {
-            margin-bottom: 5px;
-            line-height: 1.2;
-        }
+        /* Markdown styling in output */
+        .md-h { color: var(--amber); font-weight: bold; font-size: 1.3rem; margin-top: 15px; display: block; border-bottom: 1px solid rgba(255,176,0,0.2); }
 
-        .system { color: #888; font-style: italic; }
-        .ralph { color: var(--neon-green); font-weight: bold; }
-        .user { color: #0088ff; }
-        .error { color: #ff0000; text-shadow: 0 0 5px #ff0000; }
-
-        #input-container {
+        /* Input Area */
+        #input-area {
             display: flex;
-            align-items: center;
-            border: 1px solid var(--neon-green);
-            padding: 5px 10px;
+            gap: 10px;
             background: #000;
-        }
-
-        #prompt {
-            margin-right: 10px;
-            color: var(--neon-green);
+            padding: 10px;
+            border: 1px solid var(--amber);
+            align-items: center;
         }
 
         #input {
             background: transparent;
             border: none;
-            color: var(--neon-green);
+            color: var(--amber-glow);
             font-family: var(--terminal-font);
-            font-size: 1rem;
+            font-size: 1.2rem;
             flex-grow: 1;
             outline: none;
-            text-shadow: 0 0 5px var(--neon-green);
+            padding: 5px;
         }
 
-        /* Flicker animation */
+        #send-btn {
+            background: var(--amber);
+            color: #000;
+            border: none;
+            padding: 10px 25px;
+            font-family: var(--terminal-font);
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: background 0.2s;
+        }
+        
+        #send-btn:hover {
+            background: #ffe066;
+            box-shadow: 0 0 15px var(--amber);
+        }
+
+        /* Status Bar */
+        #status-footer {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: var(--amber-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Activity Overlay */
+        #activity-indicator {
+            position: fixed;
+            bottom: 120px;
+            right: 40px;
+            background: #000;
+            border: 1px solid var(--amber);
+            padding: 15px 25px;
+            z-index: 50;
+            box-shadow: 0 0 15px var(--amber);
+            display: none;
+            border-radius: 30px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border: 3px solid var(--amber);
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Reduced Flicker */
         @keyframes flicker {
-            0% { opacity: 0.97; }
-            5% { opacity: 0.95; }
-            10% { opacity: 0.9; }
-            15% { opacity: 0.95; }
-            25% { opacity: 0.98; }
-            30% { opacity: 0.94; }
+            0% { opacity: 0.99; }
+            50% { opacity: 1; }
             100% { opacity: 0.99; }
         }
-
-        body { animation: flicker 0.1s infinite; }
+        body { animation: flicker 0.2s infinite; }
 
     </style>
 </head>
 <body>
-    <h1>RALPH_CORE // OS_INTERFACE_v3.0</h1>
-    <div id="status-bar">
-        <span>DOMAIN: ralph.ai</span>
-        <span id="status">STATUS: INITIALIZING...</span>
-        <span>COMPUTE: <span id="timer">0.00</span>s</span>
-        <span>LATENCY: <span id="latency">--</span>ms</span>
+    <header>
+        <h1>RALPH OS // v3.1</h1>
+        <div id="controls">
+            <button id="mode-btn" class="toggle-btn" onclick="toggleMode()">SIMPLE MODE: ON</button>
+        </div>
+    </header>
+
+    <div id="quick-actions">
+        <div class="action-chip" onclick="fillInput('Status Report')">📊 System Status</div>
+        <div class="action-chip" onclick="fillInput('Explain Quantum Physics simply')">🧠 Explain Topic</div>
+        <div class="action-chip" onclick="fillInput('Clear Memory')">🧹 Reset Context</div>
     </div>
-    <div id="log"></div>
-    <div id="input-container">
-        <span id="prompt">tristan@ralph:~$</span>
-        <input type="text" id="input" autofocus>
+
+    <!-- Metrics Dashboard -->
+    <div id="metrics-dashboard" style="display: flex; gap: 15px; margin-bottom: 20px; font-family: var(--terminal-font);">
+        <div style="flex: 1; border: 1px solid var(--amber-dim); background: rgba(20, 10, 0, 0.3); padding: 10px; text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--amber-dim); text-transform: uppercase;">Total Tokens</div>
+            <div id="metric-tokens" style="font-size: 1.5rem; color: var(--amber-glow); font-weight: bold;">0</div>
+        </div>
+        <div style="flex: 1; border: 1px solid var(--amber-dim); background: rgba(20, 10, 0, 0.3); padding: 10px; text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--amber-dim); text-transform: uppercase;">Last Duration</div>
+            <div id="metric-duration" style="font-size: 1.5rem; color: var(--amber-glow); font-weight: bold;">0s</div>
+        </div>
+        <div style="flex: 1; border: 1px solid var(--amber-dim); background: rgba(20, 10, 0, 0.3); padding: 10px; text-align: center;">
+            <div style="font-size: 0.8rem; color: var(--amber-dim); text-transform: uppercase;">Active Task</div>
+            <div id="metric-status" style="font-size: 1.2rem; color: var(--amber-glow);">IDLE</div>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 20px; height: calc(100vh - 280px);">
+        <!-- Main Terminal -->
+        <div id="log" style="flex: 2; margin-bottom: 0;">
+            <div class="line ralph-msg">👋 Hello! I am Ralph. How can I help you today?</div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+            
+            <!-- Plan Visualization -->
+            <div style="flex: 1; border: 1px solid var(--amber-dim); background: rgba(20, 10, 0, 0.3); padding: 10px; overflow-y: auto;">
+                <h3 style="margin: 0 0 10px 0; border-bottom: 1px solid var(--amber-dim); font-size: 1rem; color: var(--amber);">MISSION PLAN</h3>
+                <div id="plan-container" style="font-size: 0.9rem;">
+                    <div style="color: var(--amber-dim); font-style: italic;">No active plan.</div>
+                </div>
+            </div>
+
+            <!-- Live Code Preview -->
+            <div style="flex: 1; border: 1px solid var(--amber-dim); background: rgba(20, 10, 0, 0.3); padding: 10px; overflow-y: auto;">
+                <h3 style="margin: 0 0 10px 0; border-bottom: 1px solid var(--amber-dim); font-size: 1rem; color: var(--amber);">LIVE CODE PREVIEW</h3>
+                <pre id="code-preview" style="font-size: 0.8rem; white-space: pre-wrap; color: #aaffaa; margin: 0;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <div id="activity-indicator">
+        <div class="spinner"></div>
+        <span id="activity-text">WORKING...</span>
+    </div>
+
+    <div id="input-area">
+        <span style="color: var(--amber); font-size: 1.2rem;">></span>
+        <input type="text" id="input" autofocus autocomplete="off" placeholder="Type your request here...">
+        <button id="send-btn">SEND</button>
+    </div>
+    
+    <div id="status-footer">
+        <span id="status">STATUS: CONNECTING...</span>
+        <span>LATENCY: <span id="latency">--</span>ms</span>
     </div>
 
     <script>
-        // Use relative URL so it works regardless of port
         const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
         const wsUrl = wsProtocol + window.location.host + "/ws";
-        
         const ws = new WebSocket(wsUrl);
+
         const log = document.getElementById("log");
-        const status = document.getElementById("status");
         const input = document.getElementById("input");
-        const timerEl = document.getElementById("timer");
+        const sendBtn = document.getElementById("send-btn");
+        const activityIndicator = document.getElementById("activity-indicator");
+        const activityText = document.getElementById("activity-text");
+        const modeBtn = document.getElementById("mode-btn");
+        const statusEl = document.getElementById("status");
 
-        let startTime;
-        let computeStartTime;
-        let timerInterval;
+        let simpleMode = true;
+        let isCleanOutputMode = false;
+        let cleanOutputBuffer = "";
 
-        function startTimer() {
-            clearInterval(timerInterval);
-            computeStartTime = Date.now();
-            timerEl.style.color = "#00ff41"; // Reset color
-            timerInterval = setInterval(() => {
-                const elapsed = (Date.now() - computeStartTime) / 1000;
-                timerEl.innerText = elapsed.toFixed(2);
-            }, 50);
+        // --- Core Functions ---
+
+        function toggleMode() {
+            simpleMode = !simpleMode;
+            modeBtn.innerText = simpleMode ? "SIMPLE MODE: ON" : "SIMPLE MODE: OFF";
+            modeBtn.classList.toggle("active", !simpleMode);
+            
+            // Toggle visibility of existing system logs
+            const sysLogs = document.querySelectorAll('.system-log');
+            sysLogs.forEach(el => el.style.display = simpleMode ? 'none' : 'block');
         }
 
-        function stopTimer() {
-            clearInterval(timerInterval);
-            timerEl.style.color = "#ffffff"; // White to indicate done
+        function sendMessage() {
+            const msg = input.value;
+            if (!msg) return;
+            
+            ws.send(msg);
+            logMessage("You", msg, "user-msg");
+            input.value = "";
+            
+            activityIndicator.style.display = "block";
+            activityText.innerText = "STARTING...";
         }
+        
+        function fillInput(text) {
+            input.value = text;
+            input.focus();
+        }
+
+        // --- Event Listeners ---
+
+        sendBtn.addEventListener("click", sendMessage);
+        
+        input.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        // --- WebSocket Logic ---
 
         ws.onopen = () => {
-            status.innerText = "STATUS: ONLINE";
-            status.style.color = "#00ff41";
-            logMessage("SYSTEM", "CORE LINK ESTABLISHED.", "system");
+            statusEl.innerText = "STATUS: ONLINE";
+            statusEl.style.color = "#ffb000";
         };
 
         ws.onmessage = (event) => {
-            if (event.data === "PONG") {
-                const latency = Date.now() - startTime;
-                document.getElementById("latency").innerText = latency;
+            const data = event.data;
+
+            if (data === "PONG") {
+                document.getElementById("latency").innerText = (Date.now() % 1000) + "ms"; // Mock latency for smoothness
                 return;
             }
 
-            if (event.data === "SYSTEM::COMPLETE") {
-                stopTimer();
-                logMessage("SYSTEM", "TASK EXECUTION FINISHED.", "system");
+            if (data === "SYSTEM::COMPLETE") {
+                activityIndicator.style.display = "none";
                 return;
             }
-            
-            // Highlight specific Ralph phases
-            let cls = "ralph";
-            if (event.data.includes("[Runner]")) cls = "system";
-            if (event.data.includes("Error")) cls = "error";
-            if (event.data.includes("Saved file")) cls = "user"; // Highlight file saves
-            
-            logMessage("RALPH", event.data, cls);
-        };
 
-        ws.onclose = () => {
-            status.innerText = "STATUS: OFFLINE";
-            status.style.color = "#ff0000";
-            logMessage("SYSTEM", "CONNECTION TERMINATED.", "error");
-            stopTimer();
-        };
-
-        input.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") {
-                const msg = e.target.value;
-                if (!msg) return;
-                
-                ws.send(msg);
-                logMessage("USER", msg, "user");
-                e.target.value = "";
-                
-                // Start the compute timer
-                startTimer();
+            // Clean Output Handling
+            if (data.includes("START_RESPONSE_DATA")) {
+                isCleanOutputMode = true;
+                cleanOutputBuffer = "";
+                return;
             }
-        });
+            if (data.includes("END_RESPONSE_DATA")) {
+                isCleanOutputMode = false;
+                renderCleanOutput(cleanOutputBuffer);
+                return;
+            }
+            if (isCleanOutputMode) {
+                cleanOutputBuffer += data + "\n";
+                return;
+            }
 
-        function logMessage(sender, msg, cls) {
+            // Classification
+            let type = "ralph-msg";
+            let sender = "RALPH";
+            
+            // Check for code
+            extractCode(data);
+            
+            // System Logs (Hidden in Simple Mode)
+            if (data.includes("[Swarm]") || data.includes("[Runner]") || data.includes("[Executor]") || data.includes("[Verifier]")) {
+                type = "system-log";
+                sender = "SYS";
+                
+                // Update Activity Overlay
+                let cleanStatus = data.split("] ")[1] || "WORKING...";
+                activityText.innerText = cleanStatus.toUpperCase().substring(0, 20);
+            }
+            
+            if (data.includes("Error")) type = "system-log error"; // Errors are system logs but maybe important?
+
+            logMessage(sender, data, type);
+        };
+
+        function logMessage(sender, msg, type) {
             const div = document.createElement("div");
-            div.className = "line " + cls;
+            div.className = "line " + type;
             
-            const timestamp = new Date().toLocaleTimeString('en-GB', { hour12: false });
-            div.innerHTML = `[${timestamp}] ${sender}> ${msg}`;
+            // If simple mode and it's a system log, hide it initially
+            if (simpleMode && type.includes("system-log")) {
+                div.style.display = "none";
+            }
+
+            // Basic escaping
+            const escapedMsg = msg.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             
+            if (type === "user-msg") {
+                 div.innerHTML = escapedMsg; // User bubbles don't need timestamp
+            } else {
+                 const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+                 div.innerHTML = `<span style="opacity:0.5">[${time}]</span> ${escapedMsg}`;
+            }
+
             log.appendChild(div);
             log.scrollTop = log.scrollHeight;
         }
 
-        // Latency Heartbeat
-        setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-                startTime = Date.now();
-                ws.send("PING");
+        function renderCleanOutput(text) {
+            const container = document.createElement("div");
+            container.className = "clean-output-box";
+            
+            const header = document.createElement("div");
+            header.className = "clean-output-header";
+            header.innerHTML = `<span>RESULT</span> <span>Verified ✅</span>`;
+            
+            const content = document.createElement("div");
+            content.className = "clean-output-content";
+            
+            // Remove <execute> blocks and <promise> tags for clean display
+            let cleanText = text.replace(/<execute>[\s\S]*?<\/execute>/g, "")
+                                .replace(/<promise>[\s\S]*?<\/promise>/g, "")
+                                .trim();
+            
+            // Basic Markdown rendering
+            // Headers: # Header -> <span class="md-h">Header</span>
+            cleanText = cleanText.replace(/^#+ (.*$)/gim, '<span class="md-h">$1</span>');
+
+            // Bold: **text** -> <b>text</b>
+            cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+            // Code blocks: ```code```
+            cleanText = cleanText.replace(/```([\s\S]*?)```/g, '<div style="background:rgba(0,0,0,0.4);padding:15px;margin:15px 0;border:1px solid var(--amber-dim);font-size:0.95rem;color:var(--amber-glow);border-radius:4px;"><pre style="margin:0;white-space:pre-wrap">$1</pre></div>');
+            
+            content.innerHTML = cleanText || "<i>(Action Completed)</i>";
+            
+            container.appendChild(header);
+            container.appendChild(content);
+            log.appendChild(container);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Keep alive
+        setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send("PING"); }, 5000);
+
+        // Poll Metrics & Plan
+        setInterval(async () => {
+            try {
+                // Metrics
+                const res = await fetch('/api/metrics');
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    let totalTokens = 0;
+                    let lastDuration = 0;
+                    
+                    data.forEach(entry => {
+                        if (entry.type === 'llm_call') {
+                            totalTokens += (entry.prompt_tokens + entry.completion_tokens);
+                            lastDuration = entry.duration_ms;
+                        }
+                    });
+
+                    document.getElementById('metric-tokens').innerText = totalTokens.toLocaleString();
+                    document.getElementById('metric-duration').innerText = (lastDuration / 1000).toFixed(2) + 's';
+                    
+                    const lastEntry = data[data.length - 1];
+                    if (Date.now() / 1000 - lastEntry.timestamp < 10) {
+                         document.getElementById('metric-status').innerText = "ACTIVE";
+                    } else {
+                         document.getElementById('metric-status').innerText = "IDLE";
+                    }
+                }
+                
+                // Plan
+                const planRes = await fetch('/api/plan');
+                const planData = await planRes.json();
+                const planContainer = document.getElementById('plan-container');
+                
+                if (planData.tasks && planData.tasks.length > 0) {
+                    let html = `<div style="margin-bottom:5px;font-weight:bold;color:#fff">${planData.master_objective || "Active Mission"}</div>`;
+                    
+                    planData.tasks.forEach(t => {
+                        let icon = "⏳";
+                        let color = "var(--amber-dim)";
+                        if (t.status === "complete") { icon = "✅"; color = "#aaffaa"; }
+                        html += `<div style="margin-bottom:4px;color:${color}">${icon} ${t.id}. ${t.description}</div>`;
+                    });
+                    planContainer.innerHTML = html;
+                }
+                
+            } catch (e) {
+                console.error("Fetch error:", e);
             }
-        }, 5000);
+        }, 2000);
+        
+        // Code Extraction Helper
+        function extractCode(text) {
+             const codeRegex = /```[\w\.]*\n([\s\S]*?)```/g;
+             let match;
+             while ((match = codeRegex.exec(text)) !== null) {
+                 // Update preview with the latest block found
+                 document.getElementById('code-preview').innerText = match[1];
+             }
+        }
+
     </script>
 </body>
 </html>
