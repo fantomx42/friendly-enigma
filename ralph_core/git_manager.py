@@ -1,7 +1,14 @@
 import subprocess
 import os
+import sys
 from typing import Optional, Tuple
-from .agents.common.llm import call_model
+
+# Ensure ralph_core is in path
+_ralph_core_path = os.path.dirname(os.path.abspath(__file__))
+if _ralph_core_path not in sys.path:
+    sys.path.insert(0, _ralph_core_path)
+
+from agents.common.llm import call_model
 
 class GitManager:
     def __init__(self, root_dir: str = "."):

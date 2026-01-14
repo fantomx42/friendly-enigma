@@ -4,13 +4,20 @@ Provides a structured set of safe, importable capabilities for generated code.
 """
 
 import os
+import sys
 import glob
 from typing import List, Dict, Any, Callable
-from .executor import Executor
-from .git_manager import git
-from .web import web
-from .vision import vision
-from .swarm_dispatcher import dispatcher
+
+# Ensure ralph_core is in path
+_ralph_core_path = os.path.dirname(os.path.abspath(__file__))
+if _ralph_core_path not in sys.path:
+    sys.path.insert(0, _ralph_core_path)
+
+from executor import Executor
+from git_manager import git
+from web import web
+from vision import vision
+from swarm_dispatcher import dispatcher
 
 class ToolRegistry:
     def __init__(self):
