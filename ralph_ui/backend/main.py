@@ -4,8 +4,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
 import os
+import sys
 import asyncio
 import subprocess
+import json
 
 app = FastAPI()
 
@@ -23,12 +25,46 @@ ROOT_DIR = os.path.join(BASE_DIR, "../..")
 FRONTEND_DIR = os.path.join(BASE_DIR, "../frontend")
 LOG_FILE = os.path.join(ROOT_DIR, "ralph.log")
 SCRIPT_PATH = os.path.join(ROOT_DIR, "ralph_loop.sh")
+METRICS_FILE = os.path.join(ROOT_DIR, "metrics.jsonl")
+PLAN_FILE = os.path.join(ROOT_DIR, "RALPH_PLAN.json")
+
+# Ensure ralph_core is importable if needed, but we can read the file directly
+sys.path.append(ROOT_DIR)
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 @app.get("/")
 async def read_root():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Returns the last 100 metrics."""
+    metrics = []
+    if os.path.exists(METRICS_FILE):
+        try:
+            with open(METRICS_FILE, "r") as f:
+                lines = f.readlines()
+                # Get last 100 lines
+                for line in lines[-100:]:
+                    try:
+                        metrics.append(json.loads(line))
+                    except:
+                        pass
+        except Exception as e:
+            return {"error": str(e)}
+    return metrics
+
+@app.get("/api/plan")
+async def get_plan():
+    """Returns the current task plan."""
+    if os.path.exists(PLAN_FILE):
+        try:
+            with open(PLAN_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            return {"error": str(e)}
+    return {"tasks": []}
 
 async def stream_logs(websocket: WebSocket):
     """
