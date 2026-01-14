@@ -1,0 +1,42 @@
+# Ralph AI Code Owners
+# These owners will be automatically requested for review when PRs modify these paths
+
+# Default owner for everything
+*                           @fantomx42
+
+# Core System Architecture
+/ralph_core/runner.py       @fantomx42
+/ralph_core/executor.py     @fantomx42
+/ralph_core/swarm.py        @fantomx42
+
+# Agent Framework
+/ralph_core/agents/         @fantomx42
+
+# ASIC System (critical component)
+/ralph_core/asic/           @fantomx42
+
+# Message Bus & Protocols (critical)
+/ralph_core/protocols/      @fantomx42
+
+# Memory & Vector DB
+/ralph_core/memory.py       @fantomx42
+/ralph_core/vector_db.py    @fantomx42
+
+# Security-sensitive files
+/ralph_core/executor.py     @fantomx42
+/sandbox/                   @fantomx42
+/.github/workflows/         @fantomx42
+/SECURITY.md                @fantomx42
+
+# Documentation (require review for consistency)
+/README.md                  @fantomx42
+/CONTRIBUTING.md            @fantomx42
+/CODE_OF_CONDUCT.md         @fantomx42
+
+# Configuration & Scripts
+/ralph_loop.sh              @fantomx42
+/ralph_daemon.py            @fantomx42
+/.github/                   @fantomx42
+
+# Web UI
+/ralph_ui/                  @fantomx42

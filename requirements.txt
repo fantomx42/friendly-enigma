@@ -1,0 +1,39 @@
+# Ralph AI - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core Dependencies
+requests>=2.31.0          # HTTP requests for Ollama API
+pydantic>=2.5.0           # Data validation and settings
+python-dotenv>=1.0.0      # Environment variable management
+
+# LLM Integration
+ollama>=0.1.0             # Ollama Python client
+
+# Vector Database
+chromadb>=0.4.22          # Vector database for memory
+sentence-transformers>=2.2.2  # For embeddings (if not using Ollama)
+
+# Web UI
+fastapi>=0.109.0          # Web framework for UI backend
+uvicorn[standard]>=0.27.0 # ASGI server for FastAPI
+websockets>=12.0          # WebSocket support for real-time UI
+
+# Voice Interface (optional)
+# Uncomment if using voice features:
+# SpeechRecognition>=3.10.0
+# pyaudio>=0.2.13
+# pyttsx3>=2.90
+
+# Vision (optional)
+# Uncomment if using vision features:
+# Pillow>=10.2.0
+
+# Development Dependencies (optional)
+# Uncomment for development:
+# black>=24.1.0           # Code formatting
+# isort>=5.13.0           # Import sorting
+# flake8>=7.0.0           # Linting
+# pylint>=3.0.0           # Advanced linting
+# mypy>=1.8.0             # Type checking
+# pytest>=8.0.0           # Testing framework
+# pytest-cov>=4.1.0       # Test coverage

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/fantomx42/friendly-enigma/discussions
+    about: Ask questions, share ideas, and discuss Ralph AI
+  - name: Documentation
+    url: https://github.com/fantomx42/friendly-enigma#readme
+    about: Read the full documentation and usage guides
