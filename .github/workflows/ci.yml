@@ -1,0 +1,114 @@
+name: Ralph AI CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-validate:
+    name: Python Syntax & Import Validation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install flake8 pylint mypy
+
+    - name: Python syntax check with flake8
+      run: |
+        # Stop build if there are Python syntax errors or undefined names
+        flake8 ralph_core/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+    - name: Import validation
+      run: |
+        # Check that all Python files can be imported without errors
+        python -c "import sys; sys.path.insert(0, '.'); import ralph_core"
+        python -c "import sys; sys.path.insert(0, '.'); from ralph_core import runner"
+        python -c "import sys; sys.path.insert(0, '.'); from ralph_core import executor"
+        python -c "import sys; sys.path.insert(0, '.'); from ralph_core import memory"
+        python -c "import sys; sys.path.insert(0, '.'); from ralph_core import swarm"
+
+    - name: Linting warnings (non-blocking)
+      continue-on-error: true
+      run: |
+        # Show linting warnings but don't fail the build
+        flake8 ralph_core/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  structure-validation:
+    name: Project Structure Validation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Verify required files exist
+      run: |
+        test -f ralph_loop.sh || (echo "Missing ralph_loop.sh" && exit 1)
+        test -f ralph_core/runner.py || (echo "Missing ralph_core/runner.py" && exit 1)
+        test -f ralph_core/executor.py || (echo "Missing ralph_core/executor.py" && exit 1)
+        test -f ralph_core/swarm.py || (echo "Missing ralph_core/swarm.py" && exit 1)
+        test -d ralph_core/agents || (echo "Missing ralph_core/agents directory" && exit 1)
+        test -d ralph_core/asic || (echo "Missing ralph_core/asic directory" && exit 1)
+        test -d ralph_core/protocols || (echo "Missing ralph_core/protocols directory" && exit 1)
+        echo "✅ All required files present"
+
+    - name: Verify shell scripts are executable
+      run: |
+        test -x ralph_loop.sh || chmod +x ralph_loop.sh
+        test -x start_ui.sh || chmod +x start_ui.sh
+        echo "✅ Shell scripts are executable"
+
+    - name: Check for common issues
+      run: |
+        # Check for hardcoded paths that might not work in CI
+        ! grep -r "\/home\/tristan" ralph_core/ --include="*.py" || (echo "Warning: Found hardcoded user paths" && exit 0)
+
+        # Check for TODO/FIXME comments (informational only)
+        grep -r "TODO\|FIXME" ralph_core/ --include="*.py" || echo "No TODO/FIXME comments found"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

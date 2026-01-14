@@ -1,0 +1,162 @@
+name: ASIC Specialist Proposal
+description: Propose a new ASIC specialist for the Ralph AI system
+title: "[ASIC]: "
+labels: ["asic", "enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose a new ASIC specialist! ASICs are ultra-small, specialized models (1.1b-1.5b parameters) for micro-tasks.
+
+        **Current ASICs:**
+        - `regex_parser` - Pattern matching & extraction
+        - `json_validator` - JSON schema validation
+        - `sql_query` - Database query generation
+        - `test_generator` - Unit test creation
+        - `fix_typo` - Quick typo corrections
+        - `docstring` - Documentation generation
+        - `log_parser` - Log analysis
+        - `error_classifier` - Error categorization
+        - `import_fixer` - Import statement repair
+        - `linter_suggestion` - Code style fixes
+
+  - type: input
+    id: asic-name
+    attributes:
+      label: ASIC Name
+      description: Proposed name for the ASIC (snake_case)
+      placeholder: e.g., yaml_validator, git_commit_msg
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: What specific micro-task does this ASIC solve?
+      placeholder: A concise, single-purpose task description
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model
+    attributes:
+      label: Recommended Model
+      description: Which small model should power this ASIC?
+      options:
+        - tinyllama:1.1b (637MB) - Ultra-fast, basic tasks
+        - deepseek-coder:1.3b (776MB) - Code-focused
+        - qwen2.5-coder:1.5b (986MB) - Advanced code tasks
+        - Other (specify in details)
+    validations:
+      required: true
+
+  - type: textarea
+    id: input-format
+    attributes:
+      label: Input Format
+      description: What inputs does this ASIC accept?
+      placeholder: |
+        Example:
+        {
+          "text": "raw input text",
+          "context": "optional context"
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: output-format
+    attributes:
+      label: Output Format
+      description: What output does this ASIC produce?
+      placeholder: |
+        Example:
+        {
+          "valid": true,
+          "parsed_data": {...}
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: When would this ASIC be invoked?
+      placeholder: |
+        1. Engineer agent generates YAML config
+        2. ASIC validates YAML syntax
+        3. Returns validation result to Designer
+    validations:
+      required: true
+
+  - type: textarea
+    id: differentiation
+    attributes:
+      label: Why Not Use Existing Agents?
+      description: Why can't the Engineer/Designer/Orchestrator handle this?
+      placeholder: Explain why this needs to be a specialized ASIC
+    validations:
+      required: true
+
+  - type: input
+    id: response-time
+    attributes:
+      label: Target Response Time
+      description: Expected max execution time
+      placeholder: e.g., <1s, <500ms
+    validations:
+      required: true
+
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration Points
+      description: Which agents would invoke this ASIC?
+      placeholder: |
+        - Engineer: after generating config files
+        - Designer: during validation phase
+    validations:
+      required: true
+
+  - type: textarea
+    id: prompt-template
+    attributes:
+      label: Prompt Template Draft
+      description: Initial prompt template for the ASIC
+      render: markdown
+      placeholder: |
+        You are a specialized ASIC for [task]. Given [input], output [format].
+        Be concise and fast.
+
+  - type: checkboxes
+    id: criteria
+    attributes:
+      label: ASIC Design Criteria
+      description: Ensure your proposal meets these criteria
+      options:
+        - label: Single, well-defined purpose (no multi-tasking)
+          required: true
+        - label: Response time target is <2 seconds
+          required: true
+        - label: Does not duplicate existing ASIC functionality
+          required: true
+        - label: Solves a frequent, repetitive micro-task
+          required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I can implement this ASIC and submit a PR
+          required: false
+        - label: I can provide test cases for validation
+          required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other relevant information
