@@ -1,0 +1,30 @@
+{
+  "master_objective": "Create a Python function that validates email addresses using regex",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Research and define the regex pattern for validating email addresses.",
+      "status": "pending"
+    },
+    {
+      "id": 2,
+      "description": "Write the Python function to validate an email using the regex pattern.",
+      "status": "pending"
+    },
+    {
+      "id": 3,
+      "description": "Create a helper function to compile the regex pattern for efficiency.",
+      "status": "pending"
+    },
+    {
+      "id": 4,
+      "description": "Implement input validation within the function.",
+      "status": "pending"
+    },
+    {
+      "id": 5,
+      "description": "Add test cases for common valid and invalid email formats.",
+      "status": "pending"
+    }
+  ]
+}
