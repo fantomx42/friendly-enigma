@@ -60,6 +60,15 @@ from compressor import compress_history
 
 from git_manager import git
 
+# Security Checkpoint - all outputs must pass through here
+try:
+    from security import checkpoint, is_safe_to_output, Decision
+    SECURITY_ENABLED = True
+except ImportError:
+    SECURITY_ENABLED = False
+    checkpoint = None
+    is_safe_to_output = lambda c, t: (True, "Security not available")
+
 # V2 Mode flag
 USE_V2 = os.environ.get("RALPH_V2", "0") == "1" and V2_AVAILABLE
 
@@ -109,6 +118,13 @@ def save_code_to_disk(text):
 
             continue
 
+        # Security Checkpoint: Validate file write before proceeding
+        if SECURITY_ENABLED:
+            safe, reason = is_safe_to_output(content, "file")
+            if not safe:
+                print(f"[Security] BLOCKED file write to {filename}: {reason}")
+                continue
+
         try:
 
             directory = os.path.dirname(filename)
@@ -138,6 +154,7 @@ def run_commands(text):
     """
 
     Extracts and runs commands from <execute>command</execute> tags.
+    All commands pass through Security Checkpoint before execution.
 
     """
 
@@ -147,13 +164,22 @@ def run_commands(text):
 
     commands = re.findall(pattern, text, re.DOTALL)
 
-    
+
 
     results = []
 
     for cmd in commands:
+        cmd = cmd.strip()
 
-        res = executor.run(cmd.strip())
+        # Security Checkpoint: Validate shell command before execution
+        if SECURITY_ENABLED:
+            safe, reason = is_safe_to_output(cmd, "shell")
+            if not safe:
+                print(f"[Security] BLOCKED command: {reason}")
+                results.append({"blocked": True, "reason": reason, "command": cmd})
+                continue
+
+        res = executor.run(cmd)
 
         results.append(res)
 
