@@ -49,6 +49,7 @@ except ImportError:
     list_available_asics = lambda: []
 
 from memory import Memory
+from forklift import Forklift, forklift_lift_sync, format_forklift_context
 
 from executor import Executor
 
@@ -668,73 +669,46 @@ def main():
 
 
     try:
-
         files = os.listdir(".")
 
-        memory_state = brain.retrieve_full_state()
-
-        
-
-        # Semantic Recall
-
-        semantic_context = brain.recall_similar(current_objective)
-
-        
+        # --- FORKLIFT PROTOCOL: Selective Memory Loading ---
+        # Replaces the old retrieve_full_state() dump with intelligent selection
+        forklift = Forklift(brain)
+        memories = forklift.lift(
+            objective=current_objective,
+            task_type="code",  # Default; could be inferred from task_spec
+            scope="standard",
+        )
+        print(f"[Forklift] Loaded {len(memories['lessons'])} lessons, {len(memories['facts'])} facts")
 
         # --- SELF-HEALING / DEBUGGER ---
-
         diagnosis_context = ""
-
         if int(iteration) > 1:
-
-             last_err, last_code = extract_last_failure("RALPH_PROGRESS.md")
-
-             if last_err:
-
-                 print("[Swarm] Detecting failure. Invoking Debugger...")
-
-                 diagnosis = diagnose(last_err, last_code)
-
-                 diagnosis_context = f"=== DEBUGGER DIAGNOSIS ===\n{diagnosis}\n"
-
-                 print(f"[Debugger] Diagnosis: {diagnosis[:100]}...")
-
-
+            last_err, last_code = extract_last_failure("RALPH_PROGRESS.md")
+            if last_err:
+                print("[Swarm] Detecting failure. Invoking Debugger...")
+                diagnosis = diagnose(last_err, last_code)
+                diagnosis_context = f"=== DEBUGGER DIAGNOSIS ===\n{diagnosis}\n"
+                print(f"[Debugger] Diagnosis: {diagnosis[:100]}...")
 
         # Read Project Docs for Context
-
         project_context = ""
-
         for doc in ["STATUS.md", "MISSION.md"]:
-
             if os.path.exists(doc):
-
                 with open(doc, 'r') as f:
-
                     project_context += f"\n--- {doc} ---\n{f.read()}\n"
 
-
-
-        context = (
-
-            f"Current Directory Files: {files}\n"
-
-            f"Iteration: {iteration}\n"
-
-            f"--- PLAN STATUS ---\n{plan_summary}\n"
-
-            f"{project_context}\n"
-
-            f"{memory_state}\n"
-
-            f"{semantic_context}\n"
-
-            f"{diagnosis_context}"
-
+        # --- FORMAT CONTEXT using Forklift output ---
+        context = format_forklift_context(
+            memories=memories,
+            files=files,
+            iteration=iteration,
+            plan_summary=plan_summary,
+            project_context=project_context,
+            diagnosis_context=diagnosis_context,
         )
 
     except Exception as e:
-
         context = f"Error reading state: {e}"
 
 

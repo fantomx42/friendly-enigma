@@ -45,6 +45,10 @@ class MessageType(Enum):
     # Orchestrator → Any
     ABORT = "abort"                      # Cancel current work
 
+    # Forklift Protocol (Memory → Agents)
+    FORKLIFT_REQUEST = "forklift_request"    # Request relevant memories for a task
+    FORKLIFT_RESPONSE = "forklift_response"  # Structured memory payload
+
 
 @dataclass
 class Message:
@@ -286,5 +290,76 @@ def asic_response(
             "options": options,
             "num_options": len(options),
             "model_used": model_used,
+        }
+    )
+
+
+# ============================================
+# Forklift Protocol Message Constructors
+# ============================================
+
+def forklift_request(
+    objective: str,
+    task_type: str = "code",
+    requester: str = "engineer",
+    scope: str = "standard",
+    hints: list[str] = None,
+) -> Message:
+    """
+    Create a FORKLIFT_REQUEST message to retrieve relevant memories.
+
+    Args:
+        objective: The task/objective to find memories for
+        task_type: Type of task (code, test, fix, regex, etc.)
+        requester: Agent requesting the memories
+        scope: Retrieval scope - "minimal", "standard", or "comprehensive"
+        hints: Optional tags/files the requester knows are relevant
+
+    Returns:
+        Message to send to Forklift handler
+    """
+    return Message(
+        type=MessageType.FORKLIFT_REQUEST,
+        sender=requester,
+        receiver="forklift",
+        payload={
+            "objective": objective,
+            "task_type": task_type,
+            "requester": requester,
+            "scope": scope,
+            "hints": hints or [],
+        }
+    )
+
+
+def forklift_response(
+    memories: dict,
+    scores: dict,
+    retrieval_time_ms: int,
+    requester: str,
+    truncated: bool = False,
+) -> Message:
+    """
+    Create a FORKLIFT_RESPONSE message with retrieved memories.
+
+    Args:
+        memories: Dict with lessons, facts, context, files
+        scores: Relevance scores by category
+        retrieval_time_ms: How long retrieval took
+        requester: Agent to send response to
+        truncated: Whether results were truncated
+
+    Returns:
+        Message with structured memory payload
+    """
+    return Message(
+        type=MessageType.FORKLIFT_RESPONSE,
+        sender="forklift",
+        receiver=requester,
+        payload={
+            "memories": memories,
+            "scores": scores,
+            "retrieval_time_ms": retrieval_time_ms,
+            "truncated": truncated,
         }
     )
