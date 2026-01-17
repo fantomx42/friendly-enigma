@@ -277,27 +277,28 @@ GATE IN ──► WAREHOUSE ──► FORKLIFT ──► PROCESSING PLANT ◄═
 | Gate IN (API) | ✅ Done | `ralph_ui/backend/main.py` |
 | Gate IN (Chrome) | 🔄 Partial | MCP integration |
 | Warehouse | ✅ Done | `memory.py`, `vector_db.py` |
-| Forklift Transfer | 🔄 Partial | Memory handlers |
+| Forklift Transfer | ✅ Done | `forklift.py` |
 | Processing Plant | ✅ Done | `asic/` directory |
 | ASIC Bus | ✅ Done | `protocols/messages.py` |
 | HQ Skyscraper | ✅ Done | `agents/` directory |
 | Air Tube System | ✅ Done | `protocols/bus.py` |
 | Ground Connection | ✅ Done | Message routing |
 | R&D Building | 🔄 Partial | `dreamer.py`, `agents/reflector/` |
-| Security Checkpoint | ❌ TODO | Need to implement |
-| Gate OUT | 🔄 Partial | Basic outputs work |
+| Security Checkpoint | ✅ Done | `security/` directory |
+| Gate OUT | ✅ Done | `security/gate_out.py` |
 
 ---
 
 ## Next Steps
 
-1. **Implement Security Checkpoint** - Create validation layer before Gate OUT
-2. **Formalize Forklift Protocol** - Explicit data transfer between Warehouse ↔ Processing
+1. ~~**Implement Security Checkpoint**~~ ✅ Done (2026-01-16)
+2. ~~**Formalize Forklift Protocol**~~ ✅ Done (2026-01-16)
 3. **Complete R&D Building** - Connect Dreamer and Reflector to main loop
-4. **Add Gate IN handlers** - Unified input interface for all modalities
-5. **Add Gate OUT handlers** - Unified output interface with security
+4. **Unify Gate IN** - Single entry point for all input modalities (CLI, voice, API, Chrome)
+5. **Chrome MCP Integration** - Complete browser automation via MCP tools
 
 ---
 
 *Architecture designed: 2026-01-14*
+*Last updated: 2026-01-16*
 *This is the target architecture for Ralph AI v2.0*
