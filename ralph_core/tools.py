@@ -1,11 +1,12 @@
 """
 tools.py - The Tool Registry for Ralph.
 Provides a structured set of safe, importable capabilities for generated code.
+
+This module wraps the enhanced tools/ package for backward compatibility.
 """
 
 import os
 import sys
-import glob
 from typing import List, Dict, Any, Callable
 
 # Ensure ralph_core is in path
@@ -17,48 +18,224 @@ from executor import Executor
 from git_manager import git
 from web import web
 from vision import vision
-from swarm_dispatcher import dispatcher
+from swarm_dispatcher import dispatcher as swarm_dispatcher
 from memory import Memory
 
+# Import enhanced registry components
+from tool_system import (
+    enhanced_registry, ToolCategory, SideEffect, PermissionLevel,
+    dispatch_tool, TOOL_HANDLERS
+)
+
+
 class ToolRegistry:
+    """
+    Backward-compatible Tool Registry.
+
+    Registers tools in both the legacy format and the enhanced registry
+    for full compatibility with existing code and new tool protocol.
+    """
+
     def __init__(self):
         self._tools: Dict[str, Callable] = {}
         self._descriptions: Dict[str, str] = {}
         self.executor = Executor()
         self.memory = Memory()
 
-        # Register core tools
-        self.register("read_file", self.read_file, "Reads content of a file.")
-        self.register("write_file", self.write_file, "Writes content to a file.")
-        self.register("list_dir", self.list_dir, "Lists files in a directory.")
-        self.register("run_shell", self.run_shell, "Executes a shell command.")
+        # Reference to enhanced registry
+        self._enhanced = enhanced_registry
 
-        # Register Memory tools (for persistent knowledge)
-        self.register("memory_save", self.memory.save, "Saves a fact to memory. Args: fact (str), tag (str, optional)")
-        self.register("memory_get", self.memory.get, "Retrieves facts by tag. Args: tag (str)")
-        self.register("memory_search", self.memory.search, "Semantic search for similar facts. Args: query (str)")
-        self.register("memory_remember", self.memory.remember, "Saves a fact with tag. Args: fact (str), tag (str)")
-        self.register("memory_recall", self.memory.recall, "Retrieves facts by tag. Args: tag (str)")
+        # Register core tools with full metadata
+        self._register_core_tools()
+        self._register_memory_tools()
+        self._register_git_tools()
+        self._register_web_tools()
+        self._register_vision_tools()
+        self._register_swarm_tools()
 
-        # Register Git tools
-        self.register("git_commit", git.commit_all, "Stages and commits all changes.")
-        self.register("git_branch", git.create_branch, "Creates a new branch.")
-        self.register("git_revert", git.revert_last_commit, "Reverts the last commit.")
+    def _register_core_tools(self):
+        """Register file and shell tools with full metadata."""
+        # read_file - safe read operation
+        self._register_enhanced(
+            name="read_file",
+            func=self.read_file,
+            description="Reads content of a file.",
+            category=ToolCategory.FILE_READ,
+            side_effects=[SideEffect.NONE],
+            permission_level=PermissionLevel.ALLOW,
+        )
 
-        # Register Web tools
-        self.register("web_search", web.search, "Searches the web for a query.")
-        self.register("read_url", web.fetch_page, "Reads the content of a URL.")
+        # write_file - modifies filesystem
+        self._register_enhanced(
+            name="write_file",
+            func=self.write_file,
+            description="Writes content to a file.",
+            category=ToolCategory.FILE_WRITE,
+            side_effects=[SideEffect.FILE_CREATE, SideEffect.FILE_MODIFY],
+            permission_level=PermissionLevel.WARN,
+        )
 
-        # Register Vision tools
-        self.register("analyze_image", vision.analyze_image, "Analyzes an image file. Args: image_path, prompt")
+        # list_dir - safe read operation
+        self._register_enhanced(
+            name="list_dir",
+            func=self.list_dir,
+            description="Lists files in a directory.",
+            category=ToolCategory.FILE_READ,
+            side_effects=[SideEffect.NONE],
+            permission_level=PermissionLevel.ALLOW,
+        )
 
-        # Register Swarm tools
-        self.register("dispatch_swarm", dispatcher.dispatch, "Spawns parallel Ralph instances for subtasks. Args: [list_of_tasks]")
+        # run_shell - spawns subprocess
+        self._register_enhanced(
+            name="run_shell",
+            func=self.run_shell,
+            description="Executes a shell command.",
+            category=ToolCategory.SHELL,
+            side_effects=[SideEffect.PROCESS],
+            permission_level=PermissionLevel.WARN,
+        )
 
-    def register(self, name: str, func: Callable, description: str):
-        """Registers a new tool function."""
+    def _register_memory_tools(self):
+        """Register memory tools."""
+        self._register_enhanced(
+            name="memory_save",
+            func=self.memory.save,
+            description="Saves a fact to memory. Args: fact (str), tag (str, optional)",
+            category=ToolCategory.MEMORY,
+            side_effects=[SideEffect.STATE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+        self._register_enhanced(
+            name="memory_get",
+            func=self.memory.get,
+            description="Retrieves facts by tag. Args: tag (str)",
+            category=ToolCategory.MEMORY,
+            side_effects=[SideEffect.NONE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+        self._register_enhanced(
+            name="memory_search",
+            func=self.memory.search,
+            description="Semantic search for similar facts. Args: query (str)",
+            category=ToolCategory.MEMORY,
+            side_effects=[SideEffect.NONE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+        self._register_enhanced(
+            name="memory_remember",
+            func=self.memory.remember,
+            description="Saves a fact with tag. Args: fact (str), tag (str)",
+            category=ToolCategory.MEMORY,
+            side_effects=[SideEffect.STATE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+        self._register_enhanced(
+            name="memory_recall",
+            func=self.memory.recall,
+            description="Retrieves facts by tag. Args: tag (str)",
+            category=ToolCategory.MEMORY,
+            side_effects=[SideEffect.NONE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+
+    def _register_git_tools(self):
+        """Register git tools."""
+        self._register_enhanced(
+            name="git_commit",
+            func=git.commit_all,
+            description="Stages and commits all changes.",
+            category=ToolCategory.GIT,
+            side_effects=[SideEffect.STATE],
+            permission_level=PermissionLevel.WARN,
+        )
+        self._register_enhanced(
+            name="git_branch",
+            func=git.create_branch,
+            description="Creates a new branch.",
+            category=ToolCategory.GIT,
+            side_effects=[SideEffect.STATE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+        self._register_enhanced(
+            name="git_revert",
+            func=git.revert_last_commit,
+            description="Reverts the last commit.",
+            category=ToolCategory.GIT,
+            side_effects=[SideEffect.STATE],
+            permission_level=PermissionLevel.ASK,
+        )
+
+    def _register_web_tools(self):
+        """Register web tools."""
+        self._register_enhanced(
+            name="web_search",
+            func=web.search,
+            description="Searches the web for a query.",
+            category=ToolCategory.WEB,
+            side_effects=[SideEffect.NETWORK],
+            permission_level=PermissionLevel.ALLOW,
+        )
+        self._register_enhanced(
+            name="read_url",
+            func=web.fetch_page,
+            description="Reads the content of a URL.",
+            category=ToolCategory.WEB,
+            side_effects=[SideEffect.NETWORK],
+            permission_level=PermissionLevel.ALLOW,
+        )
+
+    def _register_vision_tools(self):
+        """Register vision tools."""
+        self._register_enhanced(
+            name="analyze_image",
+            func=vision.analyze_image,
+            description="Analyzes an image file. Args: image_path, prompt",
+            category=ToolCategory.VISION,
+            side_effects=[SideEffect.NONE],
+            permission_level=PermissionLevel.ALLOW,
+        )
+
+    def _register_swarm_tools(self):
+        """Register swarm tools."""
+        self._register_enhanced(
+            name="dispatch_swarm",
+            func=swarm_dispatcher.dispatch,
+            description="Spawns parallel Ralph instances for subtasks. Args: [list_of_tasks]",
+            category=ToolCategory.SWARM,
+            side_effects=[SideEffect.PROCESS],
+            permission_level=PermissionLevel.ASK,
+        )
+
+    def _register_enhanced(
+        self,
+        name: str,
+        func: Callable,
+        description: str,
+        category: ToolCategory,
+        side_effects: List[SideEffect],
+        permission_level: PermissionLevel,
+    ):
+        """Register a tool in both legacy and enhanced registries."""
+        # Legacy registration
         self._tools[name] = func
         self._descriptions[name] = description
+
+        # Enhanced registration
+        self._enhanced.register(
+            name=name,
+            func=func,
+            description=description,
+            category=category,
+            side_effects=side_effects,
+            permission_level=permission_level,
+        )
+
+    def register(self, name: str, func: Callable, description: str):
+        """Registers a new tool function (legacy interface)."""
+        self._tools[name] = func
+        self._descriptions[name] = description
+        # Also register in enhanced registry with defaults
+        self._enhanced.register(name, func, description)
 
     def get_tool(self, name: str) -> Callable:
         """Retrieves a tool by name."""
@@ -67,6 +244,10 @@ class ToolRegistry:
     def list_tools(self) -> str:
         """Returns a formatted list of available tools."""
         return "\n".join([f"- {name}: {desc}" for name, desc in self._descriptions.items()])
+
+    def list_tools_for_prompt(self) -> str:
+        """Returns tool descriptions formatted for LLM prompts."""
+        return self._enhanced.list_tools_for_prompt()
 
     # --- Core Tool Implementations ---
 
@@ -106,6 +287,7 @@ class ToolRegistry:
 
     def run_shell(self, command: str) -> Dict[str, Any]:
         return self.executor.run(command)
+
 
 # Global Instance
 registry = ToolRegistry()

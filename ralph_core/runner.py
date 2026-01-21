@@ -301,6 +301,14 @@ def run_v2_pipeline(objective: str, context: str, plan_summary: str, brain: "Mem
         AGENT_HANDLERS.update(ASIC_HANDLERS)
         print(f"[V2] Registered {len(ASIC_HANDLERS)} ASIC handlers: {list(ASIC_HANDLERS.keys())}")
 
+    # Add Tool handlers for secure tool execution
+    try:
+        from tool_system import TOOL_HANDLERS
+        AGENT_HANDLERS.update(TOOL_HANDLERS)
+        print(f"[V2] Registered tool dispatcher handler")
+    except ImportError:
+        print(f"[V2] Tool dispatcher not available")
+
     # Create initial WORK_REQUEST from Orchestrator → Engineer
     if create_work_request and bus:
         initial_msg = create_work_request(

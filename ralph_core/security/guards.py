@@ -24,6 +24,7 @@ class OutputType(Enum):
     VOICE = "voice"
     SHELL = "shell"
     GIT = "git"
+    TOOL = "tool"  # Tool invocation through dispatcher
 
 
 class Permission(Enum):

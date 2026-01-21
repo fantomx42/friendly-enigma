@@ -41,6 +41,7 @@ class MessageBus:
             "engineer": deque(),
             "designer": deque(),
             "system": deque(),
+            "tool_dispatcher": deque(),  # Tool execution handler
         }
 
         # Full message history

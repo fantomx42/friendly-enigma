@@ -49,6 +49,11 @@ class MessageType(Enum):
     FORKLIFT_REQUEST = "forklift_request"    # Request relevant memories for a task
     FORKLIFT_RESPONSE = "forklift_response"  # Structured memory payload
 
+    # Tool Protocol (Agent → Tool Dispatcher)
+    TOOL_REQUEST = "tool_request"      # Agent requests tool execution
+    TOOL_RESPONSE = "tool_response"    # Tool execution result
+    TOOL_CONFIRM = "tool_confirm"      # User confirmation for dangerous tools
+
 
 @dataclass
 class Message:
