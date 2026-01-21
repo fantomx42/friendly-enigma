@@ -10,4 +10,4 @@ async def test_websocket():
         print("Test passed!")
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(test_websocket())
+    asyncio.run(test_websocket())

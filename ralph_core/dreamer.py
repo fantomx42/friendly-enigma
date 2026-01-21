@@ -1,4 +1,4 @@
-from .agents.common.llm import call_model
+from agents.common.llm import call_model
 import json
 import random
 

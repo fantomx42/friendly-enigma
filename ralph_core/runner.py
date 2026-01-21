@@ -17,7 +17,8 @@ import re
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Core swarm functions (legacy)
-from swarm import think, code, review, verify, reflect, decompose, diagnose
+from swarm import think, code, review, verify, reflect, decompose, diagnose, estimate_task
+# Note: generate_dream is used by ralph_daemon.py, not here
 
 # New V2 components
 try:
@@ -585,9 +586,26 @@ def main():
         
 
         if tasks:
+            # --- ESTIMATOR: Prioritize tasks by expected value ---
+            if len(tasks) > 1:
+                print(f"[Estimator] Analyzing {len(tasks)} tasks for prioritization...")
+                prioritized = []
+                for task in tasks:
+                    try:
+                        est = estimate_task(task)
+                        expected_value = est["value"] * est["probability"]
+                        prioritized.append((task, expected_value, est))
+                        print(f"  - [{expected_value:.1f}] {task[:50]}...")
+                    except Exception as e:
+                        print(f"  - [ERR] {task[:50]}... ({e})")
+                        prioritized.append((task, 5.0, {"value": 5, "probability": 1.0}))
+
+                # Sort by expected value (highest first)
+                prioritized.sort(key=lambda x: x[1], reverse=True)
+                tasks = [t[0] for t in prioritized]
+                print(f"[Estimator] Tasks reordered by priority")
 
             plan_mgr.set_tasks(tasks)
-
             print(f"[Planner] Created Plan with {len(tasks)} steps.")
 
         else:
