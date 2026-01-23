@@ -31,6 +31,7 @@ class ForkliftConfig:
     """Configuration for Forklift retrieval."""
     max_lessons: int = 5
     max_facts: int = 3
+    max_guidelines: int = 3  # NEW: Synthesized meta-rules from REM Sleep
     similarity_threshold: float = 0.6
     include_context_keys: list = field(default_factory=list)
 
@@ -40,16 +41,19 @@ SCOPE_CONFIGS = {
     "minimal": ForkliftConfig(
         max_lessons=2,
         max_facts=1,
+        max_guidelines=1,
         similarity_threshold=0.7,
     ),
     "standard": ForkliftConfig(
         max_lessons=5,
         max_facts=3,
+        max_guidelines=3,
         similarity_threshold=0.6,
     ),
     "comprehensive": ForkliftConfig(
         max_lessons=10,
         max_facts=5,
+        max_guidelines=5,
         similarity_threshold=0.4,
     ),
 }
@@ -112,12 +116,16 @@ class Forklift:
         result = {
             "lessons": [],
             "facts": [],
+            "guidelines": [],  # NEW: Meta-rules from REM Sleep consolidation
             "context": {},
             "files": [],
         }
 
         # 1. Semantic search for relevant lessons
         result["lessons"] = self._get_relevant_lessons(objective, config)
+
+        # 1b. NEW: Get relevant guidelines (higher-level rules from REM Sleep)
+        result["guidelines"] = self._get_relevant_guidelines(objective, config)
 
         # 2. Get facts by relevant tags
         relevant_tags = TASK_MEMORY_MAP.get(task_type, TASK_MEMORY_MAP["general"])
@@ -146,12 +154,52 @@ class Forklift:
             score = r.get("score", 0)
             if score >= config.similarity_threshold:
                 doc = r.get("document", {})
+                # Skip guidelines (handled separately)
+                if doc.get("metadata", {}).get("tag") == "guideline":
+                    continue
                 lessons.append({
                     "text": doc.get("text", ""),
                     "score": round(score, 3),
                     "tag": doc.get("metadata", {}).get("tag", "unknown"),
                 })
         return lessons
+
+    def _get_relevant_guidelines(self, objective: str, config: ForkliftConfig) -> list:
+        """
+        Retrieve semantically similar guidelines from vector DB.
+
+        Guidelines are meta-rules synthesized from lesson clusters during
+        REM Sleep consolidation. They are higher-level than individual lessons.
+        """
+        try:
+            # Search more broadly since guidelines are more general
+            results = vector_memory.search(objective, top_k=config.max_guidelines * 2)
+        except Exception:
+            return []
+
+        guidelines = []
+        for r in results:
+            score = r.get("score", 0)
+            # Slightly lower threshold for guidelines since they're more general
+            if score >= config.similarity_threshold - 0.1:
+                doc = r.get("document", {})
+                metadata = doc.get("metadata", {})
+
+                # Only include actual guidelines
+                if metadata.get("tag") != "guideline":
+                    continue
+
+                guidelines.append({
+                    "text": doc.get("text", ""),
+                    "score": round(score, 3),
+                    "category": metadata.get("category", "General"),
+                    "confidence": metadata.get("confidence", 0.8),
+                })
+
+                if len(guidelines) >= config.max_guidelines:
+                    break
+
+        return guidelines
 
     def _get_facts_by_tags(self, tags: list, config: ForkliftConfig) -> list:
         """Retrieve facts from memory/*.md files by relevant tags."""
@@ -298,6 +346,14 @@ def format_forklift_context(
         parts.append(project_context)
 
     # Forklift-loaded memories
+    # Guidelines first (higher priority - synthesized meta-rules)
+    if memories.get("guidelines"):
+        guidelines_str = "\n".join(
+            f"- [{g['score']:.2f}] [{g['category']}] {g['text']}"
+            for g in memories["guidelines"]
+        )
+        parts.append(f"--- GUIDELINES (Meta-Rules) ---\n{guidelines_str}")
+
     if memories.get("lessons"):
         lessons_str = "\n".join(
             f"- [{l['score']:.2f}] {l['text']} (Tag: {l['tag']})"
