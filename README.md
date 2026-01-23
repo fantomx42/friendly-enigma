@@ -338,6 +338,39 @@ Areas for improvement:
 - Multi-project context switching
 - Performance optimizations
 
+## Active Development
+
+- [ ] **"REM Sleep" Cycle (Active Memory Consolidation)**
+  - Implement a true "Sleep Mode" when idle to replay and analyze failed tasks.
+  - Synthesize generic rules from failures and update `global_guidelines.md`.
+  - Enable the Translator to ingest external resources during this phase.
+- [ ] **"The Neural Dashboard" (TUI/GUI Hybrid)**
+  - Unified interface using **Python + Textual** (renderable in terminal or web browser).
+  - **The Synapse Map:** Real-time graph visualization of agents (nodes) and traffic (edges).
+  - **VRAM Heatmap:** Visual bar showing model loading status (VRAM vs. RAM).
+  - **Character System:** emergent narrative layer with avatars and dialogue bubbles.
+- [ ] **Dynamic Tool Forging (Metaprogramming)**
+  - Create a "Machinist" agent capable of writing new tools on the fly.
+  - Process: Write tool -> Generate test -> Verify -> Register in `TOOLS.md`.
+  - Enable Ralph to autonomously expand his utility belt (e.g., creating a PDF parser if missing).
+- [ ] **Hybrid Compute & Tiered Storage**
+  - Offload ASICs (1B-3B models) to CPU (Ryzen 5800X3D) to reserve 16GB VRAM for Tier 1/2 agents.
+  - Implement "Hot RAM Cache" for model swapping (VRAM > RAM > SSD) to minimize latency.
+- [ ] **Intelligence Ingestion Pipeline ("Supply Truck")**
+  - Detects "Missing Knowledge" (e.g., new libraries) via the Translator/Scout.
+  - **Warehouse Curator** (Memory Agent) goes "outside the wall" to fetch documentation.
+  - Summarizes data into a "Field Manual" (.md) for the Engineer.
+- [ ] **The Tool Lab (Machinist & Firewall)**
+  - A sandboxed "Tool Lab" directory where the **Machinist** agent forges new tools.
+  - **Firewall Rule:** Tools *cannot* move themselves out of the Lab.
+  - **Translator Access:** Read-only access to the Lab to observe experiments.
+  - **Verbose Logging:** All reasoning/code must be logged for the Translator to explain built tools.
+  - User Approval (Manual Gateway) required to promote a tool from Lab to Production `TOOLS.md`.
+- [ ] **Security Dogs (Audit Layer)**
+  - **Thermal Guard:** Monitors GPU/CPU temps (e.g., if 9070 XT hits 85°C, force cooldown).
+  - **Loop Watchdog:** Detects infinite recursion or "stuck" logic states.
+  - **Financial Guard:** Hard kill-switch for API costs (if external APIs are enabled).
+
 ## Roadmap
 
 - [ ] Windows/macOS support
