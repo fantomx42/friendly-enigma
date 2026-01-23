@@ -54,6 +54,12 @@ class MessageType(Enum):
     TOOL_RESPONSE = "tool_response"    # Tool execution result
     TOOL_CONFIRM = "tool_confirm"      # User confirmation for dangerous tools
 
+    # REM Sleep Protocol (Daemon → Sleeper Agent)
+    REM_SLEEP_START = "rem_sleep_start"        # Begin memory consolidation cycle
+    REM_SLEEP_COMPLETE = "rem_sleep_complete"  # Consolidation finished
+    CONSOLIDATION_REQUEST = "consolidation_request"   # Request lesson clustering
+    CONSOLIDATION_RESPONSE = "consolidation_response" # Return synthesized guidelines
+
 
 @dataclass
 class Message:
@@ -366,5 +372,124 @@ def forklift_response(
             "scores": scores,
             "retrieval_time_ms": retrieval_time_ms,
             "truncated": truncated,
+        }
+    )
+
+
+# ============================================
+# REM Sleep Protocol Message Constructors
+# ============================================
+
+def rem_sleep_start(
+    max_duration: int = 120,
+    trigger: str = "idle",
+) -> Message:
+    """
+    Create a REM_SLEEP_START message to begin memory consolidation.
+
+    Args:
+        max_duration: Maximum seconds for the REM cycle
+        trigger: What triggered REM sleep (idle, manual, scheduled)
+
+    Returns:
+        Message to send to Sleeper agent
+    """
+    return Message(
+        type=MessageType.REM_SLEEP_START,
+        sender="daemon",
+        receiver="sleeper",
+        payload={
+            "max_duration": max_duration,
+            "trigger": trigger,
+        }
+    )
+
+
+def rem_sleep_complete(
+    success: bool,
+    new_guidelines: int,
+    lessons_analyzed: int,
+    duration_ms: int,
+    phase_completed: str = "complete",
+) -> Message:
+    """
+    Create a REM_SLEEP_COMPLETE message when consolidation finishes.
+
+    Args:
+        success: Whether consolidation completed successfully
+        new_guidelines: Number of guidelines created
+        lessons_analyzed: Number of lessons processed
+        duration_ms: Total duration in milliseconds
+        phase_completed: Last phase completed (for partial runs)
+
+    Returns:
+        Message with consolidation results
+    """
+    return Message(
+        type=MessageType.REM_SLEEP_COMPLETE,
+        sender="sleeper",
+        receiver="daemon",
+        payload={
+            "success": success,
+            "new_guidelines": new_guidelines,
+            "lessons_analyzed": lessons_analyzed,
+            "duration_ms": duration_ms,
+            "phase_completed": phase_completed,
+        }
+    )
+
+
+def consolidation_request(
+    threshold: float = 0.80,
+    min_cluster_size: int = 3,
+) -> Message:
+    """
+    Create a CONSOLIDATION_REQUEST message for lesson clustering.
+
+    Args:
+        threshold: Similarity threshold for clustering (0.80 = conservative)
+        min_cluster_size: Minimum lessons needed to form a cluster
+
+    Returns:
+        Message to send to Consolidator
+    """
+    return Message(
+        type=MessageType.CONSOLIDATION_REQUEST,
+        sender="sleeper",
+        receiver="consolidator",
+        payload={
+            "threshold": threshold,
+            "min_cluster_size": min_cluster_size,
+        }
+    )
+
+
+def consolidation_response(
+    guidelines: list,
+    clusters_found: int,
+    lessons_analyzed: int,
+    duration_ms: int,
+) -> Message:
+    """
+    Create a CONSOLIDATION_RESPONSE message with synthesized guidelines.
+
+    Args:
+        guidelines: List of guideline dicts (text, category, confidence, etc.)
+        clusters_found: Number of lesson clusters identified
+        lessons_analyzed: Total lessons processed
+        duration_ms: Processing time
+
+    Returns:
+        Message with guideline synthesis results
+    """
+    return Message(
+        type=MessageType.CONSOLIDATION_RESPONSE,
+        sender="consolidator",
+        receiver="sleeper",
+        payload={
+            "guidelines": guidelines,
+            "clusters_found": clusters_found,
+            "lessons_analyzed": lessons_analyzed,
+            "duration_ms": duration_ms,
         }
     )
