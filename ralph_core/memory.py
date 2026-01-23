@@ -134,3 +134,84 @@ class Memory:
             # Index lesson in Vector DB (Global Scope)
             vector_memory.add(lesson, {"tag": "lesson", "source": "reflector"}, scope="global")
 
+    def get_guidelines(self) -> list:
+        """Retrieves the list of synthesized guidelines (Global).
+
+        Guidelines are meta-rules created by the REM Sleep consolidation
+        process from clusters of similar lessons.
+        """
+        global_guidelines_file = os.path.expanduser("~/.ralph/global_memory/global_guidelines.md")
+        if not os.path.exists(global_guidelines_file):
+            return []
+
+        # Parse markdown to extract guidelines
+        guidelines = []
+        try:
+            with open(global_guidelines_file, 'r') as f:
+                content = f.read()
+
+            # Extract guidelines (lines starting with "- **")
+            for line in content.split('\n'):
+                if line.strip().startswith('- **') and '**' in line[4:]:
+                    # Extract text between ** markers
+                    text = line.split('**')[1] if '**' in line else line
+                    guidelines.append(text)
+        except Exception as e:
+            print(f"[Memory] Error loading guidelines: {e}")
+
+        return guidelines
+
+    def get_guidelines_detailed(self) -> list:
+        """Retrieves guidelines with metadata from consolidation log."""
+        log_file = os.path.expanduser("~/.ralph/global_memory/consolidation_log.json")
+        if not os.path.exists(log_file):
+            return []
+
+        try:
+            with open(log_file, 'r') as f:
+                log = json.load(f)
+            return log.get("events", [])
+        except Exception:
+            return []
+
+    def add_guideline(self, guideline: str, category: str = "General", confidence: float = 0.8) -> None:
+        """Adds a new guideline (typically called during REM Sleep).
+
+        Note: This is a manual add - normally guidelines are created
+        through the consolidation process in the sleeper agent.
+        """
+        global_guidelines_file = os.path.expanduser("~/.ralph/global_memory/global_guidelines.md")
+        os.makedirs(os.path.dirname(global_guidelines_file), exist_ok=True)
+
+        # Check if file exists, create header if not
+        if not os.path.exists(global_guidelines_file):
+            header = """# Ralph Global Guidelines
+
+> Auto-generated meta-rules synthesized from learned lessons.
+> Manual additions below.
+
+"""
+            with open(global_guidelines_file, 'w') as f:
+                f.write(header)
+
+        # Append new guideline
+        from datetime import datetime
+        entry = f"""
+## {category}
+
+- **{guideline}**
+  - Source: manual
+  - Confidence: {confidence}
+  - Created: {datetime.now().isoformat()}
+
+"""
+        with open(global_guidelines_file, 'a') as f:
+            f.write(entry)
+
+        # Index in Vector DB
+        vector_memory.add(
+            guideline,
+            {"tag": "guideline", "category": category, "source": "manual", "confidence": confidence},
+            scope="global"
+        )
+
