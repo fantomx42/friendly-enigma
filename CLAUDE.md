@@ -83,3 +83,18 @@ ollama list
 - Git is memory - commit frequently
 - Lessons are stored in `~/.ralph/global_memory/lessons.json`
 - Use vector DB for semantic recall across projects
+
+## Hardware Environment
+
+| Component | Specification |
+|-----------|---------------|
+| CPU | Intel Core Ultra 7 265K (Arrow Lake) |
+| Cores | 20 (8 P-cores + 12 E-cores) |
+| Max Frequency | 5.5 GHz |
+| L3 Cache | 30 MB |
+| Motherboard | ASRock Z890 Taichi OCF |
+| RAM | 32 GB DDR5 |
+| Storage | 2 TB Solidigm NVMe SSD |
+| OS | CachyOS (Linux 6.19.x) |
+
+This configuration provides ample headroom for running multiple Ollama models concurrently during swarm operations.

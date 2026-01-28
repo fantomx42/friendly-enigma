@@ -6,11 +6,15 @@ multiple OPTIONS for middle management to evaluate.
 
 Key Features:
 - Generates multiple candidate solutions (2-3 options)
-- Parallel spawning for efficiency
+- Parallel spawning for efficiency (disabled in single-GPU mode)
 - Automatic fallback to larger models
 - Metrics tracking for all calls
+
+GPU Mode:
+Set RALPH_GPU_MODE=single to force sequential execution (prevents VRAM exhaustion)
 """
 
+import os
 import requests
 import concurrent.futures
 from typing import Optional
@@ -21,6 +25,9 @@ from .registry import (
     get_model_with_fallback,
     OLLAMA_API,
 )
+
+# GPU mode: "single" forces sequential execution to prevent VRAM exhaustion
+GPU_MODE = os.environ.get("RALPH_GPU_MODE", "single")
 
 # Import metrics tracker - handle import error gracefully
 try:
@@ -58,6 +65,7 @@ def _call_asic(
                 "model": model,
                 "prompt": full_prompt,
                 "stream": False,
+                "keep_alive": "10m",  # Keep model in VRAM between requests
                 "options": {
                     "temperature": actual_temp,
                     "num_predict": max_tokens,
@@ -134,7 +142,13 @@ def spawn_asic_parallel(task_type: str, prompt: str) -> list[str]:
 
     Same as spawn_asic but generates all options concurrently.
     Use when latency matters more than resource efficiency.
+
+    Note: Falls back to sequential if RALPH_GPU_MODE=single
     """
+    # In single-GPU mode, use sequential to prevent VRAM exhaustion
+    if GPU_MODE == "single":
+        return spawn_asic(task_type, prompt)
+
     config = get_asic_config(task_type)
 
     if not config:
@@ -181,9 +195,21 @@ def spawn_multiple_asics(tasks: list[tuple[str, str]]) -> dict[str, list[str]]:
             ("regex", "Match email"),
             ("test", "Test the email validator"),
         ])
+
+    Note: Falls back to sequential if RALPH_GPU_MODE=single
     """
     results = {}
 
+    # In single-GPU mode, run sequentially to prevent VRAM exhaustion
+    if GPU_MODE == "single":
+        for task_type, prompt in tasks:
+            try:
+                results[task_type] = spawn_asic(task_type, prompt)
+            except Exception as e:
+                results[task_type] = [f"Error: {str(e)}"]
+        return results
+
+    # Multi-GPU mode: parallel execution
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
         future_to_task = {
             executor.submit(spawn_asic, task_type, prompt): task_type

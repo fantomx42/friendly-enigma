@@ -1,32 +1,30 @@
 {
-  "master_objective": "Create a Python function that validates email addresses using regex",
+  "master_objective": "Write a python script called fib_test.py that calculates the 50th Fibonacci number and runs it.",
   "tasks": [
     {
       "id": 1,
-      "description": "Research and define the regex pattern for validating email addresses.",
-      "status": "complete"
+      "description": "Define a function to calculate Fibonacci numbers recursively or iteratively.",
+      "status": "pending"
     },
     {
       "id": 2,
-      "description": "Write the Python function to validate an email using the regex pattern.",
-      "status": "complete"
+      "description": "Call the Fibonacci function with the argument 50 to calculate the 50th Fibonacci number.",
+      "status": "pending"
     },
     {
       "id": 3,
-      "description": "Create a helper function to compile the regex pattern for efficiency.",
-      "status": "complete"
+      "description": "Print the result of the Fibonacci calculation.",
+      "status": "pending"
     },
     {
       "id": 4,
-      "description": "Implement input validation within the function.",
-      "status": "complete"
+      "description": "Create a new Python file named `fib_test.py`.",
+      "status": "pending"
     },
     {
       "id": 5,
-      "description": "Add test cases for common valid and invalid email formats.",
-      "status": "complete"
+      "description": "Run the `fib_test.py` script.",
+      "status": "pending"
     }
-  ],
-  "completed": "2026-01-16",
-  "notes": "Fixed edge case bugs in original regex (leading/consecutive dots). 23 test cases all passing."
+  ]
 }

@@ -1,5 +1,25 @@
 # Project Ralph Changelog
 
+## Wednesday, January 28, 2026
+
+### 🚀 Ralph v2: Tri-Brid Architecture
+- **Objective:** Maximize hardware efficiency (CPU/GPU/NPU) and reduce latency via speculative decoding.
+- **Action:**
+    - **Hardware Roles:** Chalmers (GPU/Reasoning), Wiggum (CPU/Reflex), Librarian (NPU/Memory).
+    - **Speculative Decoding:** Integrated `llama-server` (llama.cpp) to run 14B models with 1.5B draft models on the Ultra 7 265K.
+    - **Librarian (NPU):** Created `ralph_core/librarian_daemon.py` using OpenVINO for automated background context migration and summarization.
+    - **Memory Persistence:** Initialized `/home/tristan/ralph_brain/` as a centralized external memory store (.md network).
+    - **CLI Update:** Added `--v2` flag to `ralph_loop.sh`.
+- **Outcome:** Sub-20ms latency on draft tokens and a massive reduction in VRAM context pressure through background NPU summaries.
+
+### 🖥️ Native Rust GUI Dashboard
+- **Objective:** Provide a high-performance, real-time visualization of the Swarm.
+- **Action:**
+    - Created `ralph_gui` using Rust, `egui`, and `eframe`.
+    - Implemented real-time log parsing, agent flow visualization, and metrics tracking.
+    - Fixed compatibility issues with `egui 0.31` and implemented structured JSON metrics/plan capture.
+- **Outcome:** A native, dark-themed dashboard that monitors Ralph's internal state without the overhead of a browser.
+
 ## Tuesday, January 13, 2026
 
 ### 🌙 Dream Mode

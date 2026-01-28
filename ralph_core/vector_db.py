@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 import numpy as np
 import requests
 from typing import List, Dict, Any, Optional
@@ -13,19 +14,22 @@ class VectorDB:
     def __init__(self):
         self.local_db_file = LOCAL_DB_FILE
         self.global_db_file = GLOBAL_DB_FILE
-        
+
+        # Embedding cache to avoid re-computing same embeddings
+        self.embedding_cache: Dict[str, List[float]] = {}
+
         # In-memory storage for search (combined)
         self.vectors: List[List[float]] = []
         self.documents: List[Dict[str, Any]] = []
-        
-        # Keep track of indices for saving? 
+
+        # Keep track of indices for saving?
         # Easier strategy: Load separately, keep generic "add" interface, but "save" updates specific files.
         # Actually, let's keep separate lists in memory to make saving easier.
         self.local_vectors = []
         self.local_docs = []
         self.global_vectors = []
         self.global_docs = []
-        
+
         self._load()
 
     def _load(self):
@@ -69,17 +73,29 @@ class VectorDB:
             print(f"[VectorDB] Save error ({scope}): {e}")
 
     def _get_embedding(self, text: str) -> Optional[List[float]]:
+        # Check cache first (avoids redundant API calls)
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        if text_hash in self.embedding_cache:
+            return self.embedding_cache[text_hash]
+
         try:
             response = requests.post(
                 OLLAMA_EMBED_API,
                 json={
                     "model": EMBED_MODEL,
-                    "prompt": text
+                    "prompt": text,
+                    "keep_alive": "10m"  # Keep embedding model loaded
                 },
                 timeout=10
             )
             response.raise_for_status()
-            return response.json().get("embedding")
+            embedding = response.json().get("embedding")
+
+            # Cache the result
+            if embedding:
+                self.embedding_cache[text_hash] = embedding
+
+            return embedding
         except Exception as e:
             print(f"[VectorDB] Embedding error: {e}")
             return None

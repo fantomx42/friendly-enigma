@@ -47,6 +47,9 @@ class Metrics:
 
     def save_entry(self, entry: Dict[str, Any]):
         try:
+            # Print to stdout for GUI capture
+            print(f"[METRICS] {json.dumps(entry)}", flush=True)
+            
             with open(METRICS_FILE, "a") as f:
                 f.write(json.dumps(entry) + "\n")
         except Exception as e:

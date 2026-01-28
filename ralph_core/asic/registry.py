@@ -32,6 +32,9 @@ class ASICConfig:
 
 
 # Registry of specialist ASICs
+# Consolidated for single-GPU (16GB): Only 2 small models + phi3:mini for translation
+# - tinyllama:1.1b (637MB) for simple pattern tasks
+# - qwen2.5-coder:1.5b (986MB) for code-heavy tasks
 ASIC_REGISTRY: dict[str, ASICConfig] = {
     "regex": ASICConfig(
         model="tinyllama:1.1b",
@@ -39,7 +42,7 @@ ASIC_REGISTRY: dict[str, ASICConfig] = {
         num_options=3,
         max_tokens=256,
         system_prompt="You are a regex specialist. Output ONLY valid regex patterns, no explanation.",
-        fallback_model="deepseek-coder:1.3b"
+        fallback_model="qwen2.5-coder:1.5b"
     ),
     "json": ASICConfig(
         model="tinyllama:1.1b",
@@ -50,12 +53,12 @@ ASIC_REGISTRY: dict[str, ASICConfig] = {
         fallback_model="qwen2.5-coder:1.5b"
     ),
     "sql": ASICConfig(
-        model="deepseek-coder:1.3b",
+        model="tinyllama:1.1b",
         temperature=0.2,
         num_options=2,
         max_tokens=512,
         system_prompt="You are a SQL specialist. Output ONLY valid SQL queries, no explanation.",
-        fallback_model="qwen2.5-coder:14b"
+        fallback_model="qwen2.5-coder:1.5b"
     ),
     "docstring": ASICConfig(
         model="tinyllama:1.1b",
@@ -63,15 +66,15 @@ ASIC_REGISTRY: dict[str, ASICConfig] = {
         num_options=2,
         max_tokens=256,
         system_prompt="You are a documentation specialist. Write concise, clear docstrings.",
-        fallback_model="phi3:mini"
+        fallback_model="qwen2.5-coder:1.5b"
     ),
     "test": ASICConfig(
-        model="deepseek-coder:1.3b",
+        model="qwen2.5-coder:1.5b",
         temperature=0.2,
         num_options=3,
         max_tokens=1024,
         system_prompt="You are a test specialist. Write pytest test functions. Output ONLY code.",
-        fallback_model="qwen2.5-coder:1.5b"
+        fallback_model="tinyllama:1.1b"
     ),
     "refactor": ASICConfig(
         model="qwen2.5-coder:1.5b",
@@ -79,15 +82,15 @@ ASIC_REGISTRY: dict[str, ASICConfig] = {
         num_options=2,
         max_tokens=1024,
         system_prompt="You are a refactoring specialist. Improve code structure. Output ONLY code.",
-        fallback_model="qwen2.5-coder:14b"
+        fallback_model="tinyllama:1.1b"
     ),
     "fix": ASICConfig(
-        model="deepseek-coder:1.3b",
+        model="qwen2.5-coder:1.5b",
         temperature=0.1,
         num_options=3,
         max_tokens=512,
         system_prompt="You are a bug fix specialist. Fix the code error. Output ONLY the corrected code.",
-        fallback_model="qwen2.5-coder:1.5b"
+        fallback_model="tinyllama:1.1b"
     ),
     "translate": ASICConfig(
         model="phi3:mini",
@@ -95,7 +98,7 @@ ASIC_REGISTRY: dict[str, ASICConfig] = {
         num_options=1,
         max_tokens=2048,
         system_prompt="You are a translator. Convert human requests into structured specifications.",
-        fallback_model="deepseek-r1:14b"
+        fallback_model="qwen2.5-coder:1.5b"
     ),
     "tiny_code": ASICConfig(
         model="tinyllama:1.1b",
@@ -103,15 +106,15 @@ ASIC_REGISTRY: dict[str, ASICConfig] = {
         num_options=3,
         max_tokens=256,
         system_prompt="You are a minimal code generator. Output ONLY short code snippets.",
-        fallback_model="deepseek-coder:1.3b"
+        fallback_model="qwen2.5-coder:1.5b"
     ),
     "small_code": ASICConfig(
-        model="deepseek-coder:1.3b",
+        model="qwen2.5-coder:1.5b",
         temperature=0.2,
         num_options=2,
         max_tokens=1024,
         system_prompt="You are a code generator. Output clean, efficient code.",
-        fallback_model="qwen2.5-coder:1.5b"
+        fallback_model="tinyllama:1.1b"
     ),
 }
 

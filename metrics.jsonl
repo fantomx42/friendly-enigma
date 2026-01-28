@@ -13,3 +13,149 @@
 {"type": "llm_call", "model": "mistral-nemo:12b", "prompt_tokens": 764, "completion_tokens": 258, "duration_ms": 7207, "timestamp": 1768402116.5693989}
 {"type": "llm_call", "model": "mistral-nemo:12b", "prompt_tokens": 395, "completion_tokens": 115, "duration_ms": 1971, "timestamp": 1768402118.5437593}
 {"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 210, "completion_tokens": 351, "duration_ms": 9381, "timestamp": 1768402127.9357343}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 141, "completion_tokens": 413, "duration_ms": 17855, "timestamp": 1768846533.2989378}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 70, "completion_tokens": 497, "duration_ms": 14650, "timestamp": 1768846565.3518338}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1768846613.7144644}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 65, "completion_tokens": 469, "duration_ms": 13254, "timestamp": 1768846626.9753306}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 152, "completion_tokens": 646, "duration_ms": 18265, "timestamp": 1768846645.2458649}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 142, "completion_tokens": 500, "duration_ms": 14070, "timestamp": 1768846659.3212676}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 147, "completion_tokens": 229, "duration_ms": 6519, "timestamp": 1768846665.8448012}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 144, "completion_tokens": 547, "duration_ms": 15614, "timestamp": 1768846681.4636014}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 145, "completion_tokens": 379, "duration_ms": 10857, "timestamp": 1768846692.326692}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 151, "completion_tokens": 219, "duration_ms": 6301, "timestamp": 1768846698.631194}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 580, "completion_tokens": 440, "duration_ms": 15827, "timestamp": 1768846786.9330077}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 9, "completion_tokens": 172, "duration_ms": 5305, "timestamp": 1768873448.4310546}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 35, "completion_tokens": 2, "duration_ms": 5406, "timestamp": 1768873453.839802}
+{"type": "llm_call", "model": "mistral-nemo:12b", "prompt_tokens": 9, "completion_tokens": 2, "duration_ms": 4423, "timestamp": 1768873458.2650073}
+{"type": "llm_call", "model": "phi3:mini", "prompt_tokens": 15, "completion_tokens": 2, "duration_ms": 1011, "timestamp": 1768939790.696112}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 167, "completion_tokens": 254, "duration_ms": 17457, "timestamp": 1769029032.560669}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 79, "completion_tokens": 305, "duration_ms": 19053, "timestamp": 1769029051.6178398}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 167, "completion_tokens": 345, "duration_ms": 22417, "timestamp": 1769029114.3660228}
+{"type": "llm_call", "model": "deepseek-r1:14b", "prompt_tokens": 86, "completion_tokens": 325, "duration_ms": 20987, "timestamp": 1769029135.3574877}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769626130.6063764}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769630241.8916063}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769630259.3053792}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769630263.6420424}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769630268.1899173}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769630272.2300465}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769630279.9384232}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769630282.9951274}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769630286.2174792}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769630293.8788607}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769630297.1354373}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769630313.0243497}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769630320.527724}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769630323.5765119}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769630326.6508431}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769630329.6783}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769630337.3381636}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769630344.5536509}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769630352.6640143}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769630359.9323788}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769630363.1021712}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769630441.5213099}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769630444.7602003}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769630451.8838017}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769630454.9495196}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769630458.185811}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769630466.3127837}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769630469.4666967}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769630472.642245}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769630475.8088758}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769630482.5811868}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769630621.336556}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769630624.36222}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769630632.5192235}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769630635.563338}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769630638.714332}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769630645.816027}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769630648.9262106}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769630652.0286682}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769630655.1401496}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769630663.7061167}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769630921.0637205}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769630927.9437346}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769630931.0860255}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769630934.2430453}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769630940.576255}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769630948.2345765}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769630956.5361726}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769630959.5783322}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769630962.624181}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769630969.8998697}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769631117.836982}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769631121.0796452}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769631124.1449275}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769631127.3666883}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769631130.5610716}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769631133.669705}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769631136.6886795}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769631139.7877018}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769631142.973141}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769631146.1875548}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769631246.83278}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769631255.2271345}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769631258.447388}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769631261.693346}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769631264.8837252}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769631268.0133216}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769631271.0641026}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769631274.2375112}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769631277.4898398}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769631280.5604753}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769631306.8024046}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769631309.8185132}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769631312.9700239}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769631316.0552585}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769631319.1677172}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769631326.9179394}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769631330.0738251}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769631337.4447453}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769631340.6602533}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769631343.7716186}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769631622.942695}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769631626.077754}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769631633.181272}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769631637.9405875}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769631646.5124133}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769631649.7528436}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769631658.236458}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769631661.3562622}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769631669.2502115}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769631672.368783}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769631928.0159416}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769631931.2219431}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769631934.3135614}
+{"type": "iteration", "iteration": 4, "status": "START", "timestamp": 1769631942.397311}
+{"type": "iteration", "iteration": 5, "status": "START", "timestamp": 1769631951.1211114}
+{"type": "iteration", "iteration": 6, "status": "START", "timestamp": 1769631954.339937}
+{"type": "iteration", "iteration": 7, "status": "START", "timestamp": 1769631961.6210055}
+{"type": "iteration", "iteration": 8, "status": "START", "timestamp": 1769631969.039048}
+{"type": "iteration", "iteration": 9, "status": "START", "timestamp": 1769631972.2256477}
+{"type": "iteration", "iteration": 10, "status": "START", "timestamp": 1769631975.479607}
+{"type": "iteration", "iteration": 1, "status": "START", "timestamp": 1769631991.2964725}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 110, "completion_tokens": 66, "duration_ms": 4957, "timestamp": 1769631996.2569816}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 169, "completion_tokens": 23, "duration_ms": 576, "timestamp": 1769631996.8368492}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 170, "completion_tokens": 23, "duration_ms": 591, "timestamp": 1769631997.4335268}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 178, "completion_tokens": 23, "duration_ms": 584, "timestamp": 1769631998.0202281}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 166, "completion_tokens": 20, "duration_ms": 529, "timestamp": 1769631998.5527399}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 167, "completion_tokens": 23, "duration_ms": 590, "timestamp": 1769631999.1454976}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 1235, "completion_tokens": 443, "duration_ms": 9481, "timestamp": 1769632008.6806898}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 1724, "completion_tokens": 112, "duration_ms": 3249, "timestamp": 1769632011.9371655}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 691, "completion_tokens": 120, "duration_ms": 2486, "timestamp": 1769632014.4316382}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 314, "completion_tokens": 56, "duration_ms": 1289, "timestamp": 1769632015.737284}
+{"type": "iteration", "iteration": 2, "status": "START", "timestamp": 1769632017.868221}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 682, "completion_tokens": 57, "duration_ms": 1501, "timestamp": 1769632019.376323}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 1233, "completion_tokens": 306, "duration_ms": 6766, "timestamp": 1769632026.329334}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 1533, "completion_tokens": 461, "duration_ms": 10091, "timestamp": 1769632036.430153}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 2040, "completion_tokens": 170, "duration_ms": 4611, "timestamp": 1769632041.0466263}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 767, "completion_tokens": 177, "duration_ms": 3633, "timestamp": 1769632044.6898048}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 361, "completion_tokens": 127, "duration_ms": 2681, "timestamp": 1769632047.3923953}
+{"type": "iteration", "iteration": 3, "status": "START", "timestamp": 1769632049.5295217}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 883, "completion_tokens": 66, "duration_ms": 1793, "timestamp": 1769632051.327369}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 1635, "completion_tokens": 354, "duration_ms": 8046, "timestamp": 1769632059.561853}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 1582, "completion_tokens": 421, "duration_ms": 9341, "timestamp": 1769632068.9091341}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 2049, "completion_tokens": 113, "duration_ms": 3474, "timestamp": 1769632072.3932292}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 671, "completion_tokens": 121, "duration_ms": 2500, "timestamp": 1769632074.8966002}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 269, "completion_tokens": 8, "duration_ms": 355, "timestamp": 1769632075.255277}
+{"type": "llm_call", "model": "qwen2.5-coder:14b", "prompt_tokens": 719, "completion_tokens": 12, "duration_ms": 646, "timestamp": 1769632075.932421}

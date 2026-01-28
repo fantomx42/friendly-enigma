@@ -1,0 +1,30 @@
+[package]
+name = "ralph_gui"
+version = "0.1.0"
+edition = "2021"
+description = "Native GUI dashboard for Ralph AI"
+
+[dependencies]
+# GUI framework
+eframe = "0.31"
+egui = "0.31"
+
+# Async runtime for subprocess handling
+tokio = { version = "1", features = ["full", "process"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# File watching
+notify = "8"
+
+# Time handling
+chrono = "0.4"
+
+# Channel for cross-thread communication
+crossbeam-channel = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = true

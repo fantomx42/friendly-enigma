@@ -5,6 +5,11 @@
 requests>=2.31.0          # HTTP requests for Ollama API
 pydantic>=2.5.0           # Data validation and settings
 python-dotenv>=1.0.0      # Environment variable management
+watchdog>=4.0.0           # File monitoring for Librarian
+
+# NPU / OpenVINO (Librarian)
+openvino>=2024.0.0
+openvino-genai>=2024.0.0
 
 # LLM Integration
 ollama>=0.1.0             # Ollama Python client

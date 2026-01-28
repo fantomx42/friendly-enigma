@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Ralph AI
+Comment=Autonomous Coding Agent (Tri-Brid V2)
+Exec=/home/tristan/Documents/Ralph\ Ai/ai_tech_stack/launch_ralph.sh
+Icon=utilities-terminal
+Terminal=true
+Type=Application
+Categories=Development;ArtificialIntelligence;

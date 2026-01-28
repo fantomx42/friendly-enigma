@@ -10,3 +10,6 @@ tmp/
 memory/context.json
 RALPH_PROGRESS.md
 .ai_memory/
+
+.gemini/
+gha-creds-*.json

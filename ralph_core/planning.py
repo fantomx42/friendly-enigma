@@ -23,6 +23,9 @@ class PlanManager:
         return {"master_objective": self.master_objective, "tasks": []}
 
     def save_plan(self):
+        # Print to stdout for GUI capture
+        print(f"[PLAN] {json.dumps(self.plan)}", flush=True)
+
         with open(self.plan_file, 'w') as f:
             json.dump(self.plan, f, indent=2)
 

@@ -116,6 +116,7 @@ def _call_translator(prompt: str) -> str:
                 "model": model,
                 "prompt": f"{SYSTEM_PROMPT}\n\nHuman Request: {prompt}\n\nJSON Output:",
                 "stream": False,
+                "keep_alive": "10m",  # Keep model in VRAM between requests
                 "options": {
                     "temperature": 0.3,  # Low for structured output
                     "num_predict": 1024,

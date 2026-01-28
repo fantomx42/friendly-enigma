@@ -5,12 +5,17 @@
 # Argument Parsing
 SANDBOX_MODE=0
 OBJECTIVE=""
+USE_V2=0
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --sandbox)
       SANDBOX_MODE=1
       shift # past argument
+      ;;
+    --v2)
+      USE_V2=1
+      shift
       ;;
     -*)
       echo "Unknown option $1"
@@ -24,8 +29,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$OBJECTIVE" ]; then
-    echo "Usage: ./ralph_loop.sh [--sandbox] \"Your Objective\""
+    echo "Usage: ./ralph_loop.sh [--sandbox] [--v2] \"Your Objective\""
     exit 1
+fi
+
+if [ $USE_V2 -eq 1 ]; then
+    echo "🔥 RALPH V2 MODE ACTIVE"
+    export RALPH_V2=1
+else
+    export RALPH_V2=0
 fi
 
 # Sandbox Initialization

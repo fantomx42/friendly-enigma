@@ -1,0 +1,14 @@
+/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/release/deps/serde-56aac2b9e15839bc.d: /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/tristan/Documents/Ralph\ Ai/ai_tech_stack/ralph_gui/target/release/build/serde-95229bcd89e7aa40/out/private.rs
+
+/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/release/deps/libserde-56aac2b9e15839bc.rlib: /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/tristan/Documents/Ralph\ Ai/ai_tech_stack/ralph_gui/target/release/build/serde-95229bcd89e7aa40/out/private.rs
+
+/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/release/deps/libserde-56aac2b9e15839bc.rmeta: /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/tristan/Documents/Ralph\ Ai/ai_tech_stack/ralph_gui/target/release/build/serde-95229bcd89e7aa40/out/private.rs
+
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/tristan/Documents/Ralph\ Ai/ai_tech_stack/ralph_gui/target/release/build/serde-95229bcd89e7aa40/out/private.rs:
+
+# env-dep:OUT_DIR=/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/release/build/serde-95229bcd89e7aa40/out
