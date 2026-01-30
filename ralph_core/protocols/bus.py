@@ -67,8 +67,10 @@ class MessageBus:
         Returns:
             True if sent successfully, False if circuit breaker triggered
         """
-        # Circuit breaker: max messages
-        if len(self._history) >= self.config.max_messages:
+        is_diagnostic = message.type == MessageType.DIAGNOSTIC
+
+        # Circuit breaker: max messages (Bypassed for diagnostic messages)
+        if not is_diagnostic and len(self._history) >= self.config.max_messages:
             if self.config.enable_logging:
                 print(f"[BUS] Circuit breaker: Max messages ({self.config.max_messages}) reached")
             return False
