@@ -23,7 +23,7 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Ensure high-priority dispatch (bypass standard queue if applicable).
 - [x] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md) [ee1bd56]
 
-## Phase 3: Error Interception (The "Wiggum" Logic)
+## Phase 3: Error Interception (The "Wiggum" Logic) [checkpoint: f500093]
 - [x] Task: Create Integration Test for Error Handling. [1eb0fcd]
     - [x] Create `ralph_core/tests/test_runner_error.py`.
     - [x] Mock a failing agent.
@@ -35,4 +35,4 @@ This plan follows the Test-Driven Development (TDD) workflow.
         - [x] Capture traceback.
         - [x] Create `DiagnosticMessage`.
         - [x] Publish to bus.
-- [~] Task: Conductor - User Manual Verification 'Error Interception' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Error Interception' (Protocol in workflow.md) [f500093]
