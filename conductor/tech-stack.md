@@ -21,7 +21,7 @@
 ## Backend & Communication
 - **FastAPI**: Backend framework for the web UI and external API endpoints.
 - **WebSockets**: Real-time bidirectional communication between the swarm and the UI.
-- **Message Bus (V2)**: Internal async I/O based bus with circuit breakers for inter-agent communication.
+- **Message Bus (V2)**: Internal async I/O based bus with circuit breakers and high-priority diagnostic routing for the Wiggum Protocol.
 
 ## Infrastructure & Hardware Acceleration
 - **Docker**: Provides isolated sandboxing for tool execution and code running.
