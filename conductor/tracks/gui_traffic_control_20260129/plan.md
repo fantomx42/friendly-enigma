@@ -14,7 +14,7 @@
 - [x] Task: Graph Data Structure and Layout Logic [bd681c9]
     - [ ] Implement a `Node` and `Edge` data structure within the GUI state
     - [ ] Integrate or implement a basic force-directed layout algorithm (attraction/repulsion)
-- [ ] Task: Visualization Rendering
+- [x] Task: Visualization Rendering [1036de2]
     - [ ] Write tests for node positioning logic
     - [ ] Implement `egui` painting commands to render nodes as tiered circles (Translator, Orchestrator, etc.)
     - [ ] Implement reactive link rendering that "pulses" when communication is detected
