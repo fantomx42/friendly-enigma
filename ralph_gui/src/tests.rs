@@ -53,4 +53,24 @@ mod tests {
         assert_eq!(msg.sender, "orchestrator");
         assert_eq!(msg.payload["plan"], "Do something");
     }
+
+    #[test]
+    fn test_agent_params_state() {
+        let mut app = RalphApp::default();
+        let orchestrator = Agent::Orchestrator;
+        
+        // Initial state
+        if let Some(params) = app.agent_params.get(&orchestrator) {
+            assert_eq!(params.temperature, 0.7);
+        } else {
+            panic!("Orchestrator params not found");
+        }
+        
+        // Update state
+        if let Some(params) = app.agent_params.get_mut(&orchestrator) {
+            params.temperature = 1.5;
+        }
+        
+        assert_eq!(app.agent_params.get(&orchestrator).unwrap().temperature, 1.5);
+    }
 }

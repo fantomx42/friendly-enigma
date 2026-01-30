@@ -363,6 +363,10 @@ impl RalphApp {
     pub fn is_running(&self) -> bool {
         self.runner.as_ref().map(|r| r.is_running()).unwrap_or(false)
     }
+
+    pub fn runner(&self) -> Option<&RalphRunner> {
+        self.runner.as_ref()
+    }
 }
 
 fn match_agent_name(name: &str) -> Option<Agent> {
