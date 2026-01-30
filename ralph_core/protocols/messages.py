@@ -124,6 +124,28 @@ class Message:
         )
 
 
+@dataclass
+class DiagnosticMessage(Message):
+    """
+    Specialized message for Wiggum Protocol diagnostic events.
+    Captures failure context for iterative learning.
+    """
+    def __post_init__(self):
+        # Always enforce DIAGNOSTIC type
+        self.type = MessageType.DIAGNOSTIC
+        
+        # Validation: ensure required keys exist in payload
+        if "error" not in self.payload:
+            self.payload["error"] = "Unknown Error"
+        
+        if "error_context" not in self.payload:
+            self.payload["error_context"] = {
+                "traceback": "No traceback provided",
+                "agent_state": {},
+                "attempt_count": 1
+            }
+
+
 # Convenience constructors for common message types
 
 def work_request(
@@ -518,7 +540,7 @@ def diagnostic_message(
     Returns:
         Message with structured diagnostic payload
     """
-    return Message(
+    return DiagnosticMessage(
         type=MessageType.DIAGNOSTIC,
         sender=sender,
         receiver=receiver,

@@ -40,6 +40,14 @@ def test_diagnostic_message_schema():
     assert msg.payload["error_context"]["agent_state"] == agent_state
     assert msg.payload["error_context"]["attempt_count"] == 2
 
+def test_diagnostic_message_subclass():
+    """Verify that DiagnosticMessage is a subclass of Message."""
+    from ralph_core.protocols.messages import DiagnosticMessage, diagnostic_message
+    
+    msg = diagnostic_message("error", "trace", {})
+    assert isinstance(msg, DiagnosticMessage)
+    assert isinstance(msg, Message)
+
 def test_diagnostic_message_serialization():
     """Verify that diagnostic messages serialize/deserialize correctly."""
     from ralph_core.protocols.messages import diagnostic_message
