@@ -6,6 +6,8 @@ mod app;
 mod theme;
 mod ui;
 mod ralph;
+#[cfg(test)]
+mod tests;
 
 use app::RalphApp;
 

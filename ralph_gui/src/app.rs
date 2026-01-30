@@ -45,6 +45,24 @@ impl Agent {
     }
 }
 
+/// Parameters for an agent
+#[derive(Debug, Clone)]
+pub struct AgentParams {
+    pub temperature: f32,
+    pub top_p: f32,
+    pub max_tokens: u32,
+}
+
+impl Default for AgentParams {
+    fn default() -> Self {
+        Self {
+            temperature: 0.7,
+            top_p: 0.9,
+            max_tokens: 2048,
+        }
+    }
+}
+
 /// Task in the plan
 #[derive(Debug, Clone)]
 pub struct Task {
@@ -68,6 +86,12 @@ pub struct RalphApp {
     // Agent states
     pub agent_states: std::collections::HashMap<Agent, AgentState>,
     pub active_connection: Option<(Agent, Agent)>,
+
+    // Control state
+    pub is_paused: bool,
+    pub sandbox_enabled: bool,
+    pub enabled_agents: std::collections::HashMap<Agent, bool>,
+    pub agent_params: std::collections::HashMap<Agent, AgentParams>,
 
     // Logs
     pub logs: VecDeque<LogEntry>,
@@ -94,14 +118,23 @@ pub struct RalphApp {
 impl Default for RalphApp {
     fn default() -> Self {
         let mut agent_states = std::collections::HashMap::new();
+        let mut enabled_agents = std::collections::HashMap::new();
+        let mut agent_params = std::collections::HashMap::new();
+        
         for agent in Agent::all() {
             agent_states.insert(*agent, AgentState::Idle);
+            enabled_agents.insert(*agent, true);
+            agent_params.insert(*agent, AgentParams::default());
         }
 
         Self {
             objective_input: String::new(),
             agent_states,
             active_connection: None,
+            is_paused: false,
+            sandbox_enabled: false,
+            enabled_agents,
+            agent_params,
             logs: VecDeque::new(),
             show_system_logs: false,
             current_thought: String::new(),
@@ -332,6 +365,10 @@ impl eframe::App for RalphApp {
             .min_width(200.0)
             .max_width(280.0)
             .show(ctx, |ui| {
+                ui::controls::show(ui, self);
+                ui.add_space(16.0);
+                ui.separator();
+                ui.add_space(16.0);
                 ui::metrics::show(ui, &self.metrics);
                 ui.add_space(16.0);
                 ui::tasks::show(ui, &self.tasks);

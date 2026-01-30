@@ -1,0 +1,11 @@
+/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/debug/deps/wayland_sys-7f6f6b012c14ceab.d: /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/lib.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/common.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/client.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/server.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/egl.rs
+
+/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/debug/deps/libwayland_sys-7f6f6b012c14ceab.rlib: /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/lib.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/common.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/client.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/server.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/egl.rs
+
+/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_gui/target/debug/deps/libwayland_sys-7f6f6b012c14ceab.rmeta: /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/lib.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/common.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/client.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/server.rs /home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/egl.rs
+
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/lib.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/common.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/client.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/server.rs:
+/home/tristan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wayland-sys-0.31.8/src/egl.rs:
