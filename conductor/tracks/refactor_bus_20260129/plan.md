@@ -24,10 +24,10 @@ This plan follows the Test-Driven Development (TDD) workflow.
 - [x] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md) [ee1bd56]
 
 ## Phase 3: Error Interception (The "Wiggum" Logic)
-- [ ] Task: Create Integration Test for Error Handling.
-    - [ ] Create `ralph_core/tests/test_runner_error.py`.
-    - [ ] Mock a failing agent.
-    - [ ] Assert that running the failing agent produces a `DiagnosticMessage` on the bus.
+- [x] Task: Create Integration Test for Error Handling. [1eb0fcd]
+    - [x] Create `ralph_core/tests/test_runner_error.py`.
+    - [x] Mock a failing agent.
+    - [x] Assert that running the failing agent produces a `DiagnosticMessage` on the bus.
 - [ ] Task: Implement Exception Catching in Runner.
     - [ ] Modify `ralph_core/runner.py` (execute method).
     - [ ] Wrap execution in try/except block.
