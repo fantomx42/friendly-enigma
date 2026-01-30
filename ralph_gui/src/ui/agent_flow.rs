@@ -2,7 +2,7 @@
 //!
 //! Draws a visual representation of the agent swarm with animated connections.
 
-use egui::{Pos2, Vec2, Color32, Stroke, Rect, Painter};
+use egui::{Pos2, Vec2, Color32, Stroke, Painter};
 use crate::app::{RalphApp, Agent};
 use crate::ralph::AgentState;
 use crate::theme;
@@ -12,7 +12,7 @@ const NODE_RADIUS: f32 = 28.0;
 const GLOW_RADIUS: f32 = 36.0;
 
 /// Show the agent flow visualization
-pub fn show(ui: &mut egui::Ui, app: &RalphApp) {
+pub fn show(ui: &mut egui::Ui, app: &mut RalphApp) {
     ui.horizontal(|ui| {
         ui.heading(egui::RichText::new("Agent Flow").color(theme::TEXT_PRIMARY));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -31,45 +31,22 @@ pub fn show(ui: &mut egui::Ui, app: &RalphApp) {
     let rect = response.rect;
     let center = rect.center();
 
-    // Calculate node positions
-    // Layout:
-    //   Translator ──► Orchestrator
-    //                      │
-    //                      ▼
-    //   Designer  ◄──► Engineer
-    //       │
-    //       ▼
-    //     ASICs
-
-    let positions = calculate_positions(center, rect.width(), rect.height());
+    // Update graph simulation
+    app.graph.center = center;
+    let dt = ui.input(|i| i.stable_dt).min(0.1);
+    app.graph.update(dt);
 
     // Draw connections first (so they're behind nodes)
-    draw_connections(&painter, &positions, app);
+    draw_connections(&painter, app);
 
     // Draw nodes
-    for (agent, pos) in &positions {
-        draw_agent_node(&painter, *pos, *agent, app);
+    for agent in Agent::all() {
+        let node = &app.graph.nodes[agent];
+        draw_agent_node(&painter, node.pos, *agent, app);
     }
 }
 
-fn calculate_positions(center: Pos2, width: f32, height: f32) -> Vec<(Agent, Pos2)> {
-    let h_spacing = (width * 0.35).min(180.0);
-    let v_spacing = (height * 0.35).min(100.0);
-
-    vec![
-        (Agent::Translator, Pos2::new(center.x - h_spacing, center.y - v_spacing * 0.8)),
-        (Agent::Orchestrator, Pos2::new(center.x + h_spacing * 0.3, center.y - v_spacing * 0.8)),
-        (Agent::Engineer, Pos2::new(center.x + h_spacing * 0.3, center.y + v_spacing * 0.4)),
-        (Agent::Designer, Pos2::new(center.x - h_spacing, center.y + v_spacing * 0.4)),
-        (Agent::Asic, Pos2::new(center.x - h_spacing, center.y + v_spacing * 1.4)),
-    ]
-}
-
-fn draw_connections(painter: &Painter, positions: &[(Agent, Pos2)], app: &RalphApp) {
-    let get_pos = |agent: Agent| -> Pos2 {
-        positions.iter().find(|(a, _)| *a == agent).map(|(_, p)| *p).unwrap_or_default()
-    };
-
+fn draw_connections(painter: &Painter, app: &RalphApp) {
     // Define connections: (from, to)
     let connections = [
         (Agent::Translator, Agent::Orchestrator),
@@ -79,8 +56,8 @@ fn draw_connections(painter: &Painter, positions: &[(Agent, Pos2)], app: &RalphA
     ];
 
     for (from, to) in connections {
-        let from_pos = get_pos(from);
-        let to_pos = get_pos(to);
+        let from_pos = app.graph.nodes[&from].pos;
+        let to_pos = app.graph.nodes[&to].pos;
 
         let is_active = app.active_connection == Some((from, to));
 
@@ -105,8 +82,8 @@ fn draw_connections(painter: &Painter, positions: &[(Agent, Pos2)], app: &RalphA
     }
 
     // Draw bidirectional connection between Engineer and Designer
-    let eng_pos = get_pos(Agent::Engineer);
-    let des_pos = get_pos(Agent::Designer);
+    let eng_pos = app.graph.nodes[&Agent::Engineer].pos;
+    let des_pos = app.graph.nodes[&Agent::Designer].pos;
 
     // Check if either direction is active
     let is_bidir_active = app.active_connection == Some((Agent::Engineer, Agent::Designer))
@@ -118,9 +95,18 @@ fn draw_connections(painter: &Painter, positions: &[(Agent, Pos2)], app: &RalphA
         theme::CONNECTION_IDLE
     };
 
-    // Already drawn above, just add reverse arrow if active
-    if is_bidir_active && app.active_connection == Some((Agent::Designer, Agent::Engineer)) {
-        draw_arrow_head(painter, des_pos, eng_pos, color);
+    // Draw bidirectional line
+    painter.line_segment(
+        [eng_pos, des_pos],
+        Stroke::new(if is_bidir_active { 3.0 } else { 1.5 }, color),
+    );
+
+    if is_bidir_active {
+        if app.active_connection == Some((Agent::Engineer, Agent::Designer)) {
+            draw_arrow_head(painter, eng_pos, des_pos, color);
+        } else {
+            draw_arrow_head(painter, des_pos, eng_pos, color);
+        }
     }
 }
 
