@@ -18,10 +18,10 @@
     - [ ] Write tests for node positioning logic
     - [ ] Implement `egui` painting commands to render nodes as tiered circles (Translator, Orchestrator, etc.)
     - [ ] Implement reactive link rendering that "pulses" when communication is detected
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Graph Visualization' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Graph Visualization' [1036de2]
 
 ## Phase 3: Task Control Center Implementation
-- [ ] Task: UI Control Widgets
+- [x] Task: UI Control Widgets [0cae05c]
     - [ ] Write unit tests for control state management
     - [ ] Implement the Command Input text area and Submit logic
     - [ ] Create buttons for Start, Pause, Stop, and Emergency Flush
