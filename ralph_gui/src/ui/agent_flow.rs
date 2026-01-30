@@ -79,6 +79,16 @@ fn draw_connections(painter: &Painter, app: &RalphApp) {
         if is_active {
             draw_arrow_head(painter, from_pos, to_pos, color);
         }
+
+        // Draw pulse if recently communicated
+        if let Some(edge) = app.graph.edges.iter().find(|e| e.from == from && e.to == to) {
+            let time_since_pulse = app.animation_time - edge.last_pulse;
+            if time_since_pulse < 1.0 {
+                let progress = time_since_pulse;
+                let pulse_pos = from_pos.lerp(to_pos, progress);
+                painter.circle_filled(pulse_pos, 4.0, theme::CONNECTION_ACTIVE);
+            }
+        }
     }
 
     // Draw bidirectional connection between Engineer and Designer

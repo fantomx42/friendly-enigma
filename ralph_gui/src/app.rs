@@ -199,6 +199,9 @@ impl RalphApp {
             
             // Set sender as active
             self.set_agent_active(s);
+
+            // Trigger graph pulse
+            self.graph.trigger_pulse(s, r, self.animation_time);
         }
     }
 

@@ -40,10 +40,10 @@ pub struct GraphConfig {
 impl Default for GraphConfig {
     fn default() -> Self {
         Self {
-            repulsion: 1500.0,
-            attraction: 0.05,
-            damping: 0.95,
-            ideal_length: 120.0,
+            repulsion: 2500.0,
+            attraction: 0.08,
+            damping: 0.92,
+            ideal_length: 140.0,
         }
     }
 }
@@ -104,10 +104,11 @@ impl ForceGraph {
             
             let diff = pos_b - pos_a;
             let dist = diff.length();
-            let force = diff.normalized() * (dist - self.config.ideal_length) * self.config.attraction;
-            
-            *forces.get_mut(&edge.from).unwrap() += force;
-            *forces.get_mut(&edge.to).unwrap() -= force;
+            if dist > 0.01 {
+                let force = diff.normalized() * (dist - self.config.ideal_length) * self.config.attraction;
+                *forces.get_mut(&edge.from).unwrap() += force;
+                *forces.get_mut(&edge.to).unwrap() -= force;
+            }
         }
 
         // 4. Integrate
@@ -116,6 +117,19 @@ impl ForceGraph {
             let accel = forces[agent] / node.mass;
             node.vel = (node.vel + accel * dt) * self.config.damping;
             node.pos += node.vel * dt;
+        }
+    }
+
+    pub fn trigger_pulse(&mut self, from: Agent, to: Agent, time: f32) {
+        if let Some(edge) = self.edges.iter_mut().find(|e| e.from == from && e.to == to) {
+            edge.last_pulse = time;
+        } else {
+            self.edges.push(Edge {
+                from,
+                to,
+                strength: 1.0,
+                last_pulse: time,
+            });
         }
     }
 }
