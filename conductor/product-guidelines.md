@@ -17,7 +17,7 @@
 - **The "Safety Checkpoint"**: A dedicated architectural component that intercepts all tool calls against the user's configured policy before execution.
 
 ## Visual Identity & Design
-- **Phase 1: Character-Driven Interface**: The initial GUI will focus on visualizing the "Swarm" as a team of avatars with distinct roles. This builds the mental model of a hierarchical system.
+- **Phase 1: Character-Driven Interface**: The initial GUI focuses on visualizing the "Swarm" as a team of avatars within a dynamic, force-directed traffic graph. This organic node-link visualization uses reactive animations to provide an "alive" feel, building the mental model of a hierarchical system.
 - **Future Roadmap**:
     - **Industrial Mode**: A high-density, data-centric dashboard for power users.
     - **Adaptive Modes**: Context-aware UI shifts based on the active task complexity (e.g., "War Room" view for critical debugging vs. "Status Board" for background tasks).

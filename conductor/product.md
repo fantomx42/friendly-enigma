@@ -16,6 +16,7 @@ Ralph AI is a local-first, FOSS 3-tier hierarchical swarm system for autonomous 
 - **Hybrid Memory System**: Combines vector-based semantic search with experimental spatial dynamics (Wheeler Memory) to maintain long-term context and project-wide awareness.
 
 ## Interaction Model
-- **Native GUI Dashboard**: A high-performance Rust-based native interface for real-time visualization of agent traffic, VRAM utilization, and swarm health.
+- **Native GUI Dashboard**: A high-performance Rust-based native interface for real-time visualization of agent traffic and swarm health.
+- **Integrated Task Control Center**: Provides direct dashboard control over task lifecycles (Start, Pause, Stop), sandbox toggles, and per-agent model parameters (Temperature, Top P).
 - **CLI-First Loop**: A robust command-line interface for direct task execution and integration into existing developer workflows.
 - **Multimodal Extension**: Support for voice input and vision analysis to allow for more natural and complex task descriptions.
