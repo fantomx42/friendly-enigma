@@ -16,6 +16,13 @@ if _ralph_core_path not in sys.path:
 
 from vector_db import vector_memory
 
+# Integration with Wheeler Memory System (Experimental)
+try:
+    from wheeler import WheelerMemoryBridge
+except ImportError:
+    print("[Memory] Wheeler bridge not found, skipping integration.")
+    WheelerMemoryBridge = None
+
 class Memory:
     def __init__(self, root_dir: str = "."):
         self.root_dir = root_dir
@@ -25,6 +32,9 @@ class Memory:
 
         # Ensure memory directory exists
         os.makedirs(self.memory_dir, exist_ok=True)
+        
+        # Initialize Wheeler Memory Bridge
+        self.wheeler = WheelerMemoryBridge() if WheelerMemoryBridge else None
 
     def load_context(self) -> None:
         """Loads short-term working memory."""
@@ -57,6 +67,10 @@ class Memory:
             
         # ALSO save to Vector DB
         vector_memory.add(fact, {"tag": tag, "source": "manual_memory"})
+        
+        # ALSO save to Wheeler Memory (Spatial/Dynamics)
+        if self.wheeler:
+            self.wheeler.remember(fact)
 
     def save(self, fact: str, tag: str = "general") -> None:
         """Alias for remember() - saves a fact to long-term memory.
@@ -84,13 +98,20 @@ class Memory:
     def recall_similar(self, query: str) -> str:
         """Retrieves semantically similar facts/lessons."""
         results = vector_memory.search(query)
-        if not results:
-            return ""
         
-        summary = "--- RELEVANT MEMORIES ---\n"
-        for r in results:
-            doc = r['document']
-            summary += f"- [{r['score']:.2f}] {doc['text']} (Tag: {doc['metadata'].get('tag', 'unknown')})\n"
+        summary = ""
+        if results:
+            summary += "--- RELEVANT MEMORIES ---\n"
+            for r in results:
+                doc = r['document']
+                summary += f"- [{r['score']:.2f}] {doc['text']} (Tag: {doc['metadata'].get('tag', 'unknown')})\n"
+        
+        # Check Wheeler Memory (Spatial Associations)
+        if self.wheeler:
+            wheeler_results = self.wheeler.recall(query)
+            if wheeler_results:
+                summary += "\n" + wheeler_results
+                
         return summary
 
     def retrieve_full_state(self) -> str:

@@ -1,8 +1,9 @@
 # CURRENT PROJECT STATE
 - **Phase:** Phase III: Capability Expansion
-- **Active Goal:** Implementing Long-Term Memory (Context) with Vector DB.
+- **Active Goal:** Enhancing Memory Systems (Vector DB + Experimental Wheeler Spatial Memory).
 
 # RECENT UPDATES
+- [2026-01-29] **Wheeler Memory Integrated:** Experimental spatial/dynamics-based memory system bridged into `ralph_core`.
 - [2026-01-21] **Tool Registry Complete:** Secure, message-driven tool execution via `tool_system/` package. Security checkpoint validates all tool calls.
 - [2026-01-19] **Bug Fixes:** Fixed dreamer.py import, config.py translator role, Python 3.14 compatibility.
 - [2026-01-13] **Agent Architecture Refactor:** Core logic split into `ralph_core/agents/` (Orchestrator/Engineer/Designer).
