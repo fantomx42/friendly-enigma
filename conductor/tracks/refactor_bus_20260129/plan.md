@@ -2,7 +2,7 @@
 
 This plan follows the Test-Driven Development (TDD) workflow.
 
-## Phase 1: Enhanced Message Schema
+## Phase 1: Enhanced Message Schema [checkpoint: 3aa71d4]
 - [x] Task: Create tests for `DiagnosticMessage`. [2f4b3c7]
     - [x] Create `ralph_core/tests/test_messages_diagnostic.py`.
     - [x] Define test cases for schema validation (required vs optional fields).
@@ -10,7 +10,7 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Update `ralph_core/protocols/messages.py`.
     - [x] Add `DiagnosticMessage` class inheriting from base `Message`.
     - [x] Implement validation logic.
-- [~] Task: Conductor - User Manual Verification 'Enhanced Message Schema' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Enhanced Message Schema' (Protocol in workflow.md) [3aa71d4]
 
 ## Phase 2: Diagnostic Channel & Routing
 - [ ] Task: Create tests for Bus Routing.
