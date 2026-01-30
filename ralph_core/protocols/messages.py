@@ -41,6 +41,7 @@ class MessageType(Enum):
     # Any → Any
     ERROR = "error"                      # Error occurred
     STATUS = "status"                    # Status update
+    DIAGNOSTIC = "diagnostic"            # Diagnostic info for Wiggum Protocol (NEW)
 
     # Orchestrator → Any
     ABORT = "abort"                      # Cancel current work
@@ -491,5 +492,43 @@ def consolidation_response(
             "clusters_found": clusters_found,
             "lessons_analyzed": lessons_analyzed,
             "duration_ms": duration_ms,
+        },
+    )
+
+
+def diagnostic_message(
+    error: str,
+    traceback: str,
+    agent_state: dict[str, Any],
+    attempt_count: int = 1,
+    sender: str = "system",
+    receiver: str = "orchestrator",
+) -> Message:
+    """
+    Create a DIAGNOSTIC message for the Wiggum Protocol.
+
+    Args:
+        error: Description of the error/failure
+        traceback: Stack trace or detailed error context
+        agent_state: Snapshot of agent internal state at time of failure
+        attempt_count: How many times the task has been attempted
+        sender: The agent that failed
+        receiver: Recipient (usually orchestrator or reflector)
+
+    Returns:
+        Message with structured diagnostic payload
+    """
+    return Message(
+        type=MessageType.DIAGNOSTIC,
+        sender=sender,
+        receiver=receiver,
+        payload={
+            "error": error,
+            "error_context": {
+                "traceback": traceback,
+                "agent_state": agent_state,
+                "attempt_count": attempt_count,
+            }
         }
     )
+
