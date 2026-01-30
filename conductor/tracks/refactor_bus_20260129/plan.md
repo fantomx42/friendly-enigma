@@ -13,10 +13,10 @@ This plan follows the Test-Driven Development (TDD) workflow.
 - [x] Task: Conductor - User Manual Verification 'Enhanced Message Schema' (Protocol in workflow.md) [3aa71d4]
 
 ## Phase 2: Diagnostic Channel & Routing
-- [ ] Task: Create tests for Bus Routing.
-    - [ ] Update `ralph_core/tests/test_bus.py`.
-    - [ ] Add test case: `test_publish_diagnostic_message`.
-    - [ ] Add test case: `test_diagnostic_subscriber_receives_event`.
+- [x] Task: Create tests for Bus Routing. [48cd46f]
+    - [x] Update `ralph_core/tests/test_bus.py`.
+    - [x] Add test case: `test_publish_diagnostic_message`.
+    - [x] Add test case: `test_diagnostic_subscriber_receives_event`.
 - [ ] Task: Implement Routing Logic.
     - [ ] Modify `ralph_core/protocols/bus.py`.
     - [ ] Add logic to handle `events/diagnostic` topic specifically.
