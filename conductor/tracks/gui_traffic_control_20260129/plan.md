@@ -5,7 +5,7 @@
     - [ ] Initialize Rust project in `ralph_gui/` if not already present
     - [ ] Configure `egui` and `eframe` dependencies in `Cargo.toml`
     - [ ] Implement a basic boilerplate window with placeholder areas for the graph and control center
-- [ ] Task: Message Bus Subscriber Interface
+- [x] Task: Message Bus Subscriber Interface [0559fec]
     - [ ] Define Rust structs for Agent Status and Communication Messages (matching Python backend)
     - [ ] Implement an async message bus listener using `tokio` or similar to receive real-time data
     - [ ] Create a thread-safe state store for the GUI to consume received messages
