@@ -12,7 +12,7 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Implement validation logic.
 - [x] Task: Conductor - User Manual Verification 'Enhanced Message Schema' (Protocol in workflow.md) [3aa71d4]
 
-## Phase 2: Diagnostic Channel & Routing
+## Phase 2: Diagnostic Channel & Routing [checkpoint: ee1bd56]
 - [x] Task: Create tests for Bus Routing. [48cd46f]
     - [x] Update `ralph_core/tests/test_bus.py`.
     - [x] Add test case: `test_publish_diagnostic_message`.
@@ -21,7 +21,7 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Modify `ralph_core/protocols/bus.py`.
     - [x] Add logic to handle `events/diagnostic` topic specifically.
     - [x] Ensure high-priority dispatch (bypass standard queue if applicable).
-- [~] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md) [ee1bd56]
 
 ## Phase 3: Error Interception (The "Wiggum" Logic)
 - [ ] Task: Create Integration Test for Error Handling.
