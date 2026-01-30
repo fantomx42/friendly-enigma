@@ -21,7 +21,7 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Modify `ralph_core/protocols/bus.py`.
     - [x] Add logic to handle `events/diagnostic` topic specifically.
     - [x] Ensure high-priority dispatch (bypass standard queue if applicable).
-- [ ] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md)
+- [~] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md)
 
 ## Phase 3: Error Interception (The "Wiggum" Logic)
 - [ ] Task: Create Integration Test for Error Handling.
