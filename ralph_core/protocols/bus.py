@@ -106,6 +106,8 @@ class MessageBus:
 
         if self.config.enable_logging:
             print(f"[BUS] {message.sender} --[{message.type.value}]--> {message.receiver}")
+            # GUI JSON capture
+            print(f"[MESSAGE] {json.dumps(message.to_dict())}", flush=True)
 
         return True
 

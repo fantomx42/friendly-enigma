@@ -9,20 +9,23 @@ use std::thread;
 use crossbeam_channel::Sender;
 
 use super::events::LogEntry;
+use super::messages::Message;
 
 /// Manages the Ralph subprocess
 pub struct RalphRunner {
     objective: String,
-    sender: Sender<LogEntry>,
+    log_sender: Sender<LogEntry>,
+    msg_sender: Sender<Message>,
     child: Arc<Mutex<Option<Child>>>,
     running: Arc<Mutex<bool>>,
 }
 
 impl RalphRunner {
-    pub fn new(objective: String, sender: Sender<LogEntry>) -> Self {
+    pub fn new(objective: String, log_sender: Sender<LogEntry>, msg_sender: Sender<Message>) -> Self {
         Self {
             objective,
-            sender,
+            log_sender,
+            msg_sender,
             child: Arc::new(Mutex::new(None)),
             running: Arc::new(Mutex::new(false)),
         }
@@ -66,27 +69,35 @@ impl RalphRunner {
         *self.running.lock().unwrap() = true;
 
         // Spawn thread to read stdout
-        let sender_stdout = self.sender.clone();
+        let log_sender = self.log_sender.clone();
+        let msg_sender = self.msg_sender.clone();
         let running_stdout = self.running.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().flatten() {
                 if !line.trim().is_empty() {
+                    if line.starts_with("[MESSAGE]") {
+                        let json_part = line.trim_start_matches("[MESSAGE]").trim();
+                        if let Ok(msg) = serde_json::from_str::<Message>(json_part) {
+                            let _ = msg_sender.send(msg);
+                        }
+                    }
+                    
                     let entry = LogEntry::parse(&line);
-                    let _ = sender_stdout.send(entry);
+                    let _ = log_sender.send(entry);
                 }
             }
             *running_stdout.lock().unwrap() = false;
         });
 
         // Spawn thread to read stderr
-        let sender_stderr = self.sender.clone();
+        let log_sender_err = self.log_sender.clone();
         thread::spawn(move || {
             let reader = BufReader::new(stderr);
             for line in reader.lines().flatten() {
                 if !line.trim().is_empty() {
                     let entry = LogEntry::error(line);
-                    let _ = sender_stderr.send(entry);
+                    let _ = log_sender_err.send(entry);
                 }
             }
         });

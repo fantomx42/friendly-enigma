@@ -4,6 +4,7 @@
 
 mod runner;
 mod events;
+pub mod messages;
 
 pub use runner::RalphRunner;
 pub use events::{LogEntry, LogLevel, AgentState, Metrics};

@@ -7,6 +7,7 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use serde_json::Value;
 
 use crate::ralph::{RalphRunner, AgentState, Metrics, LogEntry};
+use crate::ralph::messages::Message;
 use crate::ui;
 use crate::theme;
 
@@ -110,6 +111,7 @@ pub struct RalphApp {
     // Runner
     runner: Option<RalphRunner>,
     log_receiver: Option<Receiver<LogEntry>>,
+    message_receiver: Option<Receiver<Message>>,
 
     // Animation state
     pub animation_time: f32,
@@ -143,6 +145,7 @@ impl Default for RalphApp {
             tasks: Vec::new(),
             runner: None,
             log_receiver: None,
+            message_receiver: None,
             animation_time: 0.0,
         }
     }
@@ -166,15 +169,32 @@ impl RalphApp {
         self.active_connection = None;
 
         // Create runner
-        let (sender, receiver) = unbounded();
-        self.log_receiver = Some(receiver);
+        let (log_sender, log_receiver) = unbounded();
+        let (msg_sender, msg_receiver) = unbounded();
+        self.log_receiver = Some(log_receiver);
+        self.message_receiver = Some(msg_receiver);
 
-        let runner = RalphRunner::new(objective, sender);
+        let runner = RalphRunner::new(objective, log_sender, msg_sender);
         if let Err(e) = runner.start() {
             self.add_log(LogEntry::error(format!("Failed to start: {}", e)));
         } else {
             self.runner = Some(runner);
             self.add_log(LogEntry::system("Starting Ralph...".to_string()));
+        }
+    }
+
+    /// Handle a structured message from the bus
+    fn handle_structured_message(&mut self, msg: Message) {
+        // Map string names to Agent enum
+        let sender = match_agent_name(&msg.sender);
+        let receiver = match_agent_name(&msg.receiver);
+
+        // Update active connection
+        if let (Some(s), Some(r)) = (sender, receiver) {
+            self.active_connection = Some((s, r));
+            
+            // Set sender as active
+            self.set_agent_active(s);
         }
     }
 
@@ -188,14 +208,23 @@ impl RalphApp {
 
     /// Process incoming log messages and update state
     fn process_messages(&mut self) {
-        let receiver = if let Some(ref r) = self.log_receiver {
+        // 1. Process structured messages first (higher priority for state)
+        if let Some(ref r) = self.message_receiver {
+            let receiver = r.clone();
+            while let Ok(msg) = receiver.try_recv() {
+                self.handle_structured_message(msg);
+            }
+        }
+
+        // 2. Process log messages
+        let log_receiver = if let Some(ref r) = self.log_receiver {
             r.clone()
         } else {
             return;
         };
 
         // Process all pending messages
-        while let Ok(entry) = receiver.try_recv() {
+        while let Ok(entry) = log_receiver.try_recv() {
             let message = entry.message.clone();
 
             // Handle thinking blocks
@@ -329,6 +358,23 @@ impl RalphApp {
     /// Check if Ralph is currently running
     pub fn is_running(&self) -> bool {
         self.runner.as_ref().map(|r| r.is_running()).unwrap_or(false)
+    }
+}
+
+fn match_agent_name(name: &str) -> Option<Agent> {
+    let name = name.to_lowercase();
+    if name.contains("translator") {
+        Some(Agent::Translator)
+    } else if name.contains("orchestrator") {
+        Some(Agent::Orchestrator)
+    } else if name.contains("engineer") {
+        Some(Agent::Engineer)
+    } else if name.contains("designer") {
+        Some(Agent::Designer)
+    } else if name.contains("asic") {
+        Some(Agent::Asic)
+    } else {
+        None
     }
 }
 
