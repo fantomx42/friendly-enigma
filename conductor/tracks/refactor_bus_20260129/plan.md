@@ -17,10 +17,10 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Update `ralph_core/tests/test_bus.py`.
     - [x] Add test case: `test_publish_diagnostic_message`.
     - [x] Add test case: `test_diagnostic_subscriber_receives_event`.
-- [ ] Task: Implement Routing Logic.
-    - [ ] Modify `ralph_core/protocols/bus.py`.
-    - [ ] Add logic to handle `events/diagnostic` topic specifically.
-    - [ ] Ensure high-priority dispatch (bypass standard queue if applicable).
+- [x] Task: Implement Routing Logic. [3b74ed2]
+    - [x] Modify `ralph_core/protocols/bus.py`.
+    - [x] Add logic to handle `events/diagnostic` topic specifically.
+    - [x] Ensure high-priority dispatch (bypass standard queue if applicable).
 - [ ] Task: Conductor - User Manual Verification 'Diagnostic Channel & Routing' (Protocol in workflow.md)
 
 ## Phase 3: Error Interception (The "Wiggum" Logic)
