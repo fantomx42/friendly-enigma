@@ -2534,6 +2534,7 @@ dependencies = [
  "crossbeam-channel",
  "eframe",
  "egui",
+ "fastrand",
  "notify",
  "serde",
  "serde_json",

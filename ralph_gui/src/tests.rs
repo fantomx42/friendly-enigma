@@ -20,6 +20,21 @@ mod tests {
     }
 
     #[test]
+    fn test_graph_update() {
+        use crate::ui::graph::ForceGraph;
+        use egui::Pos2;
+        
+        let mut graph = ForceGraph::new(Pos2::new(0.0, 0.0));
+        let initial_pos = graph.nodes[&Agent::Orchestrator].pos;
+        
+        graph.update(0.1);
+        let new_pos = graph.nodes[&Agent::Orchestrator].pos;
+        
+        // Positions should have moved due to repulsion
+        assert_ne!(initial_pos, new_pos);
+    }
+
+    #[test]
     fn test_message_parsing() {
         use crate::ralph::messages::{Message, MessageType};
         

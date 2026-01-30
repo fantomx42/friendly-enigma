@@ -108,6 +108,9 @@ pub struct RalphApp {
     // Tasks
     pub tasks: Vec<Task>,
 
+    // Graph
+    pub graph: ui::graph::ForceGraph,
+
     // Runner
     runner: Option<RalphRunner>,
     log_receiver: Option<Receiver<LogEntry>>,
@@ -143,6 +146,7 @@ impl Default for RalphApp {
             is_thinking: false,
             metrics: Metrics::default(),
             tasks: Vec::new(),
+            graph: ui::graph::ForceGraph::new(egui::Pos2::new(640.0, 400.0)),
             runner: None,
             log_receiver: None,
             message_receiver: None,

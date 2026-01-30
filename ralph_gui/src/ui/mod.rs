@@ -6,3 +6,4 @@ pub mod metrics;
 pub mod input;
 pub mod tasks;
 pub mod controls;
+pub mod graph;
