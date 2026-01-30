@@ -26,7 +26,7 @@
     - [ ] Implement the Command Input text area and Submit logic
     - [ ] Create buttons for Start, Pause, Stop, and Emergency Flush
     - [ ] Implement the Sandbox Toggle and Agent Configuration switches
-- [ ] Task: Backend Command Routing
+- [x] Task: Backend Command Routing [86f8166]
     - [ ] Implement the publisher side of the message bus to send commands back to the swarm
     - [ ] Verify that UI actions (e.g., clicking Stop) generate the correct message bus packets
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Control Center' (Protocol in workflow.md)
