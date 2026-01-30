@@ -9,10 +9,9 @@
     - [ ] Define Rust structs for Agent Status and Communication Messages (matching Python backend)
     - [ ] Implement an async message bus listener using `tokio` or similar to receive real-time data
     - [ ] Create a thread-safe state store for the GUI to consume received messages
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Foundation' (Protocol in workflow.md)
-
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Foundation'
 ## Phase 2: Force-Directed Graph Visualization
-- [ ] Task: Graph Data Structure and Layout Logic
+- [x] Task: Graph Data Structure and Layout Logic [bd681c9]
     - [ ] Implement a `Node` and `Edge` data structure within the GUI state
     - [ ] Integrate or implement a basic force-directed layout algorithm (attraction/repulsion)
 - [ ] Task: Visualization Rendering
