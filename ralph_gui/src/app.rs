@@ -212,6 +212,20 @@ impl RalphApp {
 
     /// Process incoming log messages and update state
     fn process_messages(&mut self) {
+        // 0. Check if process just stopped
+        if let Some(ref runner) = self.runner {
+            if !runner.is_running() {
+                // Process died or finished - reset UI state
+                for state in self.agent_states.values_mut() {
+                    *state = AgentState::Idle;
+                }
+                self.active_connection = None;
+                self.is_thinking = false;
+                self.add_log(LogEntry::system("Ralph process disconnected".to_string()));
+                self.runner = None;
+            }
+        }
+
         // 1. Process structured messages first (higher priority for state)
         if let Some(ref r) = self.message_receiver {
             let receiver = r.clone();

@@ -73,4 +73,22 @@ mod tests {
         
         assert_eq!(app.agent_params.get(&orchestrator).unwrap().temperature, 1.5);
     }
+
+    #[test]
+    fn test_disconnection_handling() {
+        let mut app = RalphApp::default();
+        
+        // Mock active state
+        app.agent_states.insert(Agent::Orchestrator, crate::ralph::AgentState::Active);
+        app.active_connection = Some((Agent::Translator, Agent::Orchestrator));
+        
+        // Reset state manually as process_messages would
+        for state in app.agent_states.values_mut() {
+            *state = crate::ralph::AgentState::Idle;
+        }
+        app.active_connection = None;
+        
+        assert_eq!(app.agent_states[&Agent::Orchestrator], crate::ralph::AgentState::Idle);
+        assert!(app.active_connection.is_none());
+    }
 }
