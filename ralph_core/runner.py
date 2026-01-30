@@ -12,21 +12,23 @@ Set RALPH_V2=1 environment variable to enable V2 mode.
 import sys
 import os
 import re
+import traceback
 
 # Ensure we can import swarm from the same directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Core swarm functions (legacy)
-from swarm import think, code, review, verify, reflect, decompose, diagnose, estimate_task
+from ralph_core.swarm import think, code, review, verify, reflect, decompose, diagnose, estimate_task
 # Note: generate_dream is used by ralph_daemon.py, not here
 
 # New V2 components
 try:
-    from swarm import (
+    from ralph_core.swarm import (
         translate, TaskSpec,
         code_with_revision, review_with_feedback,
         spawn_asic, get_bus, reset_bus,
         Message, MessageType,
+        diagnostic_message,
         # Message handlers
         orchestrator_handle_message,
         engineer_handle_message,
@@ -365,7 +367,21 @@ def run_v2_pipeline(objective: str, context: str, plan_summary: str, brain: "Mem
                         msg.payload["original_context"] = full_context
 
                     # Handle message
-                    response = handler(msg)
+                    try:
+                        response = handler(msg)
+                    except Exception as e:
+                        print(f"[V2] Agent {agent_name} CRASHED: {e}")
+                        # Create diagnostic message
+                        tb = traceback.format_exc()
+                        response = diagnostic_message(
+                            error=str(e),
+                            traceback=tb,
+                            agent_state={}, # TODO: Capture actual agent state if possible
+                            attempt_count=iteration, # Use loop iteration as attempt count for now
+                            sender=agent_name,
+                            receiver="orchestrator"
+                        )
+
                     message_processed = True
 
                     if response is None:

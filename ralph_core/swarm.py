@@ -70,12 +70,13 @@ except ImportError:
 # New: Message Bus Protocol
 # ============================================
 try:
-    from protocols import Message, MessageType, MessageBus
-    from protocols.bus import get_bus, reset_bus
+    from ralph_core.protocols import Message, MessageType, MessageBus, diagnostic_message
+    from ralph_core.protocols.bus import get_bus, reset_bus
 except ImportError:
     Message = None
     MessageType = None
     MessageBus = None
+    diagnostic_message = None
     get_bus = None
     reset_bus = None
 
@@ -108,5 +109,5 @@ __all__ = [
 
     # Message Bus
     "Message", "MessageType", "MessageBus",
-    "get_bus", "reset_bus",
+    "get_bus", "reset_bus", "diagnostic_message",
 ]

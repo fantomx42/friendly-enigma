@@ -22,6 +22,8 @@ from .messages import (
     options_message, complete_message, error_message,
     # ASIC messages
     asic_request, asic_response,
+    # Diagnostic messages
+    diagnostic_message,
 )
 from .bus import MessageBus, get_bus, reset_bus, BusConfig
 
@@ -35,6 +37,7 @@ __all__ = [
     # Message constructors
     "work_request", "code_output", "revision_request",
     "options_message", "complete_message", "error_message",
+    "diagnostic_message",
 
     # ASIC message constructors
     "asic_request", "asic_response",
