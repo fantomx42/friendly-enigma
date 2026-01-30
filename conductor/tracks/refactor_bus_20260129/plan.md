@@ -28,11 +28,11 @@ This plan follows the Test-Driven Development (TDD) workflow.
     - [x] Create `ralph_core/tests/test_runner_error.py`.
     - [x] Mock a failing agent.
     - [x] Assert that running the failing agent produces a `DiagnosticMessage` on the bus.
-- [ ] Task: Implement Exception Catching in Runner.
-    - [ ] Modify `ralph_core/runner.py` (execute method).
-    - [ ] Wrap execution in try/except block.
-    - [ ] On exception:
-        - [ ] Capture traceback.
-        - [ ] Create `DiagnosticMessage`.
-        - [ ] Publish to bus.
+- [x] Task: Implement Exception Catching in Runner. [455f258]
+    - [x] Modify `ralph_core/runner.py` (execute method).
+    - [x] Wrap execution in try/except block.
+    - [x] On exception:
+        - [x] Capture traceback.
+        - [x] Create `DiagnosticMessage`.
+        - [x] Publish to bus.
 - [ ] Task: Conductor - User Manual Verification 'Error Interception' (Protocol in workflow.md)
