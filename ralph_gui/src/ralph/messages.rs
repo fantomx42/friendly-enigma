@@ -42,3 +42,26 @@ pub struct Message {
     #[serde(default)]
     pub metadata: Value,
 }
+
+impl Message {
+    pub fn abort() -> Self {
+        Self::new(MessageType::Abort, "orchestrator", serde_json::json!({}))
+    }
+
+    pub fn status(status: &str) -> Self {
+        Self::new(MessageType::Status, "system", serde_json::json!({"status": status}))
+    }
+
+    fn new(msg_type: MessageType, receiver: &str, payload: Value) -> Self {
+        Self {
+            id: fastrand::u32(..).to_string(),
+            msg_type,
+            sender: "gui".to_string(),
+            receiver: receiver.to_string(),
+            payload,
+            timestamp: chrono::Local::now().to_rfc3339(),
+            correlation_id: None,
+            metadata: serde_json::json!({}),
+        }
+    }
+}

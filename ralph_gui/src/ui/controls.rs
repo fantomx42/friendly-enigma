@@ -30,6 +30,7 @@ pub fn show(ui: &mut egui::Ui, app: &mut RalphApp) {
 
         // Stop button
         if ui.add_enabled(is_running, egui::Button::new("Stop")).clicked() {
+            app.send_to_backend(crate::ralph::messages::Message::abort());
             if let Some(ref runner) = app.runner() {
                 runner.kill();
             }

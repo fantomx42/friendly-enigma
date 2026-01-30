@@ -5,6 +5,11 @@ Routes messages between agents and maintains conversation history.
 Implements circuit breakers to prevent infinite loops.
 """
 
+import json
+import os
+import time
+import sys
+import threading
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional, Callable
@@ -59,6 +64,34 @@ class MessageBus:
             "by_type": {},
             "start_time": datetime.now(),
         }
+
+        # GUI Stdin Listener
+        self._stop_event = threading.Event()
+        self._gui_thread = threading.Thread(target=self._listen_to_gui, daemon=True)
+        self._gui_thread.start()
+
+    def _listen_to_gui(self):
+        """Background thread to listen for messages from GUI via stdin."""
+        while not self._stop_event.is_set():
+            try:
+                # Use select or similar for non-blocking if needed, but simple readline is ok for daemon
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                
+                if line.startswith("[MESSAGE]"):
+                    json_str = line[9:].strip()
+                    data = json.loads(json_str)
+                    msg = Message.from_dict(data)
+                    self.send(msg)
+            except Exception as e:
+                if self.config.enable_logging:
+                    print(f"[BUS] GUI listener error: {e}")
+                time.sleep(0.1)
+
+    def stop(self):
+        """Stop background threads."""
+        self._stop_event.set()
 
     def send(self, message: Message) -> bool:
         """
@@ -234,4 +267,6 @@ def get_bus() -> MessageBus:
 def reset_bus():
     """Reset the global message bus."""
     global _global_bus
+    if _global_bus:
+        _global_bus.stop()
     _global_bus = MessageBus()

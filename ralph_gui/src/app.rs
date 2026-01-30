@@ -367,6 +367,17 @@ impl RalphApp {
     pub fn runner(&self) -> Option<&RalphRunner> {
         self.runner.as_ref()
     }
+
+    /// Send a command/message to the running Ralph process
+    pub fn send_to_backend(&self, msg: Message) {
+        if let Some(ref runner) = self.runner {
+            if let Err(e) = runner.send_message(&msg) {
+                // We can't use self.add_log here because &self is immutable
+                // For now, print to stderr
+                eprintln!("[GUI] Error sending message: {}", e);
+            }
+        }
+    }
 }
 
 fn match_agent_name(name: &str) -> Option<Agent> {

@@ -2,7 +2,7 @@
 //!
 //! Spawns ralph_loop.sh as a subprocess and captures output.
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio, Child};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -18,6 +18,7 @@ pub struct RalphRunner {
     msg_sender: Sender<Message>,
     child: Arc<Mutex<Option<Child>>>,
     running: Arc<Mutex<bool>>,
+    stdin: Arc<Mutex<Option<std::process::ChildStdin>>>,
 }
 
 impl RalphRunner {
@@ -28,6 +29,7 @@ impl RalphRunner {
             msg_sender,
             child: Arc::new(Mutex::new(None)),
             running: Arc::new(Mutex::new(false)),
+            stdin: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -57,15 +59,18 @@ impl RalphRunner {
             .current_dir(&project_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+            .stdin(Stdio::piped())
             .spawn()
             .map_err(|e| format!("Failed to spawn: {}", e))?;
 
-        // Take stdout and stderr
+        // Take stdout, stderr, and stdin
         let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
         let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
+        let stdin = child.stdin.take().ok_or("Failed to capture stdin")?;
 
-        // Store child handle
+        // Store child handle and stdin
         *self.child.lock().unwrap() = Some(child);
+        *self.stdin.lock().unwrap() = Some(stdin);
         *self.running.lock().unwrap() = true;
 
         // Spawn thread to read stdout
@@ -108,6 +113,18 @@ impl RalphRunner {
     /// Check if Ralph is still running
     pub fn is_running(&self) -> bool {
         *self.running.lock().unwrap()
+    }
+
+    /// Send a message to the Ralph process
+    pub fn send_message(&self, msg: &Message) -> Result<(), String> {
+        if let Some(ref mut stdin) = *self.stdin.lock().unwrap() {
+            let json = serde_json::to_string(msg).map_err(|e| e.to_string())?;
+            writeln!(stdin, "[MESSAGE] {}", json).map_err(|e| e.to_string())?;
+            stdin.flush().map_err(|e| e.to_string())?;
+            Ok(())
+        } else {
+            Err("Stdin not available".to_string())
+        }
     }
 
     /// Kill the Ralph process
