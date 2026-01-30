@@ -145,7 +145,7 @@ def handle_message(message: "Message") -> "Message":
     Returns:
         Response Message object (could be CODE_OUTPUT or ASIC_REQUEST)
     """
-    from protocols.messages import Message, MessageType, code_output, asic_request
+    from ralph_core.protocols.messages import Message, MessageType, code_output, asic_request
 
     msg_type = message.type
     payload = message.payload
@@ -244,7 +244,7 @@ def handle_message(message: "Message") -> "Message":
 
     else:
         # Unknown message type
-        from protocols.messages import error_message
+        from ralph_core.protocols.messages import error_message
         return error_message(
             error=f"Engineer cannot handle message type: {msg_type}",
             recoverable=True,

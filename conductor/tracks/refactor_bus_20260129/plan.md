@@ -35,4 +35,4 @@ This plan follows the Test-Driven Development (TDD) workflow.
         - [x] Capture traceback.
         - [x] Create `DiagnosticMessage`.
         - [x] Publish to bus.
-- [ ] Task: Conductor - User Manual Verification 'Error Interception' (Protocol in workflow.md)
+- [~] Task: Conductor - User Manual Verification 'Error Interception' (Protocol in workflow.md)

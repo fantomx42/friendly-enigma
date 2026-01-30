@@ -13,7 +13,7 @@ if _ralph_core_path not in sys.path:
     sys.path.insert(0, _ralph_core_path)
 
 from typing import Any, Optional
-from protocols.messages import Message, MessageType
+from ralph_core.protocols.messages import Message, MessageType
 
 
 def tool_request(

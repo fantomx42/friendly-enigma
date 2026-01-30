@@ -28,7 +28,7 @@ def handle_tool_request(message: "Message") -> Optional["Message"]:
     Returns:
         TOOL_RESPONSE message (or None if confirmation needed)
     """
-    from protocols.messages import Message, MessageType
+    from ralph_core.protocols.messages import Message, MessageType
 
     payload = message.payload
     tool_name = payload.get("tool_name", "")
@@ -149,7 +149,7 @@ def handle_message(message: "Message") -> Optional["Message"]:
     """
     Main message handler for tool system.
     """
-    from protocols.messages import MessageType
+    from ralph_core.protocols.messages import MessageType
 
     msg_type = message.type
 
@@ -158,7 +158,7 @@ def handle_message(message: "Message") -> Optional["Message"]:
     elif msg_type == MessageType.TOOL_CONFIRM:
         return handle_tool_confirm(message)
     else:
-        from protocols.messages import error_message
+        from ralph_core.protocols.messages import error_message
         return error_message(
             error=f"Tool handler cannot process: {msg_type}",
             recoverable=True,

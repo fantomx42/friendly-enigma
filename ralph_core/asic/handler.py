@@ -31,7 +31,7 @@ def handle_asic_request(message: "Message") -> Optional["Message"]:
     Returns:
         ASIC_RESPONSE message with options, or ERROR message
     """
-    from protocols.messages import (
+    from ralph_core.protocols.messages import (
         Message, MessageType,
         asic_response, error_message,
     )
@@ -99,7 +99,7 @@ def handle_message(message: "Message") -> Optional["Message"]:
 
     Routes based on message type and task_type in receiver.
     """
-    from protocols.messages import MessageType, error_message
+    from ralph_core.protocols.messages import MessageType, error_message
 
     msg_type = message.type
 

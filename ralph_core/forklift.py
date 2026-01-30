@@ -23,7 +23,7 @@ from vector_db import vector_memory
 
 if TYPE_CHECKING:
     from memory import Memory
-    from protocols.messages import Message
+    from ralph_core.protocols.messages import Message
 
 
 @dataclass
@@ -253,7 +253,7 @@ def handle_forklift_request(message: "Message") -> "Message":
     For use with the MessageBus.
     """
     from memory import Memory
-    from protocols.messages import MessageType, Message as Msg, forklift_response
+    from ralph_core.protocols.messages import MessageType, Message as Msg, forklift_response
 
     start_time = time.time()
 

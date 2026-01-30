@@ -192,7 +192,7 @@ def handle_message(message: "Message") -> "Message":
     Returns:
         Response Message object
     """
-    from protocols.messages import (
+    from ralph_core.protocols.messages import (
         Message, MessageType,
         revision_request, complete_message, error_message
     )

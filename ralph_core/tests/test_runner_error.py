@@ -14,7 +14,8 @@ from ralph_core.protocols.messages import Message, MessageType, DiagnosticMessag
 @patch("ralph_core.runner.translate")
 @patch("ralph_core.runner.think")
 @patch("ralph_core.runner.Memory")
-def test_runner_catches_agent_exception(mock_memory, mock_think, mock_translate, mock_get_bus):
+@patch("ralph_core.runner.create_work_request")
+def test_runner_catches_agent_exception(mock_create_work_request, mock_memory, mock_think, mock_translate, mock_get_bus):
     """
     Verify that an exception in an agent handler results in a DiagnosticMessage.
     """
@@ -25,6 +26,7 @@ def test_runner_catches_agent_exception(mock_memory, mock_think, mock_translate,
     # Setup mocks to allow the pipeline to reach the message loop
     mock_translate.return_value = MagicMock(to_dict=lambda: {}, to_prompt_context=lambda: "")
     mock_think.return_value = "Test Plan"
+    mock_create_work_request.return_value = Message(MessageType.WORK_REQUEST, "orchestrator", "engineer", {})
     
     # Simulate a work request being sent and then processed
     # We'll mock the handler to throw an error
@@ -58,6 +60,7 @@ def test_runner_catches_agent_exception(mock_memory, mock_think, mock_translate,
     # Check if bus.send was called with a DiagnosticMessage
     # The first call is the initial work request, subsequent should be diagnostic
     sent_messages = [call.args[0] for call in bus.send.call_args_list]
+    print(f"Sent messages: {[type(m) for m in sent_messages]}")
     
     diagnostic_msgs = [m for m in sent_messages if isinstance(m, DiagnosticMessage)]
     

@@ -57,7 +57,7 @@ def create_work_request(
     Returns:
         Message ready to send via bus
     """
-    from protocols.messages import work_request
+    from ralph_core.protocols.messages import work_request
     return work_request(plan=plan, task_spec=task_spec, context=context)
 
 
@@ -76,7 +76,7 @@ def handle_message(message: "Message") -> Optional["Message"]:
     Returns:
         Response Message or None (orchestrator often terminates flow)
     """
-    from protocols.messages import Message, MessageType, error_message
+    from ralph_core.protocols.messages import Message, MessageType, error_message
 
     msg_type = message.type
     payload = message.payload
