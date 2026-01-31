@@ -13,3 +13,25 @@ RALPH_PROGRESS.md
 
 .gemini/
 gha-creds-*.json
+
+# Build artifacts
+ralph_gui/target/
+*.tar.gz
+cmake.tar.gz
+cmake-*/
+
+# Node
+node_modules/
+ralph_ui/node_modules/
+
+# Test artifacts
+ralph_ui/playwright-report/
+ralph_ui/test-results/
+.coverage
+
+# Vendor builds
+vendor/llama.cpp/build/
+
+# Large files
+*.rlib
+wget-log
