@@ -10,11 +10,21 @@ if _ralph_core_path not in sys.path:
 from .config import MODELS, OLLAMA_API, LLAMA_CPP_API
 from metrics import tracker
 
+try:
+    from ollama_client import OllamaClient
+except ImportError:
+    # Fallback for different execution environments
+    from ralph_core.ollama_client import OllamaClient
+
+# Global client instance
+_ollama_client = OllamaClient()
+
 USE_V2 = os.environ.get("RALPH_V2", "0") == "1"
 
 def call_model(role: str, prompt: str, stream: bool = False) -> str:
     """
     Generic handler to call a specific role in the swarm.
+    Now with VRAM awareness via OllamaClient.
     """
     model_name = MODELS.get(role)
     if not model_name:
@@ -25,8 +35,7 @@ def call_model(role: str, prompt: str, stream: bool = False) -> str:
 
     try:
         if USE_V2:
-            # Ralph v2 uses llama-server (Chalmers + Wiggum)
-            # This uses speculative decoding automatically on the server side
+            # ... (keep existing v2 logic)
             response = requests.post(
                 LLAMA_CPP_API,
                 json={
@@ -38,38 +47,19 @@ def call_model(role: str, prompt: str, stream: bool = False) -> str:
             )
             response.raise_for_status()
             data = response.json()
-            
-            # Log Metrics (llama.cpp format)
-            if not stream:
-                tracker.log_llm_call(
-                    model="v2-chalmers-wiggum",
-                    prompt_tokens=data.get("tokens_evaluated", 0),
-                    completion_tokens=data.get("tokens_predicted", 0),
-                    duration_ms=int(data.get("timings", {}).get("predicted_ms", 0))
-                )
-            
             result = data.get("content", "").strip()
 
         else:
-            # Legacy/V1 uses Ollama
-            response = requests.post(
-                OLLAMA_API,
-                json={
-                    "model": model_name,
-                    "prompt": prompt,
-                    "stream": stream,
-                    "keep_alive": "10m",
-                    "options": {
-                        "temperature": 0.7 if role == "orchestrator" else 0.2
-                    }
-                },
-                timeout=600
+            # Use the VRAM-aware OllamaClient
+            data = _ollama_client.generate(
+                model=model_name,
+                prompt=prompt,
+                stream=stream,
+                keep_alive="10m",
+                options={
+                    "temperature": 0.7 if role == "orchestrator" else 0.2
+                }
             )
-            if response.status_code == 404:
-                return f"Error: Model {model_name} not found. Run 'ollama pull {model_name}'"
-            
-            response.raise_for_status()
-            data = response.json()
             
             # Log Metrics
             if not stream:
@@ -82,14 +72,13 @@ def call_model(role: str, prompt: str, stream: bool = False) -> str:
             
             result = data.get("response", "").strip()
         
-        if stream:
-            print(f"[AGENT:{role.upper()}:END]", flush=True)
-            return "Streaming not yet implemented in swarm.py"
-
         # Emit agent end marker for GUI
         print(f"[AGENT:{role.upper()}:END]", flush=True)
-
         return result
+
+    except Exception as e:
+        print(f"[AGENT:{role.upper()}:END]", flush=True)
+        return f"CRITICAL SWARM ERROR ({role}): {str(e)}"
 
     except Exception as e:
         print(f"[AGENT:{role.upper()}:END]", flush=True)

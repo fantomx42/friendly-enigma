@@ -1,0 +1,6 @@
+FROM ./bitnet_b1_58-3B.Q3_K_S.gguf
+TEMPLATE "{{ .Prompt }}"
+SYSTEM "You are a helpful AI assistant."
+PARAMETER temperature 0.7
+PARAMETER top_k 40
+PARAMETER top_p 0.9

@@ -35,3 +35,9 @@ vendor/llama.cpp/build/
 # Large files
 *.rlib
 wget-log
+
+# Model files (too large for git)
+*.gguf
+*.safetensors
+conductor/tracks/*/models/
+conductor/tracks/*/experiments/*.gguf

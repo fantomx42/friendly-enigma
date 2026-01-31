@@ -2,8 +2,8 @@
 # Unified model architecture: single 14B model for all core roles
 # Eliminates model swapping on single-GPU setups (16GB VRAM)
 MODELS = {
-    # Core Agents - all use same model to avoid swapping
-    "orchestrator": "qwen2.5-coder:14b",
+    # Core Agents
+    "orchestrator": "deepseek-r1:14b",
     "engineer": "qwen2.5-coder:14b",
     "designer": "qwen2.5-coder:14b",
     "translator": "phi3:mini",
