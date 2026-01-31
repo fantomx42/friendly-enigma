@@ -2,8 +2,7 @@
 
 use eframe::egui;
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
-use crossbeam_channel::{Receiver, Sender, unbounded};
+use crossbeam_channel::{Receiver, unbounded};
 use serde_json::Value;
 
 use crate::ralph::{RalphRunner, AgentState, Metrics, LogEntry};
@@ -51,7 +50,7 @@ impl Agent {
 pub struct AgentParams {
     pub temperature: f32,
     pub top_p: f32,
-    pub max_tokens: u32,
+    pub _max_tokens: u32,
 }
 
 impl Default for AgentParams {
@@ -59,7 +58,7 @@ impl Default for AgentParams {
         Self {
             temperature: 0.7,
             top_p: 0.9,
-            max_tokens: 2048,
+            _max_tokens: 2048,
         }
     }
 }
@@ -67,7 +66,7 @@ impl Default for AgentParams {
 /// Task in the plan
 #[derive(Debug, Clone)]
 pub struct Task {
-    pub id: usize,
+    pub _id: usize,
     pub description: String,
     pub status: TaskStatus,
 }
@@ -162,6 +161,8 @@ impl RalphApp {
 
     /// Start a new Ralph run with the given objective
     pub fn start_run(&mut self, objective: String) {
+        println!("[GUI] Starting run with objective: {}", objective);
+        
         // Clear previous state
         self.logs.clear();
         self.tasks.clear();
@@ -299,7 +300,7 @@ impl RalphApp {
                                 "in_progress" => TaskStatus::InProgress,
                                 _ => TaskStatus::Pending,
                             };
-                            Task { id, description, status }
+                            Task { _id: id, description, status }
                         }).collect();
                     }
                 }

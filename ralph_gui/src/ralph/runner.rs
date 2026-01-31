@@ -42,21 +42,31 @@ impl RalphRunner {
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-        let script_path = project_dir.join("ralph_loop.sh");
+        let mut script_path = project_dir.join("ralph_loop.sh");
 
         if !script_path.exists() {
-            // Try alternate location
-            let alt_path = std::path::Path::new("/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_loop.sh");
-            if !alt_path.exists() {
-                return Err(format!("ralph_loop.sh not found at {:?}", script_path));
+            // Try relative to current dir
+            let rel_path = std::path::Path::new("ralph_loop.sh");
+            if rel_path.exists() {
+                script_path = rel_path.to_path_buf();
+            } else {
+                // Try hardcoded absolute path as last resort
+                let alt_path = std::path::Path::new("/home/tristan/Documents/Ralph Ai/ai_tech_stack/ralph_loop.sh");
+                if alt_path.exists() {
+                    script_path = alt_path.to_path_buf();
+                } else {
+                    return Err(format!("ralph_loop.sh not found (tried {:?})", script_path));
+                }
             }
         }
+
+        println!("[Runner] Spawning Ralph script at {:?}", script_path);
 
         let mut child = Command::new("bash")
             .arg(&script_path)
             .arg("--v2")  // Force V2 mode for the GUI
             .arg(&self.objective)
-            .current_dir(&project_dir)
+            .current_dir(script_path.parent().unwrap_or(&project_dir))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::piped())

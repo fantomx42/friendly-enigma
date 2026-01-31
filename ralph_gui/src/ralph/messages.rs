@@ -48,6 +48,7 @@ impl Message {
         Self::new(MessageType::Abort, "orchestrator", serde_json::json!({}))
     }
 
+    #[allow(dead_code)]
     pub fn status(status: &str) -> Self {
         Self::new(MessageType::Status, "system", serde_json::json!({"status": status}))
     }

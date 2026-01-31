@@ -19,6 +19,12 @@ try:
 except ImportError as e:
     print(f"[WheelerBridge] Could not import WheelerAI: {e}")
 
+try:
+    from .npu_engine import NPUWheelerEngine
+    NPU_AVAILABLE = True
+except ImportError:
+    NPU_AVAILABLE = False
+
 class WheelerMemoryBridge:
     """
     Bridge to integrate the experimental Wheeler AI memory system
@@ -45,6 +51,24 @@ class WheelerMemoryBridge:
                 # Initialize with standard size
                 print("[WheelerBridge] Initializing Wheeler AI backend...")
                 self.ai = WheelerAI(width=128, height=128)
+                
+                # Try to offload dynamics to NPU
+                if NPU_AVAILABLE:
+                    try:
+                        print("[WheelerBridge] Attempting NPU offload...")
+                        # Map to 128x128 as specified in WheelerAI init
+                        npu_engine = NPUWheelerEngine(
+                            model_path="ai_tech_stack/models/wheeler_dynamics_128.xml", 
+                            device="NPU"
+                        )
+                        # Replace the CPU dynamics with NPU engine
+                        # We need to make sure the NPU engine has a run_dynamics method 
+                        # compatible with the Trajectory expectation
+                        self.ai.dynamics = npu_engine
+                        print(f"[WheelerBridge] NPU Acceleration Active on {npu_engine.device}.")
+                    except Exception as e:
+                        print(f"[WheelerBridge] NPU offload failed: {e}. Using CPU.")
+                
                 # Start autonomic system (dreaming/consolidation)
                 self.ai.start_autonomic()
                 print("[WheelerBridge] Wheeler AI Active.")

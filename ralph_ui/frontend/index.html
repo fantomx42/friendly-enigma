@@ -561,8 +561,8 @@
             }
         }, 2000);
         
-        // Code Extraction Helper
-        function extractCode(text) {
+        // Code Extraction Helper (exposed for testing)
+        window.extractCode = function(text) {
              const codeRegex = /```[\w\.]*\n([\s\S]*?)```/g;
              let match;
              while ((match = codeRegex.exec(text)) !== null) {

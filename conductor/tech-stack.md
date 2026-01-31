@@ -1,30 +1,47 @@
-# Technology Stack
+# Ralph AI: Technology Stack
 
-## Core Languages
-- **Python (3.8+)**: Primary language for agent logic, message bus, and swarm orchestration.
-- **Rust**: Used for the high-performance native GUI dashboard (`ralph_gui`) via the `egui` framework.
-- **JavaScript/HTML/CSS**: Powers the accessible web interface (`ralph_ui`).
+## Core Language & Runtime
+- **Language:** Python 3.8+
+- **Execution Environment:** Linux (CachyOS/Arch)
+- **Isolation:** Docker (Sandbox mode for untrusted execution)
 
-## LLM Orchestration & Inference
-- **Ollama**: Local inference engine for running all swarm models.
-- **Hierarchical Model Swarm**:
-    - **Strategic (Tier 1)**: `phi3:mini` (Translator), `deepseek-r1:14b` (Orchestrator).
-    - **Management (Tier 2)**: `qwen2.5-coder:14b` (Engineer), `mistral-nemo:12b` (Designer).
-    - **Specialists (Tier 3/ASICs)**: `tinyllama`, `deepseek-coder`, `qwen2.5-coder:1.5b`.
-- **Embeddings**: `nomic-embed-text` via Ollama for semantic search and vector memory.
+## Silicon-Native Swarm Architecture
+Ralph AI utilizes a hybrid hardware strategy to maximize local performance:
 
-## Memory & Data Persistence
-- **ChromaDB**: Vector database for long-term semantic memory and context retrieval.
-- **Wheeler Memory (Experimental)**: Spatial dynamics-based memory system using cellular automata.
-- **JSONL**: Used for high-frequency metrics, execution tracking, and agent communication logs.
+### 1. The Heavy Thinkers (dGPU - RX 9070 XT)
+- **Role:** Deep reasoning, planning, and complex code generation.
+- **Engine:** Ollama (ROCm).
+- **Models:** `deepseek-r1:14b` (Orchestrator) and `qwen2.5-coder:14b` (Engineer).
+- **Strategy:** Models swap in/out of the 16GB VRAM buffer.
 
-## Backend & Communication
-- **FastAPI**: Backend framework for the web UI and external API endpoints.
-- **WebSockets**: Real-time bidirectional communication between the swarm and the UI.
-- **Message Bus (V2)**: Internal async I/O based bus with circuit breakers, high-priority diagnostic routing, and structured JSON emission for external dashboards.
-- **Subprocess IPC**: Bidirectional command routing between the Rust GUI and Python swarm via stdin/stdout pipe monitoring.
+### 2. The ASIC Specialists (iGPU - Intel Xe-LPG)
+- **Role:** Micro-tasks, linting, regex, and syntax fixing.
+- **Engine:** OpenVINO (DP4a).
+- **Models:** `qwen2.5-coder:1.5b` and `tinyllama:1.1b`.
+- **Strategy:** Runs on iGPU using System RAM to keep dGPU VRAM clear.
 
-## Infrastructure & Hardware Acceleration
-- **Docker**: Provides isolated sandboxing for tool execution and code running.
-- **OpenVINO / OpenVINO-GenAI**: Leverages Intel NPU for background memory management (The Librarian).
-- **ROCm**: AMD GPU compute stack support (optimized for RX 9070 XT).
+### 3. The Wheeler Memory Engine (NPU - Intel AI Boost)
+- **Role:** Associative memory dynamics and spatial attractor updates.
+- **Engine:** Custom OpenVINO Kernels.
+- **Logic:** Uses NPU SHAVE DSPs for continuous, low-power background memory consolidation ("Dreaming").
+
+### 4. The System Bus (CPU - Core Ultra 7 265K)
+- **Role:** Human-to-machine translation and message routing.
+- **Engine:** Ollama (CPU mode).
+- **Model:** `phi3:mini`.
+- **Strategy:** Leveraging 20 high-performance cores for always-on responsiveness.
+
+## Memory & Knowledge
+- **Semantic Memory:** ChromaDB (Vector DB) with `nomic-embed-text`.
+- **Associative Memory:** Custom "Wheeler" Spatial Memory (NPU-accelerated).
+- **Persistence:** JSONL logging & Git-based context snapshots.
+
+## Interface & Communication
+- **API Backend:** FastAPI with Uvicorn.
+- **Neural Dashboard:** Vanilla JavaScript (Browser) - Visualizes silicon usage (NPU/iGPU/dGPU).
+- **Terminal UI (TUI):** Python + Textual.
+
+## Development Tools
+- **Version Control:** Git
+- **Testing:** Pytest
+- **Linting:** Flake8 / MyPy

@@ -1,5 +1,16 @@
 # Project Ralph Changelog
 
+## Thursday, January 29, 2026
+
+### 🛠️ GUI Fixes & Robustness
+- **Objective:** Fix "nothing happens" issue when submitting objectives via the Enter key in the GUI.
+- **Action:**
+    - **Enter Key Handling:** Refactored `src/ui/input.rs` to use a more reliable Enter key detection logic (explicit focus check + `surrender_focus`).
+    - **Path Resolution:** Fixed a bug in `src/ralph/runner.rs` where alternate script paths were checked for existence but not actually used during process spawning. Added fallback to relative and absolute paths for `ralph_loop.sh`.
+    - **Debug Logging:** Added stderr logging in `app.rs` and `runner.rs` to provide visibility into the start process.
+    - **Compiler Warnings:** Resolved 10 compiler warnings related to unused imports and dead code in the Rust GUI project.
+- **Outcome:** Submitting an objective via the Enter key now reliably triggers the Ralph backend, and script path resolution is robust to different execution contexts.
+
 ## Wednesday, January 28, 2026
 
 ### 🚀 Ralph v2: Tri-Brid Architecture

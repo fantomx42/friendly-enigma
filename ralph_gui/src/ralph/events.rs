@@ -31,6 +31,7 @@ impl LogEntry {
         }
     }
 
+    #[allow(dead_code)]
     pub fn info(message: String) -> Self {
         Self::new(LogLevel::Info, message)
     }
@@ -39,6 +40,7 @@ impl LogEntry {
         Self::new(LogLevel::System, message)
     }
 
+    #[allow(dead_code)]
     pub fn agent(message: String) -> Self {
         Self::new(LogLevel::Agent, message)
     }
@@ -47,6 +49,7 @@ impl LogEntry {
         Self::new(LogLevel::Error, message)
     }
 
+    #[allow(dead_code)]
     pub fn success(message: String) -> Self {
         Self::new(LogLevel::Success, message)
     }
@@ -96,6 +99,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             total_tokens: 0,

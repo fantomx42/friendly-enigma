@@ -148,5 +148,5 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
 
 if __name__ == "__main__":
-    # Run on port 80 to enable http://ralph.ai (Requires sudo)
-    uvicorn.run(app, host="0.0.0.0", port=80)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

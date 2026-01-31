@@ -1,22 +1,35 @@
 # Initial Concept
 Ralph AI is a local-first, FOSS 3-tier hierarchical swarm system for autonomous task execution.
 
-# Product Definition
+# Ralph AI: Product Definition
+
+## Initial Concept
+Ralph AI is a hierarchical local swarm system designed for autonomous task execution. It utilizes the "Ralph Wiggum Method" of iterative failure and refinement to achieve success without cloud dependencies or token costs.
+
+## Product Vision
+To provide a 100% private, hardware-optimized autonomous agent system that moves beyond simple text-based retrieval by integrating a custom "Wheeler" spatial memory architecture for human-like associative recall.
 
 ## Target Audience
-- **Sovereign Developers**: Individual developers who want the power of autonomous agent swarms without the constraints, costs, or privacy implications of corporate LLM APIs.
-- **Privacy-Conscious Engineers**: Professionals working on sensitive codebases that require local execution for security compliance.
-- **System Architecture Enthusiasts**: Users interested in exploring hierarchical multi-agent dynamics and local model orchestration.
+- **Local-First Developers:** Individuals who require a private coding assistant that runs entirely on their own silicon.
+- **Enterprise Automation Teams:** Organizations looking to deploy specialized agent swarms for internal workflows without data leakage.
+- **AI Researchers:** Professionals exploring the intersection of hierarchical LLM orchestration and dynamical system-based memory.
 
-## Key Differentiators
-- **Local-First & FOSS**: Designed specifically to run on high-end consumer hardware (GPU/NPU) using open-source models (DeepSeek, Qwen, Mistral).
-- **Iterative Resilience (The Wiggum Protocol)**: A unique operational loop that treats errors as diagnostic signals, allowing the system to self-correct and iterate until a success condition is met.
-- **Structured Diagnostic Bus**: Implements a dedicated high-priority channel for agent failure data, capturing stack traces and internal states to feed the iterative learning cycle.
-- **Hierarchical ASIC Swarm**: Instead of relying on a single large model, Ralph employs a "Librarian" for memory, an "Orchestrator" for strategy, and tiny "ASIC" specialists for micro-tasks, optimizing both performance and VRAM usage.
-- **Hybrid Memory System**: Combines vector-based semantic search with experimental spatial dynamics (Wheeler Memory) to maintain long-term context and project-wide awareness.
+## Core Value Proposition
+- **Privacy & Autonomy:** Zero-cost, zero-latency (local), and zero-leakage execution.
+- **Wheeler Memory Dynamics:** A revolutionary associative memory system based on spatial attractors, providing deeper context than standard RAG.
+- **Silicon-Aware Performance:** Native optimization for high-end consumer hardware (AMD RDNA4/RX 9070 XT) via automated configuration.
 
-## Interaction Model
-- **Native GUI Dashboard**: A high-performance Rust-based native interface for real-time visualization of agent traffic and swarm health.
-- **Integrated Task Control Center**: Provides direct dashboard control over task lifecycles (Start, Pause, Stop), sandbox toggles, and per-agent model parameters (Temperature, Top P).
-- **CLI-First Loop**: A robust command-line interface for direct task execution and integration into existing developer workflows.
-- **Multimodal Extension**: Support for voice input and vision analysis to allow for more natural and complex task descriptions.
+## Key Features (Priority Order)
+1. **The Wheeler Bridge:** Deep integration of spatial/attractor dynamics into the agent's cognition.
+2. **The Ralph Loop:** A persistent, self-correcting development loop (Analyze -> Execute -> Verify).
+3. **Hardware-Aware Boot:** Automated detection and tuning of GPU, VRAM, and CPU resources on initialization.
+4. **Dynamic Tool Forging:** The "Machinist" agent capable of metaprogramming new utilities on demand.
+
+## User Experience: The Neural Dashboard
+The primary interface is a web-based "Neural Dashboard" that provides:
+- Real-time visualization of memory attractors and basins of attraction.
+- A live swarm traffic map showing communication between Translator, Orchestrator, and ASIC agents.
+- VRAM/RAM heatmaps and hardware performance metrics.
+
+## Strategic Roadmap (3-Month North Star)
+- **Memory Perfection:** Transition from experimental to production-ready Wheeler Memory, allowing the agent to perform associative recall across long-term task histories using purely spatial dynamics.

@@ -17,7 +17,7 @@ pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(150, 150, 170);
 pub const TEXT_MUTED: Color32 = Color32::from_rgb(100, 100, 120);
 
 pub const SUCCESS: Color32 = Color32::from_rgb(78, 204, 163);      // #4ecca3 teal
-pub const WARNING: Color32 = Color32::from_rgb(255, 193, 7);       // amber
+pub const _WARNING: Color32 = Color32::from_rgb(255, 193, 7);       // amber
 pub const ERROR: Color32 = Color32::from_rgb(244, 67, 54);         // red
 pub const ACCENT: Color32 = Color32::from_rgb(123, 44, 191);       // #7b2cbf purple
 

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 /// A node in the graph representing an agent
 #[derive(Debug, Clone)]
 pub struct Node {
-    pub agent: Agent,
+    pub _agent: Agent,
     pub pos: Pos2,
     pub vel: Vec2,
     pub mass: f32,
@@ -18,7 +18,7 @@ pub struct Node {
 pub struct Edge {
     pub from: Agent,
     pub to: Agent,
-    pub strength: f32,
+    pub _strength: f32,
     pub last_pulse: f32, // timestamp of last communication
 }
 
@@ -53,7 +53,7 @@ impl ForceGraph {
         let mut nodes = HashMap::new();
         for agent in crate::app::Agent::all() {
             nodes.insert(*agent, Node {
-                agent: *agent,
+                _agent: *agent,
                 pos: center + Vec2::new(fastrand::f32() * 10.0, fastrand::f32() * 10.0),
                 vel: Vec2::ZERO,
                 mass: 1.0,
@@ -127,7 +127,7 @@ impl ForceGraph {
             self.edges.push(Edge {
                 from,
                 to,
-                strength: 1.0,
+                _strength: 1.0,
                 last_pulse: time,
             });
         }
