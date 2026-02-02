@@ -3,9 +3,9 @@
 This plan focuses on the critical path to MVP: Dependencies -> Pipeline Glue -> Model Check -> End-to-End Verification.
 
 ## Phase 1: Environment & Dependencies
-- [ ] Task: Install Python dependencies
-    - [ ] Install dependencies using `pip install -r ai_tech_stack/requirements.txt`.
-    - [ ] Verify installation of critical packages (chromadb, openvino, ollama).
+- [x] Task: Install Python dependencies 11a9ddc
+    - [x] Install dependencies using `pip install -r ai_tech_stack/requirements.txt`.
+    - [x] Verify installation of critical packages (chromadb, openvino, ollama).
 - [ ] Task: Verify and Pull Ollama Models
     - [ ] Check for existence of `phi3:mini`, `deepseek-r1:14b`, `qwen2.5-coder:14b`, and `mistral-nemo:12b`.
     - [ ] Create a script or command to pull any missing models.
