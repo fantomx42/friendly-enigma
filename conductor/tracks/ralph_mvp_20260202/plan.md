@@ -6,9 +6,9 @@ This plan focuses on the critical path to MVP: Dependencies -> Pipeline Glue -> 
 - [x] Task: Install Python dependencies 11a9ddc
     - [x] Install dependencies using `pip install -r ai_tech_stack/requirements.txt`.
     - [x] Verify installation of critical packages (chromadb, openvino, ollama).
-- [ ] Task: Verify and Pull Ollama Models
-    - [ ] Check for existence of `phi3:mini`, `deepseek-r1:14b`, `qwen2.5-coder:14b`, and `mistral-nemo:12b`.
-    - [ ] Create a script or command to pull any missing models.
+- [x] Task: Verify and Pull Ollama Models 613b6ba
+    - [x] Check for existence of `phi3:mini`, `deepseek-r1:14b`, `qwen2.5-coder:14b`, and `mistral-nemo:12b`.
+    - [x] Create a script or command to pull any missing models.
 - [ ] Task: Conductor - User Manual Verification 'Environment & Dependencies' (Protocol in workflow.md)
 
 ## Phase 2: Pipeline Completion (Shell & Runner)
