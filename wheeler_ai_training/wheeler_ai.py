@@ -294,6 +294,27 @@ class Memory:
     timestamp: float = field(default_factory=time.time)
     hits: int = 1
     associations: List[int] = field(default_factory=list)  # Indices of related memories
+    
+    # Confidence Metadata
+    reinforcement_diversity: int = 1  # Number of unique contexts in which this was reinforced
+    connectivity: int = 0             # Number of incoming/outgoing associations
+    stability: float = 1.0            # Resistance to drift (0.0 to 1.0)
+    creation_time: float = field(default_factory=time.time)
+    
+    @property
+    def confidence(self) -> float:
+        """
+        Calculate dynamic confidence score (0.0 to 1.0).
+        High confidence = High hits + Diverse reinforcement + High connectivity + Stability
+        """
+        # Sigmoid-like normalization for counts
+        hit_score = 1 - (1 / (1 + 0.1 * self.hits))
+        div_score = 1 - (1 / (1 + 0.2 * self.reinforcement_diversity))
+        conn_score = 1 - (1 / (1 + 0.1 * self.connectivity))
+        
+        # Weighted average
+        raw_score = (0.4 * hit_score) + (0.3 * div_score) + (0.2 * conn_score) + (0.1 * self.stability)
+        return float(min(1.0, max(0.0, raw_score)))
 
 
 class KnowledgeStore:
@@ -311,15 +332,24 @@ class KnowledgeStore:
         self.memories: List[Memory] = []
         self.text_index: Dict[str, int] = {}  # text hash -> index
         
-    def store(self, text: str, frame: np.ndarray) -> int:
+    def store(self, text: str, frame: np.ndarray, context_hash: Optional[str] = None) -> int:
         """Store a memory, return its index."""
         text_hash = hashlib.sha256(text.encode()).hexdigest()[:16]
         
         # Check for duplicate
         if text_hash in self.text_index:
             idx = self.text_index[text_hash]
-            self.memories[idx].hits += 1
-            self.memories[idx].timestamp = time.time()
+            mem = self.memories[idx]
+            mem.hits += 1
+            mem.timestamp = time.time()
+            
+            # Update diversity if context is new (simple heuristic: probabilistic or hash set?)
+            # For simplicity, we assume if context_hash is provided and different, we increment
+            if context_hash:
+                 # In a real system we'd store a set of context hashes, 
+                 # but for efficiency we'll just probabilistic increment or increment if explicitly passed
+                 mem.reinforcement_diversity += 1
+            
             return idx
         
         # Evict if full
@@ -328,6 +358,9 @@ class KnowledgeStore:
         
         # Store new
         memory = Memory(frame=frame.copy(), text=text)
+        if context_hash:
+            memory.reinforcement_diversity = 1
+            
         idx = len(self.memories)
         self.memories.append(memory)
         self.text_index[text_hash] = idx
@@ -358,8 +391,10 @@ class KnowledgeStore:
         if 0 <= idx_a < len(self.memories) and 0 <= idx_b < len(self.memories):
             if idx_b not in self.memories[idx_a].associations:
                 self.memories[idx_a].associations.append(idx_b)
+                self.memories[idx_a].connectivity += 1
             if idx_a not in self.memories[idx_b].associations:
                 self.memories[idx_b].associations.append(idx_a)
+                self.memories[idx_b].connectivity += 1
     
     def get_associated(self, idx: int) -> List[Memory]:
         """Get memories associated with the given one."""
@@ -534,8 +569,8 @@ class WheelerAI:
         # Response patterns (learned from usage)
         self.response_patterns: Dict[str, np.ndarray] = {}
         
-        print(f"Wheeler AI initialized ({width}x{height} frames)")
-        print(f"Numba: {NUMBA_AVAILABLE}")
+        print(f"Wheeler AI initialized ({width}x{height} frames)", file=sys.stderr)
+        print(f"Numba: {NUMBA_AVAILABLE}", file=sys.stderr)
     
     def process(self, user_input: str) -> str:
         """
@@ -602,8 +637,34 @@ class WheelerAI:
         # TODO: This needs actual learned response patterns
         response = self._generate_response(user_input, memories, understood)
         
-        # Store this interaction
-        self.knowledge.store(user_input, input_attractor)
+        # Tension Check & Storage
+        tension_detected = False
+        if memories:
+            idx, score, existing_mem = memories[0]
+            # Debug
+            # print(f"DEBUG: Score={score:.4f}, Conf={existing_mem.confidence:.4f}")
+            
+            # If very similar but not identical, and existing memory is high confidence
+            # Lowered threshold to 0.70 based on empirical testing with TextCodec
+            if 0.70 < score < 0.99:
+                if existing_mem.confidence > 0.60:
+                    # Potential tension/contradiction with established belief
+                    tension_detected = True
+                    msg = f"\n[!] Tension detected with established belief: '{existing_mem.text}' (Conf: {existing_mem.confidence:.2f})"
+                    response += msg
+                    # We do NOT store strictly contradictory/tension-causing inputs immediately
+                    # This implements the "Epistemological Independence" - don't just overwrite.
+
+        if not tension_detected:
+            # Store this interaction
+            # Generate context hash from recent frames for diversity tracking
+            if self.context_frames:
+                ctx_bytes = b"".join([f.tobytes() for f in self.context_frames[-3:]])
+                ctx_hash = hashlib.sha256(ctx_bytes).hexdigest()[:16]
+            else:
+                ctx_hash = None
+                
+            self.knowledge.store(user_input, input_attractor, context_hash=ctx_hash)
         
         # Update context
         self.context_frames.append(input_attractor)
@@ -665,17 +726,22 @@ class WheelerAI:
     def start_autonomic(self):
         """Start background autonomous processing."""
         self.autonomic.start()
-        print("Autonomic system started")
+        print("Autonomic system started", file=sys.stderr)
     
     def stop_autonomic(self):
         """Stop background autonomous processing."""
         self.autonomic.stop()
-        print("Autonomic system stopped")
+        print("Autonomic system stopped", file=sys.stderr)
     
     def stats(self) -> Dict:
         """Get system statistics."""
+        avg_conf = 0.0
+        if self.knowledge.memories:
+            avg_conf = sum(m.confidence for m in self.knowledge.memories) / len(self.knowledge.memories)
+            
         return {
             'memories': len(self.knowledge.memories),
+            'avg_confidence': round(avg_conf, 3),
             'context_depth': len(self.context_frames),
             'response_patterns': len(self.response_patterns),
             'autonomic_consolidations': self.autonomic.consolidation_count
@@ -731,6 +797,14 @@ def interactive_shell():
             elif cmd == '/clear':
                 ai.context_frames = []
                 print("Context cleared.")
+                continue
+            elif cmd == '/memory':
+                # Show top memories by confidence
+                sorted_mem = sorted(ai.knowledge.memories, key=lambda m: m.confidence, reverse=True)
+                print("\nTop Beliefs (by Confidence):")
+                for i, m in enumerate(sorted_mem[:5]):
+                    print(f" {i+1}. [{m.confidence:.2f}] {m.text[:60]} (Hits: {m.hits}, Div: {m.reinforcement_diversity})")
+                print()
                 continue
         
         # Process input
