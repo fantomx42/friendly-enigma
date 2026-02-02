@@ -12,10 +12,10 @@ This plan focuses on the critical path to MVP: Dependencies -> Pipeline Glue -> 
 - [x] Task: Conductor - User Manual Verification 'Environment & Dependencies' (Protocol in workflow.md)
 
 ## Phase 2: Pipeline Completion (Shell & Runner)
-- [ ] Task: Finalize `ralph_loop.sh` logic
-    - [ ] Review `ai_tech_stack/ralph_loop.sh` for "Phase 4" TODOs.
-    - [ ] Implement the call to `ai_tech_stack/ralph_core/runner.py`.
-    - [ ] Ensure proper argument passing (user objective) and exit code handling.
+- [x] Task: Finalize `ralph_loop.sh` logic c91e682
+    - [x] Review `ai_tech_stack/ralph_loop.sh` for "Phase 4" TODOs.
+    - [x] Implement the call to `ai_tech_stack/ralph_core/runner.py`.
+    - [x] Ensure proper argument passing (user objective) and exit code handling.
 - [ ] Task: Verify `runner.py` Entry Point
     - [ ] Ensure `runner.py` can be invoked from the shell and correctly initializes the V2 pipeline.
 - [ ] Task: Conductor - User Manual Verification 'Pipeline Completion' (Protocol in workflow.md)
