@@ -21,10 +21,10 @@ This plan focuses on the critical path to MVP: Dependencies -> Pipeline Glue -> 
 - [x] Task: Conductor - User Manual Verification 'Pipeline Completion' (Protocol in workflow.md)
 
 ## Phase 3: Integration Testing (The "Hello World")
-- [~] Task: Create End-to-End Test Script
-    - [ ] Create `ai_tech_stack/tests/test_hello_world.py` (or shell equivalent).
-    - [ ] Test should invoke `ralph_loop.sh` with a simple objective (e.g., "Write a poem about coding").
-    - [ ] Assert that the process completes with a success signal.
-- [ ] Task: Fix Import/Runtime Errors
-    - [ ] Run the test and iteratively fix any `ImportError` or runtime exceptions that arise during the first full execution.
+- [x] Task: Create End-to-End Test Script b0bb27c
+    - [x] Create `ai_tech_stack/tests/test_hello_world.py` (or shell equivalent).
+    - [x] Test should invoke `ralph_loop.sh` with a simple objective (e.g., "Write a poem about coding").
+    - [x] Assert that the process completes with a success signal.
+- [x] Task: Fix Import/Runtime Errors
+    - [x] Run the test and iteratively fix any `ImportError` or runtime exceptions that arise during the first full execution.
 - [ ] Task: Conductor - User Manual Verification 'Integration Testing' (Protocol in workflow.md)
