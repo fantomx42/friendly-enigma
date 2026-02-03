@@ -1,34 +1,24 @@
 {
-  "master_objective": "status check",
+  "master_objective": "Write a 4-line poem about local AI.",
   "tasks": [
     {
       "id": 1,
-      "description": "Analyze current status against defined metrics or benchmarks.",
-      "status": "complete"
+      "description": "Highlight how AI supports community elements like shops and schools.",
+      "status": "pending"
     },
     {
       "id": 2,
-      "description": "Define the purpose and scope of the status check.",
+      "description": "Introduce the setting of a small town.",
       "status": "pending"
     },
     {
       "id": 3,
-      "description": "Share findings with stakeholders for review.",
+      "description": "Mention the creation of AI as a local innovation.",
       "status": "pending"
     },
     {
       "id": 4,
-      "description": "Gather relevant data and information for analysis.",
-      "status": "pending"
-    },
-    {
-      "id": 5,
-      "description": "Document key findings and observations.",
-      "status": "pending"
-    },
-    {
-      "id": 6,
-      "description": "Obtain feedback and finalize the status report.",
+      "description": "Conclude with a positive note on collective thriving.",
       "status": "pending"
     }
   ]
