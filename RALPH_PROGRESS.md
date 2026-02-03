@@ -26,3 +26,11 @@
 
 ### Verification
 <promise>COMPLETE</promise>
+
+## Iteration 1 - Task: Define the purpose and scope of the status check.
+### Result
+<promise>COMPLETE</promise>
+### Execution
+
+### Verification
+<promise>COMPLETE</promise>
