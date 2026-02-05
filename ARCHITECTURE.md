@@ -272,7 +272,7 @@ GATE IN ──► WAREHOUSE ──► FORKLIFT ──► PROCESSING PLANT ◄═
 
 | Component | Status | Files |
 |-----------|--------|-------|
-| Gate IN (CLI) | ✅ Done | `ralph_loop.sh`, `runner.py` |
+| Gate IN (CLI) | ✅ Done | `ralph_loop.sh`, `runner.py`, `ralph_simple.py` |
 | Gate IN (Voice) | ✅ Done | `ralph_voice.py` |
 | Gate IN (API) | ✅ Done | `ralph_ui/backend/main.py` |
 | Gate IN (Chrome) | 🔄 Partial | MCP integration |
@@ -286,6 +286,104 @@ GATE IN ──► WAREHOUSE ──► FORKLIFT ──► PROCESSING PLANT ◄═
 | R&D Building | 🔄 Partial | `dreamer.py`, `agents/reflector/` |
 | Security Checkpoint | ✅ Done | `security/` directory |
 | Gate OUT | ✅ Done | `security/gate_out.py` |
+| Wheeler Memory Bridge | ✅ Done | `wheeler.py`, `npu_engine.py` |
+| SCM Stability Metrics | ✅ Done | `wheeler_weights.py` |
+| Context Budget Weighting | ✅ Done | `context_budget.py` |
+| Single-Model Architecture | ✅ Done | `ralph_simple.py` |
+
+---
+
+## Wheeler Stability Metrics & SCM Integration
+
+Wheeler Memory stability metrics now inform semantic importance in the Ralph loop.
+This is grounded in the **Symbolic Collapse Model** (see `/docs/SCM_AXIOMS.md`).
+
+### How It Works
+
+```
+Wheeler Memory Patterns
+        |
+        v
+  +-----------------------+
+  | StabilityTracker      |     Tracks per-pattern:
+  | (wheeler_weights.py)  | --> - hit_count (activation frequency)
+  |                       |     - frame_persistence (context switch survival)
+  |                       |     - compression_survived (REM Sleep survival)
+  +-----------+-----------+
+              |
+              v
+     stability_score (0.0 - 1.0)
+              |
+              v
+  +-----------------------+
+  | Context Budget        |     Token allocation by tier:
+  | (context_budget.py)   | --> - High (>0.7):  full budget
+  |                       |     - Medium (0.3-0.7): proportional
+  |                       |     - Low (<0.3):  compressed/dropped
+  +-----------+-----------+
+              |
+              v
+    Assembled context string
+    (injected into LLM prompt)
+```
+
+### Stability Score Formula
+
+```
+stability_score = 0.40 * hit_score + 0.35 * persist_score + 0.25 * compress_score
+```
+
+Where:
+- **hit_score** = log(hit_count + 1) / log(21), capped at 1.0
+- **persist_score** = frame_persistence / context_switches_seen
+- **compress_score** = 1.0 if survived REM Sleep compression, else 0.0
+
+### Integration Points
+
+1. **`wheeler.py`** - Records hits on each `recall()` via `stability_tracker.record_hit()`
+2. **`memory.py`** - Records context switches via `record_context_switch()` at iteration boundaries
+3. **`ralph_simple.py`** - Calls `get_weighted_context()` to build stability-weighted prompts
+4. **Sleeper Agent** - Calls `record_compression_survival()` for patterns surviving REM Sleep
+5. **`forklift.py`** - Can incorporate stability scores into memory loading decisions
+
+### SCM Axiom Mapping
+
+| Axiom | Metric | Meaning |
+|-------|--------|---------|
+| Survives symbolic pressure | Frame Persistence | Pattern survives context switches |
+| Remainder after compression | Compression Survival | Pattern survives REM Sleep consolidation |
+| Demonstrated, not assigned | Hit Count | Usage frequency demonstrates value |
+| Usable after context loss | Stability Score | Composite survivability across all dimensions |
+
+---
+
+## Single-Model Architecture (V2)
+
+In addition to the multi-agent compound, Ralph now supports a single-model mode
+using `qwen3-coder-next` (80B MoE, 3B active per pass, 256K context).
+
+```
+                          +-----------------+
+  Objective  -----------> |                 |
+                          | qwen3-coder-    |
+  Wheeler Context ------> |     next        | --> Response
+  (stability-weighted)    |                 |
+                          | (all cognitive  |
+  History   ------------> |  tasks unified) |
+                          +-----------------+
+                                  |
+                                  v
+                          Wheeler Store
+                          (update stability)
+```
+
+**Advantages over multi-agent:**
+- No model switching overhead (was: phi3 -> deepseek -> qwen -> mistral)
+- Single 256K context window holds all working memory
+- MoE architecture: only 3B params active per forward pass
+- Stability-weighted context ensures token budget is spent on meaningful patterns
+
+**Entry point:** `ralph_simple.py`
 
 ---
 
@@ -293,12 +391,17 @@ GATE IN ──► WAREHOUSE ──► FORKLIFT ──► PROCESSING PLANT ◄═
 
 1. ~~**Implement Security Checkpoint**~~ ✅ Done (2026-01-16)
 2. ~~**Formalize Forklift Protocol**~~ ✅ Done (2026-01-16)
-3. **Complete R&D Building** - Connect Dreamer and Reflector to main loop
-4. **Unify Gate IN** - Single entry point for all input modalities (CLI, voice, API, Chrome)
-5. **Chrome MCP Integration** - Complete browser automation via MCP tools
+3. ~~**SCM Stability Metrics**~~ ✅ Done (2026-02-05)
+4. ~~**Context Budget Weighting**~~ ✅ Done (2026-02-05)
+5. ~~**Single-Model Architecture**~~ ✅ Done (2026-02-05)
+6. **Complete R&D Building** - Connect Dreamer and Reflector to main loop
+7. **Unify Gate IN** - Single entry point for all input modalities (CLI, voice, API, Chrome)
+8. **Chrome MCP Integration** - Complete browser automation via MCP tools
+9. **Forklift + SCM Integration** - Weight Forklift memory loading by stability scores
+10. **BitNet Research** - Evaluate BitNet for ultra-efficient ASIC models
 
 ---
 
 *Architecture designed: 2026-01-14*
-*Last updated: 2026-01-16*
+*Last updated: 2026-02-05*
 *This is the target architecture for Ralph AI v2.0*

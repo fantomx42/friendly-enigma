@@ -23,6 +23,13 @@ except ImportError:
     print("[Memory] Wheeler bridge not found, skipping integration.")
     WheelerMemoryBridge = None
 
+# Stability tracking for SCM-weighted context budgeting
+try:
+    from wheeler_weights import stability_tracker
+    STABILITY_TRACKING = True
+except ImportError:
+    STABILITY_TRACKING = False
+
 class Memory:
     def __init__(self, root_dir: str = "."):
         self.root_dir = root_dir
@@ -98,21 +105,34 @@ class Memory:
     def recall_similar(self, query: str) -> str:
         """Retrieves semantically similar facts/lessons."""
         results = vector_memory.search(query)
-        
+
         summary = ""
         if results:
             summary += "--- RELEVANT MEMORIES ---\n"
             for r in results:
                 doc = r['document']
                 summary += f"- [{r['score']:.2f}] {doc['text']} (Tag: {doc['metadata'].get('tag', 'unknown')})\n"
-        
+
         # Check Wheeler Memory (Spatial Associations)
+        # Stability scores are now included by WheelerMemoryBridge.recall()
         if self.wheeler:
             wheeler_results = self.wheeler.recall(query)
             if wheeler_results:
                 summary += "\n" + wheeler_results
-                
+
         return summary
+
+    def record_context_switch(self) -> None:
+        """
+        Record a context switch (new iteration) for stability tracking.
+
+        Called at the start of each Ralph loop iteration so the
+        StabilityTracker can update frame persistence metrics for
+        all tracked Wheeler patterns.
+        """
+        if STABILITY_TRACKING:
+            stability_tracker.record_context_switch()
+            stability_tracker.flush()
 
     def retrieve_full_state(self) -> str:
         """Returns a summary of current context and available memory tags."""

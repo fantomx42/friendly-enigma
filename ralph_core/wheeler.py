@@ -1,5 +1,6 @@
 import sys
 import os
+import hashlib
 import threading
 import numpy as np
 
@@ -24,6 +25,17 @@ try:
     NPU_AVAILABLE = True
 except ImportError:
     NPU_AVAILABLE = False
+
+# Stability tracking (SCM integration)
+try:
+    from .wheeler_weights import stability_tracker
+    STABILITY_TRACKING = True
+except ImportError:
+    try:
+        from wheeler_weights import stability_tracker
+        STABILITY_TRACKING = True
+    except ImportError:
+        STABILITY_TRACKING = False
 
 class WheelerMemoryBridge:
     """
@@ -92,35 +104,46 @@ class WheelerMemoryBridge:
     def recall(self, query: str) -> str:
         """
         Probe Wheeler memory for associations.
+
+        When stability tracking is enabled, each recalled pattern
+        gets a hit recorded and its stability_score is appended.
         """
         if not self.ai:
             return ""
-        
+
         try:
             # 1. Encode query to frame
             frame = self.ai.codec.encode(query)
-            
+
             # 2. Run dynamics to find attractor (stable thought)
             # Use fewer ticks for quick lookup
             traj = self.ai.dynamics.run_dynamics(frame, max_ticks=20)
             attractor = traj.final_frame
-            
+
             # 3. Query knowledge store
             results = self.ai.knowledge.recall(attractor, top_k=3)
-            
+
             if not results:
                 return ""
-            
-            # Format results
+
+            # Format results with stability scores
             summary = []
             for _, score, memory in results:
                 if score > 0.4:  # Similarity threshold
-                    summary.append(f"- [{score:.2f}] {memory.text}")
-            
+                    stability_info = ""
+                    if STABILITY_TRACKING:
+                        pid = hashlib.md5(memory.text.encode()).hexdigest()[:12]
+                        metrics = stability_tracker.record_hit(pid, memory.text)
+                        stability_info = f" (stability={metrics.stability_score:.2f})"
+                    summary.append(f"- [{score:.2f}]{stability_info} {memory.text}")
+
+            if STABILITY_TRACKING:
+                stability_tracker.flush()
+
             if summary:
                 return "\n--- WHEELER SPATIAL ASSOCIATIONS ---\n" + "\n".join(summary) + "\n"
             return ""
-            
+
         except Exception as e:
             print(f"[WheelerBridge] Error recalling: {e}")
             return ""
