@@ -52,6 +52,12 @@ Screenshot_*.png
 ai_tech_stack/ralph_gui/target/
 ai_tech_stack/cmake-*/
 
+# Junk / non-project files
+cmake-*/
+squashfs-root/
+*.AppImage
+wget-log*
+
 # Secrets
 .env
 *.pem
