@@ -1,72 +1,85 @@
 # Ralph AI
 
 ## Project Overview
-Ralph AI is a hierarchical, autonomous multi-agent system designed to execute tasks using local LLMs (via Ollama). It operates on the "Ralph Wiggum Protocol," which embraces iterative failure and refinement to achieve success. The system is designed to run entirely locally, leveraging high-end consumer hardware (specifically AMD ROCm for GPUs).
 
-## Architecture & Components
-The project is organized into several key modules:
+Ralph AI is a hierarchical autonomous agent system that uses local LLMs (via Ollama) to accomplish tasks iteratively. The system follows the "Ralph Wiggum Method": iterate until `<promise>COMPLETE</promise>` is detected.
 
-### Core System (`ai_tech_stack/`)
-The primary logic resides here, implementing the multi-agent swarm architecture.
-*   **Orchestrator**: Strategic planning (DeepSeek-R1).
-*   **Translator**: Input processing (Phi-3).
-*   **Engineer/Designer**: Execution and verification (Qwen/Mistral).
-*   **Memory**: Vector database (ChromaDB) and "Wheeler Memory" (2D spatial representation).
-    *   **Epistemological Independence**: Implemented confidence tracking and tension detection to maintain evidence-backed beliefs and resist contradictory input.
+**Current Architecture:** Single-model (v3.0) using `qwen3-coder-next` with Wheeler Memory integration.
 
-### Interfaces
-*   **CLI**: The primary entry point via `ralph_loop.sh`.
-*   **Native GUI (`ai_tech_stack/ralph_gui/`)**: A Rust-based immediate mode GUI using `eframe`/`egui` for real-time monitoring and control.
-*   **Web UI (`ai_tech_stack/ralph_ui/`)**: A FastAPI backend with a Vanilla JS frontend, including Playwright E2E tests.
+## Repository Structure
 
-### Experimental (`wheeler_ai_training/`)
-Dedicated training environment for the "Wheeler" model—a text-to-spatial-grid autoencoder designed for efficient memory representation.
-*   **Stack**: PyTorch (ROCm), Transformers, Datasets.
+| Directory | Purpose |
+|-----------|---------|
+| `ai_tech_stack/` | Core Ralph AI system (Python) |
+| `ai_tech_stack/ralph_gui/` | Native desktop GUI (Rust/egui) |
+| `ai_tech_stack/ralph_ui/` | Web dashboard (FastAPI + vanilla JS) |
+| `ai_tech_stack/conductor/` | Project management framework (TDD workflows) |
+| `wheeler_ai_training/` | Wheeler Memory neural network (text-to-2D-grid autoencoder) |
+
+## Key Commands
+
+```bash
+cd ai_tech_stack
+
+# Run Ralph with an objective
+./ralph_loop.sh "Your objective here"
+
+# Native GUI
+cd ralph_gui && cargo build --release
+./target/release/ralph_gui
+
+# Web UI
+./start_ui.sh  # Port 8000 (terminal) + 8001 (neural dashboard)
+
+# Testing
+source venv/bin/activate
+PYTHONPATH=. pytest ralph_core/tests/ -v
+```
+
+## Architecture
+
+### Current: Single-Model (v3.0)
+
+```
+Human Input -> [qwen3-coder-next] -> Wheeler Memory <-> Stability Scoring -> Output
+```
+
+- **Model:** qwen3-coder-next (80B MoE, 3B active per pass, 256K context)
+- **Entry point:** `ralph_simple.py` via `ralph_loop.sh`
+
+### Wheeler Memory
+
+Text-to-spatial-grid autoencoder providing stability-weighted context:
+
+| Metric | Weight | Meaning |
+|--------|--------|---------|
+| hit_count | 40% | Activation frequency |
+| frame_persistence | 30% | Re-encode matches stored frame |
+| compression_survival | 30% | Pattern survives dynamics |
+
+### Legacy Multi-Agent (V2)
+
+Preserved in `ralph_core/agents/` but not used by default. Includes Translator, Orchestrator, Engineer, and Designer agents.
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `ralph_loop.sh` | Entry point |
+| `ralph_simple.py` | Single-model loop with Wheeler integration |
+| `ralph_core/wheeler.py` | Wheeler Memory bridge |
+| `ralph_core/runner.py` | Legacy multi-agent handler |
+| `ralph_daemon.py` | Background daemon with REM sleep |
 
 ## Technical Stack
-*   **Languages**: Python 3.8+ (Core), Rust (GUI), JavaScript (Web UI).
-*   **AI/ML**: Ollama (Inference), PyTorch (Training), ChromaDB (Vector Store), OpenVINO (NPU/iGPU Optimization).
-*   **Hardware Optimization**: Optimized for **AMD Radeon RX 9070 XT** (ROCm/HIP), **Intel Core Ultra 7 265K**, and **Intel NPU** (via Wheeler Dynamics).
-*   **OS**: CachyOS (Linux).
 
-## Key Files & Directories
-*   `README.md`: Root project documentation.
-*   `ai_tech_stack/ralph_loop.sh`: Main CLI execution script.
-*   `ai_tech_stack/setup_models.sh`: Automates model export and hardware configuration.
-*   `ai_tech_stack/ralph_daemon.py`: Background service handling periodic tasks (like REM sleep).
-*   `ai_tech_stack/ralph_core/`: Python source code for agents, tools, and memory.
-*   `ai_tech_stack/ralph_gui/Cargo.toml`: Rust GUI configuration.
-*   `wheeler_ai_training/export_dynamics.py`: OpenVINO export toolchain for NPU/iGPU engines.
+- **Languages:** Python 3.8+ (Core), Rust (GUI), JavaScript (Web UI)
+- **AI/ML:** Ollama (Inference), PyTorch (Training), ChromaDB (Vector Store)
+- **Hardware:** AMD GPU via ROCm/Ollama, Intel NPU for Wheeler dynamics
 
-## Development & Usage
+## Development Notes
 
-### Running Ralph
-```bash
-# Basic Task
-./ai_tech_stack/ralph_loop.sh "Your objective here"
-
-# Launch Web UI
-./ai_tech_stack/start_ui.sh
-
-# Run Background Daemon
-python ai_tech_stack/ralph_daemon.py
-```
-
-### Wheeler Training
-Training the Wheeler autoencoder requires a specific ROCm environment:
-```bash
-cd wheeler_ai_training
-source venv/bin/activate
-python train.py --fp16 --batch_size 64
-```
-
-### Rust GUI
-```bash
-cd ai_tech_stack/ralph_gui
-cargo run --release
-```
-
-## Conventions
-*   **Local First**: All dependencies and models should run locally. No external APIs.
-*   **Iterative Design**: The system is built to loop and refine. Failures are expected and handled.
-*   **Hardware Awareness**: Scripts often include specific optimizations for the user's AMD GPU and Intel CPU.
+- **Completion signal:** `<promise>COMPLETE</promise>` in output
+- **Code output format:** ` ```python:filename.py ` for file saves
+- **Command execution:** `<execute>command</execute>` tags
+- **Local first:** All models run locally via Ollama

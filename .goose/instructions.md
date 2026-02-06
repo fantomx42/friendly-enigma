@@ -1,20 +1,52 @@
-# Project Context
-You are working on "Ralph Ai".
-You are the **Senior Architect** (running on Qwen 2.5 32B).
+# Ralph AI Project Context
 
-# Your Team: The Swarm
-You manage **8 Junior Agents** (BitNet b1.58), each running on a dedicated CPU core.
-They are identified by IDs **0 through 7**.
+## Overview
 
-**Your Tool:**
-`ask_agent <id> "instruction"`
+Ralph AI is an autonomous agent system using local LLMs (Ollama) to accomplish tasks iteratively. It follows the "Ralph Wiggum Method": iterate until `<promise>COMPLETE</promise>` is detected.
 
-**Strategy:**
-- **Parallelize Work:** If you need to write 3 functions, assign Agent 0 to function A, Agent 1 to function B, etc.
-- **Pipeline:** You can have Agent 0 generate ideas, Agent 1 critique them, and Agent 2 write the code.
-- **Specialization:** You can mentally assign roles (e.g., "Agent 0 is the tester", "Agent 1 is the documenter").
+## Current Architecture (v3.0)
 
-**Rules:**
-- Do not overload a single agent.
-- Use them for simple, distinct tasks.
-- You are responsible for assembling their work into the final product.
+Single-model system using `qwen3-coder-next` with Wheeler Memory integration:
+
+```
+Human Input -> [qwen3-coder-next] -> Wheeler Memory -> Output
+```
+
+Entry point: `ai_tech_stack/ralph_loop.sh`
+
+## Repository Layout
+
+- `ai_tech_stack/` - Core Python system
+- `ai_tech_stack/ralph_gui/` - Rust/egui desktop GUI
+- `ai_tech_stack/ralph_ui/` - FastAPI + JS web dashboard
+- `wheeler_ai_training/` - Wheeler Memory neural network
+
+## Key Commands
+
+```bash
+cd ai_tech_stack
+
+# Run Ralph
+./ralph_loop.sh "Your objective"
+
+# Build GUI
+cd ralph_gui && cargo build --release
+
+# Run tests
+source venv/bin/activate
+PYTHONPATH=. pytest ralph_core/tests/ -v
+```
+
+## Important Files
+
+- `ralph_simple.py` - Main single-model loop
+- `ralph_core/wheeler.py` - Wheeler Memory bridge
+- `ralph_core/memory.py` - Context and vector DB
+- `ralph_daemon.py` - Background daemon
+
+## Conventions
+
+- Local-first: All models run via Ollama
+- Completion signal: `<promise>COMPLETE</promise>`
+- Code blocks: ` ```python:filename.py `
+- Commands: `<execute>command</execute>` tags
