@@ -1,25 +1,61 @@
 {
-  "master_objective": "Write a 4-line poem about local AI.",
+  "master_objective": "SCM Architecture: Single-model pipeline with Wheeler stability-weighted context",
+  "version": "3.0",
+  "last_updated": "2026-02-05",
   "tasks": [
     {
       "id": 1,
-      "description": "Highlight how AI supports community elements like shops and schools.",
-      "status": "complete"
+      "description": "Create SCM Axioms document",
+      "status": "complete",
+      "file": "docs/SCM_AXIOMS.md"
     },
     {
       "id": 2,
-      "description": "Introduce the setting of a small town.",
-      "status": "pending"
+      "description": "Add recall_with_stability() to WheelerMemoryBridge",
+      "status": "complete",
+      "file": "ai_tech_stack/ralph_core/wheeler.py"
     },
     {
       "id": 3,
-      "description": "Mention the creation of AI as a local innovation.",
-      "status": "pending"
+      "description": "Update wheeler_recall.py to use stability scores",
+      "status": "complete",
+      "file": "ai_tech_stack/wheeler_recall.py"
     },
     {
       "id": 4,
-      "description": "Conclude with a positive note on collective thriving.",
-      "status": "pending"
+      "description": "Create ralph_simple.py single-model pipeline",
+      "status": "complete",
+      "file": "ai_tech_stack/ralph_simple.py"
+    },
+    {
+      "id": 5,
+      "description": "Replace ralph_loop.sh to use new pipeline",
+      "status": "complete",
+      "file": "ai_tech_stack/ralph_loop.sh"
+    },
+    {
+      "id": 6,
+      "description": "Update ARCHITECTURE.md with SCM and single-model docs",
+      "status": "complete",
+      "file": "ai_tech_stack/ARCHITECTURE.md"
+    },
+    {
+      "id": 7,
+      "description": "Install qwen3-coder-next model",
+      "status": "complete",
+      "model": "qwen3-coder-next:latest",
+      "size": "51GB"
     }
-  ]
+  ],
+  "configuration": {
+    "model": "qwen3-coder-next",
+    "model_params": "80B total, 3B active (MoE)",
+    "vram_required": "44.5GB (offloads to RAM on smaller systems)",
+    "embeddings": "nomic-embed-text",
+    "wheeler_stability_weights": {
+      "hit_count": 0.4,
+      "frame_persistence": 0.3,
+      "compression_survival": 0.3
+    }
+  }
 }

@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs and temp
+*.log
+logs/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+context.json
+RALPH_TASK.md
+metrics.jsonl
+*.pkl
+*.bin
+
+# Large files
+*.zip
+*.tar.gz
+*.tar.zst
+Screenshot_*.png
+
+# Obsidian
+.obsidian/
+
+# Build outputs
+ai_tech_stack/ralph_gui/target/
+ai_tech_stack/cmake-*/
+
+# Secrets
+.env
+*.pem
+*.key

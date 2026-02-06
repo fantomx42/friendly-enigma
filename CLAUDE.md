@@ -6,52 +6,99 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Ralph AI is a hierarchical autonomous agent swarm system that uses local LLMs (via Ollama) to accomplish tasks iteratively. The system follows the "Ralph Wiggum Method": iterate until `<promise>COMPLETE</promise>` is detected.
 
-The repository contains three main components:
-1. **ai_tech_stack/** - The core Ralph AI swarm system
-2. **ai_tech_stack/conductor/** - Project management framework with tracks, workflows, and development guidelines
-3. **wheeler_ai_training/** - Wheeler Memory neural network for text-to-2D-grid encoding
+**Repository components:**
+1. **ai_tech_stack/** - Core Ralph AI swarm system (Python)
+2. **ai_tech_stack/ralph_gui/** - Native desktop GUI (Rust/egui)
+3. **ai_tech_stack/ralph_ui/** - Web dashboard (FastAPI + vanilla JS)
+4. **ai_tech_stack/conductor/** - Project management framework (tracks, workflows, TDD)
+5. **wheeler_ai_training/** - Wheeler Memory neural network (text-to-2D-grid autoencoder)
 
 ## Key Commands
 
 ```bash
-# Run Ralph with an objective (legacy pipeline)
+# All commands from ai_tech_stack/ directory
 cd ai_tech_stack
+
+# Run Ralph with an objective (single-model, qwen3-coder-next)
 ./ralph_loop.sh "Your objective here"
 
-# Run with V2 message-driven pipeline
-./ralph_loop.sh --v2 "Your objective here"
+# Override model (if needed)
+RALPH_MODEL=qwen2.5-coder:14b ./ralph_loop.sh "Your objective"
 
-# Run with Docker sandbox isolation
-./ralph_loop.sh --sandbox "Your objective here"
+# Legacy multi-agent mode (V2 message bus)
+PYTHONPATH=. venv/bin/python3 ralph_core/runner.py "objective" 1
 
-# Run the daemon (monitors queue, handles REM sleep consolidation)
-python ralph_daemon.py
+# Native GUI (Rust/egui desktop app)
+cd ralph_gui && cargo build --release
+./target/release/ralph_gui                 # Or launch "Ralph AI" from desktop menu
 
-# Start the web UI
-./start_ui.sh
+# Web UI
+./start_ui.sh                              # Port 8000 (terminal) + 8001 (neural dashboard)
 
-# Run tests
-pytest ralph_core/tests/ -v
-pytest ralph_core/tests/test_bus.py -v  # Single test file
+# Background services
+python ralph_daemon.py                     # Monitors queue, REM sleep consolidation
+python ralph_voice.py                      # Voice interface
 
-# Wheeler Memory with local Ollama
-./ralph_wheeler_local.sh task.md --model llama3
+# Testing (activate venv first, set PYTHONPATH)
+source venv/bin/activate
+PYTHONPATH=. pytest ralph_core/tests/ -v                        # All tests
+PYTHONPATH=. pytest ralph_core/tests/test_bus.py -v             # Single file
+PYTHONPATH=. pytest ralph_core/tests/test_bus.py::test_name -v  # Single test
+PYTHONPATH=. pytest --cov=ralph_core --cov-report=html          # Coverage
 
-# Check available Ollama models
-ollama list
+# Linting (runs in CI)
+flake8 ralph_core/ --select=E9,F63,F7,F82  # Syntax errors only
+flake8 ralph_core/ --max-line-length=127    # Full lint
 ```
+
+## Native GUI (`ralph_gui/`)
+
+Rust application using **egui/eframe**. Desktop launcher entry at `~/.local/share/applications/ralph-ai.desktop`.
+
+**Key source files:**
+- `src/main.rs` - Entry point (1280x800 window)
+- `src/app.rs` - Main app state, run lifecycle, message processing
+- `src/theme.rs` - Cyberpunk dark color scheme
+- `src/ui/agent_flow.rs` - Force-directed agent graph visualization
+- `src/ui/controls.rs` - Control Center (Start/Pause/Stop/Flush)
+- `src/ui/input.rs` - Objective input field
+- `src/ui/graph.rs` - Force-directed graph physics simulation
+- `src/ui/metrics.rs` - Token/duration/model/iteration display
+- `src/ui/tasks.rs` - Task list with status icons
+- `src/ui/logs.rs` - Auto-scrolling log viewer
+- `src/ralph/runner.rs` - Subprocess management for ralph_loop.sh
+
+**Build:** `cd ralph_gui && cargo build --release`
+
+**Current state:** Start and Stop buttons are functional. Pause and Flush are UI stubs (TODO).
+
+## Web UI (`ralph_ui/`)
+
+Two FastAPI servers:
+- `backend/main.py` (port 8000) - Terminal UI, serves `frontend/index.html`, WebSocket streams logs from `ralph.log`
+- `backend/dashboard.py` (port 8001) - Neural dashboard, serves `frontend/neural.html`, D3.js agent visualization + Wheeler Memory canvas
 
 ## Architecture
 
-Ralph AI uses a 3-tier "compound" architecture:
+### Current: Single-Model (v3.0)
 
 ```
-Human Input → [Translator] → [Orchestrator] → [Middle Management] → [ASICs]
-                                                   ↕ bidirectional
-                                               [Engineer] ↔ [Designer]
+Human Input → [qwen3-coder-next] → Wheeler Memory ↔ Stability Scoring → Output
+               All cognitive roles    (hit_count, frame_persistence, compression_survival)
 ```
 
-### Core Agents (in `ai_tech_stack/ralph_core/agents/`)
+**Model:** `qwen3-coder-next` (80B MoE, 3B active per pass, 256K context)
+**Entry point:** `ralph_simple.py` via `ralph_loop.sh`
+
+### SCM Foundation
+
+The Symbolic Collapse Model (see `/docs/SCM_AXIOMS.md`) provides theoretical grounding:
+- Meaning is what survives symbolic pressure
+- Wheeler stability scoring weights context by pattern survival
+
+### Legacy: Multi-Agent Hierarchy
+
+The previous multi-agent system is preserved in `ralph_core/agents/` but not used by default:
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
@@ -59,18 +106,16 @@ Human Input → [Translator] → [Orchestrator] → [Middle Management] → [ASI
 | Orchestrator | deepseek-r1:14b | Strategic planning |
 | Engineer | qwen2.5-coder:14b | Code generation |
 | Designer | mistral-nemo:12b | Code review |
-| Reflector | - | Learns from past runs |
-| Debugger | - | Error analysis |
-| Estimator | - | Task prioritization |
-| Sleeper | - | REM sleep memory consolidation |
 
-### ASICs (micro-specialists in `ai_tech_stack/ralph_core/asic/`)
+To use legacy mode, run `ralph_core/runner.py` directly instead of `ralph_simple.py`.
 
-Small, fast models for specific tasks: regex, json, sql, test, fix, doc, tiny_code, sm_code.
+### ASICs (`ralph_core/asic/`)
 
-### Message Bus (`ai_tech_stack/ralph_core/protocols/`)
+Ultra-small specialist models for micro-tasks (legacy, not used in v3): regex, json, sql, test, fix, doc, tiny_code, sm_code.
 
-V2 mode uses a message-driven pipeline where agents communicate via typed messages:
+### Message Bus (`ralph_core/protocols/`)
+
+V2 mode uses typed messages with circuit breakers (max 50 messages, 3 revision rounds, 300s timeout):
 
 | Category | Messages |
 |----------|----------|
@@ -79,132 +124,88 @@ V2 mode uses a message-driven pipeline where agents communicate via typed messag
 | Memory | FORKLIFT_REQUEST, FORKLIFT_RESPONSE |
 | Tools | TOOL_REQUEST, TOOL_RESPONSE, TOOL_CONFIRM |
 | Sleep | REM_SLEEP_START, REM_SLEEP_COMPLETE |
-| Learning | CONSOLIDATION_REQUEST, CONSOLIDATION_RESPONSE |
-| Debug | DIAGNOSTIC (bypasses circuit breakers for critical error recovery) |
+| Debug | DIAGNOSTIC (bypasses circuit breakers) |
 
-Circuit breakers: max 50 messages, max 3 revision rounds, 300s timeout.
+### Security Layer (`ralph_core/security/`)
 
-### Security Layer (`ai_tech_stack/ralph_core/security/`)
+All agent outputs pass `checkpoint()` before user exposure:
+- `checkpoint.py` - Orchestrates all checks
+- `towers.py` - Audit logging (structured JSON)
+- `dogs.py` - Malware/secret detection
+- `guards.py` - Input/output validation
+- `gate_out.py` - Final output approval
 
-All agent outputs must pass `checkpoint()` before user exposure:
-- towers.py - Audit logging with structured JSON
-- dogs.py - Malware/secret detection (hardcoded patterns)
-- guards.py - Input/output validation
-- gate_out.py - Final output approval
-- checkpoint.py - Orchestrates all security checks
+### Tool System (`ralph_core/tool_system/`)
 
-### Silicon-Native Hardware Integration
+- `registry.py` - Tool definitions (category, permission_level, side_effects)
+- `dispatcher.py` - Routes tool requests
+- `handler.py` - Executes tools, captures results
+- Permission levels: ALLOW, WARN, DENY
 
-Three specialized GPU engines for hardware-optimized inference:
+### Hardware Integration
 
-| Engine | Hardware | Purpose | Models |
-|--------|----------|---------|--------|
-| iGPU | Intel Xe-LPG | ASIC micro-tasks | qwen2.5-coder:1.5b, tinyllama:1.1b |
-| NPU | Intel AI Boost | Wheeler dynamics, memory consolidation | 64x64 frame processing |
-| dGPU | AMD via Ollama | Primary reasoning | deepseek-r1:14b, qwen2.5-coder:14b |
-
-### Tool System (`ai_tech_stack/ralph_core/tool_system/`)
-
-- registry.py - Tool definitions with category, permission_level, side_effects
-- dispatcher.py - Routes tool requests to handlers
-- handler.py - Executes tools and captures results
-- Permission levels: ALLOW, WARN, DENY (for generated code safety)
+| Engine | Hardware | Purpose |
+|--------|----------|---------|
+| iGPU | Intel Xe-LPG | ASIC micro-tasks |
+| NPU | Intel AI Boost | Wheeler dynamics, memory consolidation |
+| dGPU | AMD via Ollama | Primary reasoning |
 
 ## Key Files
 
-- `ai_tech_stack/ralph_loop.sh` - Main execution loop
-- `ai_tech_stack/ralph_core/runner.py` - Iteration handler (connects shell to swarm)
-- `ai_tech_stack/ralph_core/swarm.py` - Agent interface exports
-- `ai_tech_stack/ralph_core/memory.py` - Context and vector DB
-- `ai_tech_stack/ralph_core/forklift.py` - Selective memory loading
-- `ai_tech_stack/ralph_daemon.py` - Background daemon with REM sleep
+| File | Purpose |
+|------|---------|
+| `ralph_loop.sh` | Entry point (delegates to ralph_simple.py) |
+| `ralph_simple.py` | Single-model loop with Wheeler integration |
+| `ralph_core/wheeler.py` | Wheeler Memory bridge with `recall_with_stability()` |
+| `wheeler_recall.py` | CLI for stability-weighted memory recall |
+| `ralph_core/runner.py` | Legacy multi-agent iteration handler |
+| `ralph_core/memory.py` | Context and vector DB |
+| `ralph_core/forklift.py` | Selective memory loading |
+| `ralph_core/executor.py` | Command execution with sandbox support (30s timeout) |
+| `ralph_daemon.py` | Background daemon with REM sleep |
 
 ## Memory System
-
-Three memory tiers:
 
 | Tier | Storage | Purpose |
 |------|---------|---------|
 | Short-term | `context.json` | Working memory for current task |
-| Long-term | ChromaDB (`ralph_local_memory`, `ralph_global_memory`) | Vector DB with nomic-embed-text embeddings |
-| Wheeler Bridge | `~/.wheeler_memory/` | Spatial dynamics (text -> 64x64 grid -> attractors) |
+| Long-term | ChromaDB (`ralph_local_memory`, `ralph_global_memory`) | Vector DB with nomic-embed-text |
+| Wheeler Bridge | `~/.wheeler_memory/` | Spatial dynamics (text → 128x128 grid → attractors) |
 
-Lessons stored in `~/.ralph/global_memory/lessons.json`.
+### Wheeler Stability Scoring
 
-The Forklift protocol (`forklift.py`) selectively loads memories by scope: "minimal", "standard", or "comprehensive".
+`recall_with_stability()` scores memories 0.0-1.0:
+| Metric | Weight | Meaning |
+|--------|--------|---------|
+| hit_count | 40% | Activation frequency (sigmoid normalized) |
+| frame_persistence | 30% | Re-encode matches stored frame |
+| compression_survival | 30% | Pattern survives 10-tick dynamics |
 
-### REM Sleep & Consolidation
+Higher stability = more context budget. Implements SCM Axiom 2: "Meaning is the remainder after compression."
 
-The daemon (`ralph_daemon.py`) triggers REM sleep cycles after 60s idle:
-- Consolidator clusters lessons using semantic similarity (0.80 threshold, min 3 lessons)
-- Synthesizes higher-level guidelines from clusters
-- Sleeper agent initiates cycles and updates global memory
+- Lessons stored in `~/.ralph/global_memory/lessons.json`
+- Forklift protocol loads memories by scope: "minimal", "standard", "comprehensive"
+- REM sleep triggers after 60s idle, clusters lessons (0.80 similarity threshold, min 3)
 
-## Wheeler Memory (Neural Net)
+## Conductor System (`conductor/`)
 
-Located in `wheeler_ai_training/`, this implements a text autoencoder with 2D spatial latent space:
+TDD-based project management. See `conductor/workflow.md` for full protocol.
 
-```
-Text → Encoder → 2D Grid (64x64) → Decoder → Text
-```
+**Task lifecycle:** select from `plan.md` → mark `[~]` → RED → GREEN → BLUE → verify >80% coverage → commit with git notes → mark `[x]` with SHA.
 
-The grid is compatible with Wheeler Memory dynamics for spatial reasoning.
+## Development Notes
 
-### Training (AMD GPU with ROCm)
+- **V2 mode**: `RALPH_V2=1` or `--v2` flag
+- **Completion signal**: `<promise>COMPLETE</promise>` in output
+- **Code output format**: ` ```python:filename.py ` for file saves
+- **Command execution**: `<execute>command</execute>` tags
+- **Sandbox mode**: Wraps commands in `docker exec ralph_sandbox /bin/bash -c`
+- **CI**: flake8 syntax checks, structure validation, Trivy security scan
+- **Python venv**: Always `source ai_tech_stack/venv/bin/activate` and set `PYTHONPATH=.` before running tests
 
-```bash
-cd wheeler_ai_training
-source venv/bin/activate
-python train.py --batch_size 64 --grid_size 64 --d_model 256 --epochs 10 --fp16
-```
+## ROCm Setup (AMD GPU)
 
-## Environment
-
-- **CPU**: Intel Core Ultra 7 265K (20 cores)
-- **GPU**: AMD Radeon RX 9070 XT (RDNA4) with ROCm
-- **RAM**: 32GB DDR5
-- **OS**: CachyOS Linux
-
-For ROCm setup:
 ```bash
 export HSA_OVERRIDE_GFX_VERSION=12.0.0
 export PYTORCH_ROCM_ARCH="gfx1200"
 ```
-
-## Conductor System (`ai_tech_stack/conductor/`)
-
-Project management framework for development tracks:
-- `workflow.md` - Strict TDD-based task workflow with phase completion protocols
-- `tech-stack.md` - Hardware architecture documentation
-- `tracks.md` - Registry of development initiatives
-- `tracks/` - Individual track directories (e.g., `ralph_loop_dgpu_20260131/`)
-
-**Phase-Based TDD Workflow**:
-1. Pick task from plan.md (sequential order)
-2. Mark in-progress: `[ ]` -> `[~]`
-3. Write failing tests (RED)
-4. Implement minimum code (GREEN)
-5. Refactor with test safety (BLUE)
-6. Verify >80% coverage
-7. Document deviations in tech-stack.md
-8. Commit with clear message
-9. Attach git notes with task summary
-10. Update plan with commit SHA (first 7 chars)
-11. Mark task complete: `[x]`
-
-## Executor & Sandbox
-
-`executor.py` provides:
-- Sandbox mode: wraps commands in `docker exec ralph_sandbox /bin/bash -c <command>`
-- Verification: `run_tests()`, `run_lint()`, `run_typecheck()`
-- 30 second default timeout
-
-## Development Notes
-
-- V2 mode: Set `RALPH_V2=1` or use `--v2` flag
-- Completion signal: `<promise>COMPLETE</promise>` in output
-- Git is treated as memory - commit frequently
-- Code output format: Use ` ```python:filename.py ` for file saves
-- Command execution: Use `<execute>command</execute>` tags
-- Test coverage target: >80% for new code
-- CI/CD: `.github/workflows/` contains ci.yml, codeql.yml, and Gemini-based automation

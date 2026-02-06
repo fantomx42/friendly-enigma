@@ -12,6 +12,7 @@ The primary logic resides here, implementing the multi-agent swarm architecture.
 *   **Translator**: Input processing (Phi-3).
 *   **Engineer/Designer**: Execution and verification (Qwen/Mistral).
 *   **Memory**: Vector database (ChromaDB) and "Wheeler Memory" (2D spatial representation).
+    *   **Epistemological Independence**: Implemented confidence tracking and tension detection to maintain evidence-backed beliefs and resist contradictory input.
 
 ### Interfaces
 *   **CLI**: The primary entry point via `ralph_loop.sh`.
@@ -24,16 +25,18 @@ Dedicated training environment for the "Wheeler" model—a text-to-spatial-grid 
 
 ## Technical Stack
 *   **Languages**: Python 3.8+ (Core), Rust (GUI), JavaScript (Web UI).
-*   **AI/ML**: Ollama (Inference), PyTorch (Training), ChromaDB (Vector Store).
-*   **Hardware Optimization**: Optimized for **AMD Radeon RX 9070 XT** (ROCm/HIP) and **Intel Core Ultra 7 265K**.
+*   **AI/ML**: Ollama (Inference), PyTorch (Training), ChromaDB (Vector Store), OpenVINO (NPU/iGPU Optimization).
+*   **Hardware Optimization**: Optimized for **AMD Radeon RX 9070 XT** (ROCm/HIP), **Intel Core Ultra 7 265K**, and **Intel NPU** (via Wheeler Dynamics).
 *   **OS**: CachyOS (Linux).
 
 ## Key Files & Directories
 *   `README.md`: Root project documentation.
 *   `ai_tech_stack/ralph_loop.sh`: Main CLI execution script.
+*   `ai_tech_stack/setup_models.sh`: Automates model export and hardware configuration.
 *   `ai_tech_stack/ralph_daemon.py`: Background service handling periodic tasks (like REM sleep).
 *   `ai_tech_stack/ralph_core/`: Python source code for agents, tools, and memory.
 *   `ai_tech_stack/ralph_gui/Cargo.toml`: Rust GUI configuration.
+*   `wheeler_ai_training/export_dynamics.py`: OpenVINO export toolchain for NPU/iGPU engines.
 
 ## Development & Usage
 
