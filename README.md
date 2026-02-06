@@ -4,7 +4,7 @@ Ralph is a Wheeler Memory system. The memory is the intelligence — not the LLM
 
 Something comes in. The system changes because of it. That change IS the memory. There is no separate read/write cycle. Every query creates a new attractor in the dynamics. The system learns by existing.
 
-The LLM (currently `qwen3-coder-next`) is a swappable interface layer — it translates between human language and Wheeler Memory. It is not Ralph's brain.
+The LLM (currently `qwen2.5:3b` for testing, swappable to any Ollama model) is a swappable interface layer — it translates between human language and Wheeler Memory. It is not Ralph's brain.
 
 ## How It Works
 
@@ -41,6 +41,15 @@ Override the model:
 RALPH_MODEL=qwen2.5-coder:14b ./ralph_loop.sh "objective"
 ```
 
+Use the Python client directly:
+```python
+from ollama_client import OllamaClient
+
+client = OllamaClient(model="qwen2.5:3b")
+for chunk in client.generate("Explain quicksort"):
+    print(chunk["response"], end="", flush=True)
+```
+
 Run Wheeler Memory standalone:
 ```bash
 cd wheeler_ai_training
@@ -49,16 +58,23 @@ python wheeler_ai.py
 
 ## Requirements
 
-- **Ollama** with `qwen3-coder-next` (51GB) or another model
-- **Python 3.10+**
-- **RAM:** 44GB+ recommended (or accept slower inference with RAM offload)
-- **GPU:** AMD ROCm or NVIDIA CUDA via Ollama
+- **Ollama** running locally (https://ollama.com)
+- **Python 3.10+** with `requests` (`pip install requests`)
+- **Base test model:** `qwen2.5:3b` (1.9GB) — small and fast for development/testing
+- **Production model:** `qwen3-coder-next` (51GB) or any Ollama-compatible model
+- **GPU:** AMD ROCm or NVIDIA CUDA via Ollama (optional — CPU works for small models)
 
 ### Install Models
 
 ```bash
-ollama pull qwen3-coder-next
+# Base test model (small, fast)
+ollama pull qwen2.5:3b
+
+# Embeddings
 ollama pull nomic-embed-text
+
+# Optional: larger models for production
+ollama pull qwen3-coder-next
 ```
 
 ## Repository Structure
