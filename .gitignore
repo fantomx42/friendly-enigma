@@ -43,7 +43,11 @@ metrics.jsonl
 *.zip
 *.tar.gz
 *.tar.zst
-Screenshot_*.png
+
+# Screenshots (catch stray images at root)
+*.png
+!docs/*.png
+!ai_tech_stack/ralph_gui/assets/*.png
 
 # Obsidian
 .obsidian/
@@ -51,6 +55,10 @@ Screenshot_*.png
 # Build outputs
 ai_tech_stack/ralph_gui/target/
 ai_tech_stack/cmake-*/
+
+# Runtime output
+ai_tech_stack/ralph_output/
+ralph_output/
 
 # Junk / non-project files
 cmake-*/
