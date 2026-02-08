@@ -462,6 +462,66 @@ install_void_editor() {
 }
 
 #-------------------------------------------------------------------------------
+# Ralph AI Extension
+#-------------------------------------------------------------------------------
+
+install_ralph_extension() {
+    print_header "Installing Ralph AI Extension"
+
+    # Find the ralph-vscode directory relative to this script
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local ext_dir="$script_dir/ralph-vscode"
+
+    if [[ ! -f "$ext_dir/package.json" ]]; then
+        print_warn "ralph-vscode/ not found at $ext_dir, skipping extension install"
+        return 0
+    fi
+
+    # Check for npm
+    if ! check_command npm; then
+        print_warn "npm not found, skipping extension build"
+        return 0
+    fi
+
+    print_step "Installing extension dependencies..."
+    (cd "$ext_dir" && npm install --no-audit --no-fund) || {
+        print_warn "npm install failed, skipping extension"
+        return 0
+    }
+
+    print_step "Compiling extension..."
+    (cd "$ext_dir" && npx tsc -p ./) || {
+        print_warn "TypeScript compilation failed, skipping extension"
+        return 0
+    }
+
+    print_step "Packaging extension..."
+    (cd "$ext_dir" && npx vsce package --no-dependencies 2>/dev/null) || {
+        print_warn "VSIX packaging failed, installing from source instead"
+    }
+
+    # Install into Void Editor
+    local void_exe="$VOID_HOME/void/void"
+    [[ ! -x "$void_exe" ]] && void_exe="$VOID_HOME/void/Void"
+
+    local vsix_file
+    vsix_file=$(ls "$ext_dir"/*.vsix 2>/dev/null | head -1)
+
+    if [[ -x "$void_exe" ]]; then
+        if [[ -n "$vsix_file" ]]; then
+            print_step "Installing extension into Void Editor..."
+            "$void_exe" --install-extension "$vsix_file" --ozone-platform=x11 2>/dev/null || true
+            print_success "Ralph AI extension installed"
+        else
+            print_info "No .vsix found; use --extensionDevelopmentPath=$ext_dir for dev mode"
+        fi
+    else
+        print_info "Void Editor not found; extension built but not installed"
+    fi
+}
+
+#-------------------------------------------------------------------------------
 # Launcher Script
 #-------------------------------------------------------------------------------
 
@@ -740,6 +800,7 @@ BANNER
     install_llama_cpp
     download_model
     install_void_editor
+    install_ralph_extension
     create_launcher
     create_desktop_entry
     create_readme

@@ -8,7 +8,7 @@
 #
 # Usage:
 #   ./ralph_loop.sh "Your objective here"
-#   RALPH_MODEL=qwen2.5:3b ./ralph_loop.sh "Your objective"
+#   RALPH_MODEL=qwen3:8b ./ralph_loop.sh "Your objective"
 #
 # =============================================================================
 

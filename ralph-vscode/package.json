@@ -1,0 +1,161 @@
+{
+  "name": "ralph-ai",
+  "displayName": "Ralph AI",
+  "description": "Control panel for the Ralph AI iterative agent loop",
+  "version": "0.1.0",
+  "publisher": "ralph-ai",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onView:ralph-ai.sidebar",
+    "onView:ralph-ai.wheeler",
+    "onCommand:ralph-ai.start",
+    "onCommand:ralph-ai.setObjective"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ralph-ai",
+          "title": "Ralph AI",
+          "icon": "media/ralph-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ralph-ai": [
+        {
+          "id": "ralph-ai.sidebar",
+          "name": "Control Panel",
+          "type": "tree"
+        },
+        {
+          "id": "ralph-ai.wheeler",
+          "name": "Wheeler Memory",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ralph-ai.setObjective",
+        "title": "Ralph AI: Set Objective"
+      },
+      {
+        "command": "ralph-ai.start",
+        "title": "Ralph AI: Start"
+      },
+      {
+        "command": "ralph-ai.stop",
+        "title": "Ralph AI: Stop"
+      },
+      {
+        "command": "ralph-ai.pauseResume",
+        "title": "Ralph AI: Pause / Resume"
+      },
+      {
+        "command": "ralph-ai.showOutput",
+        "title": "Ralph AI: Show Output"
+      },
+      {
+        "command": "ralph-ai.openIterationOutput",
+        "title": "Ralph AI: Open Iteration Output"
+      },
+      {
+        "command": "ralph-ai.startLlamaServer",
+        "title": "Ralph AI: Start llama-server"
+      },
+      {
+        "command": "ralph-ai.stopLlamaServer",
+        "title": "Ralph AI: Stop llama-server"
+      },
+      {
+        "command": "ralph-ai.showWheelerMemory",
+        "title": "Ralph AI: Show Wheeler Memory"
+      },
+      {
+        "command": "ralph-ai.storeMemory",
+        "title": "Ralph AI: Store Text in Wheeler Memory"
+      },
+      {
+        "command": "ralph-ai.storeSelection",
+        "title": "Ralph AI: Store Selection in Wheeler Memory"
+      }
+    ],
+    "configuration": {
+      "title": "Ralph AI",
+      "properties": {
+        "ralph-ai.model": {
+          "type": "string",
+          "default": "qwen3:8b",
+          "description": "Ollama model name"
+        },
+        "ralph-ai.numCtx": {
+          "type": "number",
+          "default": 32768,
+          "description": "Context window size in tokens"
+        },
+        "ralph-ai.maxIterations": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum loop iterations"
+        },
+        "ralph-ai.ollamaHost": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama server URL"
+        },
+        "ralph-ai.outputDir": {
+          "type": "string",
+          "default": "./ralph_output",
+          "description": "Directory for iteration output files"
+        },
+        "ralph-ai.llamaServer.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-start llama-server before Ralph runs"
+        },
+        "ralph-ai.llamaServer.modelPath": {
+          "type": "string",
+          "default": "~/VoidAI/models/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf",
+          "description": "Path to the GGUF model file for llama-server"
+        },
+        "ralph-ai.llamaServer.port": {
+          "type": "number",
+          "default": 8000,
+          "description": "llama-server port"
+        },
+        "ralph-ai.llamaServer.gpuLayers": {
+          "type": "number",
+          "default": 18,
+          "description": "Number of layers to offload to GPU (-ngl)"
+        },
+        "ralph-ai.llamaServer.ctxSize": {
+          "type": "number",
+          "default": 8192,
+          "description": "llama-server context size"
+        },
+        "ralph-ai.llamaServer.threads": {
+          "type": "number",
+          "default": 16,
+          "description": "Number of CPU threads for llama-server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.3.0"
+  }
+}

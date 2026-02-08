@@ -8,7 +8,7 @@ every time.
 
 Usage:
     python ralph_simple.py "Your objective here"
-    RALPH_MODEL=qwen2.5:3b python ralph_simple.py "Your objective"
+    RALPH_MODEL=qwen3:8b python ralph_simple.py "Your objective"
 """
 
 import argparse
@@ -37,7 +37,12 @@ DEFAULT_OUTPUT_DIR = "./ralph_output"
 DEFAULT_SYSTEM_PROMPT = (
     "You are Ralph, an autonomous AI agent. Work toward the objective "
     "iteratively. When the objective is fully satisfied, include the "
-    "exact token <promise>COMPLETE</promise> in your response."
+    "exact token <promise>COMPLETE</promise> in your response.\n\n"
+    "You have a persistent memory called Wheeler Memory. Between iterations, "
+    "relevant memories may be recalled and provided to you in a block tagged "
+    "[Wheeler Memory Context]. Treat this context like your own past experience "
+    "— use it when relevant, but recognize that older memories may be less "
+    "accurate. Your outputs are also stored to memory for future recall."
 )
 
 
@@ -54,7 +59,15 @@ def _wheeler_recall(prompt: str) -> str:
             text=True,
             timeout=30,
         )
-        return result.stdout.strip()
+        recalled = result.stdout.strip()
+        if recalled:
+            mem_count = recalled.count("\n---\n") + 1
+            logger.info("Wheeler recalled %d memory(s)", mem_count)
+            print(f"[Wheeler] Recalled {mem_count} memory(s)", flush=True)
+        else:
+            logger.info("Wheeler recall returned no memories")
+            print("[Wheeler] No memories found", flush=True)
+        return recalled
     except Exception as exc:
         logger.debug("Wheeler recall failed: %s", exc)
         return ""
@@ -67,13 +80,18 @@ def _wheeler_store(output_path: str) -> None:
         return
     try:
         import subprocess
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, str(wheeler_store_script), output_path,
              "--type", "iteration"],
             capture_output=True,
             text=True,
             timeout=30,
         )
+        if result.returncode == 0:
+            logger.info("Wheeler stored iteration output: %s", output_path)
+            print("[Wheeler] Stored iteration output", flush=True)
+        else:
+            logger.debug("Wheeler store returned non-zero: %s", result.stderr)
     except Exception as exc:
         logger.debug("Wheeler store failed: %s", exc)
 
@@ -81,6 +99,7 @@ def _wheeler_store(output_path: str) -> None:
 def run_loop(
     objective: str,
     model: str | None = None,
+    num_ctx: int | None = None,
     base_url: str | None = None,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
     output_dir: str = DEFAULT_OUTPUT_DIR,
@@ -95,7 +114,7 @@ def run_loop(
 
     # One client for the entire loop — the underlying Session keeps
     # the HTTP connection alive between generate() calls.
-    with OllamaClient(base_url=base_url, model=model) as client:
+    with OllamaClient(base_url=base_url, model=model, num_ctx=num_ctx) as client:
         logger.info("Ollama client: %s", client)
 
         if not client.is_available():
@@ -118,6 +137,7 @@ def run_loop(
             print("-" * 50)
 
             # Recall relevant Wheeler Memory context
+            print("[Wheeler] Recalling...", flush=True)
             wheeler_context = _wheeler_recall(objective)
 
             # Build the prompt for this iteration
@@ -176,6 +196,7 @@ def run_loop(
             output_path.write_text(full_output, encoding="utf-8")
 
             # Store in Wheeler Memory
+            print("[Wheeler] Storing...", flush=True)
             _wheeler_store(str(output_path))
 
             # Check for completion
@@ -201,7 +222,11 @@ def main():
     parser.add_argument("objective", help="The objective to work toward")
     parser.add_argument(
         "--model", default=None,
-        help="Ollama model name (default: RALPH_MODEL env or qwen2.5:3b)"
+        help="Ollama model name (default: RALPH_MODEL env or qwen3:8b)"
+    )
+    parser.add_argument(
+        "--num-ctx", type=int, default=None,
+        help="Context window size in tokens (default: RALPH_NUM_CTX env or 32768)"
     )
     parser.add_argument(
         "--base-url", default=None,
@@ -233,6 +258,7 @@ def main():
     success = run_loop(
         objective=args.objective,
         model=args.model,
+        num_ctx=args.num_ctx,
         base_url=args.base_url,
         max_iterations=args.max_iterations,
         output_dir=args.output_dir,

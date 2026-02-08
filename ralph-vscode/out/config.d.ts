@@ -1,0 +1,11 @@
+export declare function getModel(): string;
+export declare function getNumCtx(): number;
+export declare function getMaxIterations(): number;
+export declare function getOllamaHost(): string;
+export declare function getOutputDir(): string;
+export declare function getLlamaServerEnabled(): boolean;
+export declare function getLlamaServerModelPath(): string;
+export declare function getLlamaServerPort(): number;
+export declare function getLlamaServerGpuLayers(): number;
+export declare function getLlamaServerCtxSize(): number;
+export declare function getLlamaServerThreads(): number;

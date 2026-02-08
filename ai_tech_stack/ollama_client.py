@@ -13,7 +13,7 @@ swap models without changing any other code.
 Usage:
     from ollama_client import OllamaClient
 
-    client = OllamaClient(model="qwen2.5:3b")
+    client = OllamaClient(model="qwen3:8b")
 
     # Stream tokens as they arrive
     for chunk in client.generate("Explain quicksort"):
@@ -41,7 +41,8 @@ from urllib3.util.retry import Retry
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "http://localhost:11434"
-DEFAULT_MODEL = "qwen2.5:3b"
+DEFAULT_MODEL = "qwen3:8b"
+DEFAULT_NUM_CTX = 32768  # 32K tokens — fits ~8GB KV cache on 16GB GPU
 
 
 class OllamaError(Exception):
@@ -62,6 +63,9 @@ class OllamaClient:
     Args:
         base_url: Ollama server URL (default http://localhost:11434).
         model:    Default model name.  Can be overridden per call.
+        num_ctx:  Context window size in tokens.  Controls KV cache
+                  VRAM allocation.  Resolved from: explicit arg →
+                  RALPH_NUM_CTX env var → DEFAULT_NUM_CTX (32768).
         timeout:  Request timeout in seconds (default 300 — large
                   models may be slow on first load).
         max_retries: Number of automatic retries on connection errors.
@@ -71,6 +75,7 @@ class OllamaClient:
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
+        num_ctx: Optional[int] = None,
         timeout: int = 300,
         max_retries: int = 3,
     ):
@@ -79,6 +84,9 @@ class OllamaClient:
             or os.environ.get("OLLAMA_HOST", DEFAULT_BASE_URL)
         ).rstrip("/")
         self.model = model or os.environ.get("RALPH_MODEL", DEFAULT_MODEL)
+        self.num_ctx = num_ctx or int(
+            os.environ.get("RALPH_NUM_CTX", DEFAULT_NUM_CTX)
+        )
         self.timeout = timeout
 
         # Persistent session — keeps TCP connections alive between calls
@@ -136,8 +144,7 @@ class OllamaClient:
             payload["system"] = system
         if context is not None:
             payload["context"] = context
-        if options is not None:
-            payload["options"] = options
+        payload["options"] = self._merge_options(options)
 
         yield from self._stream_request("/api/generate", payload, stream)
 
@@ -166,8 +173,7 @@ class OllamaClient:
             "messages": messages,
             "stream": stream,
         }
-        if options is not None:
-            payload["options"] = options
+        payload["options"] = self._merge_options(options)
 
         yield from self._stream_request("/api/chat", payload, stream)
 
@@ -253,6 +259,17 @@ class OllamaClient:
     # --------------------------------------------------------------------- #
     #  Internal helpers
     # --------------------------------------------------------------------- #
+
+    def _merge_options(self, user_options: Optional[dict]) -> dict:
+        """Merge self.num_ctx into the options dict for an API call.
+
+        Starts with num_ctx default, then overlays any user-provided
+        options so per-call overrides always win.
+        """
+        merged = {"num_ctx": self.num_ctx}
+        if user_options:
+            merged.update(user_options)
+        return merged
 
     def _stream_request(
         self, endpoint: str, payload: dict, stream: bool

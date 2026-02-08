@@ -8,7 +8,7 @@ Ralph AI is a hierarchical autonomous agent swarm system that uses local LLMs (v
 
 **Repository components:**
 1. **ai_tech_stack/** - Core Ralph AI swarm system (Python)
-2. **ai_tech_stack/ralph_gui/** - Native desktop GUI (Rust/egui)
+2. **ralph-vscode/** - Void Editor extension (TypeScript, VS Code API)
 3. **ai_tech_stack/ralph_ui/** - Web dashboard (FastAPI + vanilla JS)
 4. **ai_tech_stack/conductor/** - Project management framework (tracks, workflows, TDD)
 5. **wheeler_ai_training/** - Wheeler Memory neural network (text-to-2D-grid autoencoder)
@@ -19,18 +19,19 @@ Ralph AI is a hierarchical autonomous agent swarm system that uses local LLMs (v
 # All commands from ai_tech_stack/ directory
 cd ai_tech_stack
 
-# Run Ralph with an objective (single-model, qwen3-coder-next)
+# Run Ralph with an objective (single-model, qwen3:8b)
 ./ralph_loop.sh "Your objective here"
 
-# Override model (if needed)
+# Override model or context window
 RALPH_MODEL=qwen2.5-coder:14b ./ralph_loop.sh "Your objective"
+RALPH_NUM_CTX=16384 ./ralph_loop.sh "Your objective"  # Smaller context to save VRAM
 
 # Legacy multi-agent mode (V2 message bus)
 PYTHONPATH=. venv/bin/python3 ralph_core/runner.py "objective" 1
 
-# Native GUI (Rust/egui desktop app)
-cd ralph_gui && cargo build --release
-./target/release/ralph_gui                 # Or launch "Ralph AI" from desktop menu
+# Void Editor extension
+cd ralph-vscode && npm run compile         # Build the extension
+npm run package                            # Create .vsix package
 
 # Web UI
 ./start_ui.sh                              # Port 8000 (terminal) + 8001 (neural dashboard)
@@ -51,26 +52,34 @@ flake8 ralph_core/ --select=E9,F63,F7,F82  # Syntax errors only
 flake8 ralph_core/ --max-line-length=127    # Full lint
 ```
 
-## Native GUI (`ralph_gui/`)
+## Void Editor Extension (`ralph-vscode/`)
 
-Rust application using **egui/eframe**. Desktop launcher entry at `~/.local/share/applications/ralph-ai.desktop`.
+VS Code/Void Editor extension providing integrated Ralph AI control. Installs into the Void Editor sidebar.
 
 **Key source files:**
-- `src/main.rs` - Entry point (1280x800 window)
-- `src/app.rs` - Main app state, run lifecycle, message processing
-- `src/theme.rs` - Cyberpunk dark color scheme
-- `src/ui/agent_flow.rs` - Force-directed agent graph visualization
-- `src/ui/controls.rs` - Control Center (Start/Pause/Stop/Flush)
-- `src/ui/input.rs` - Objective input field
-- `src/ui/graph.rs` - Force-directed graph physics simulation
-- `src/ui/metrics.rs` - Token/duration/model/iteration display
-- `src/ui/tasks.rs` - Task list with status icons
-- `src/ui/logs.rs` - Auto-scrolling log viewer
-- `src/ralph/runner.rs` - Subprocess management for ralph_loop.sh
+- `src/extension.ts` - Entry point: activate/deactivate, command registration
+- `src/types.ts` - Enums (RalphState, LlamaServerState), interfaces
+- `src/config.ts` - Settings accessor (reads VS Code workspace config)
+- `src/ralph/ralphRunner.ts` - Spawns ralph_loop.sh, manages lifecycle, emits events
+- `src/ralph/outputParser.ts` - State machine parsing stdout signals into typed events
+- `src/ralph/llamaServer.ts` - llama-server start/stop/health polling
+- `src/views/sidebarProvider.ts` - TreeDataProvider: objective, controls, iteration, Wheeler status
+- `src/views/statusBar.ts` - Status bar item: idle/running/paused/complete/error
+- `src/views/wheelerWebview.ts` - WebviewViewProvider: memory list from ~/.wheeler_memory/
 
-**Build:** `cd ralph_gui && cargo build --release`
+**Build:** `cd ralph-vscode && npm run compile`
+**Package:** `cd ralph-vscode && npm run package` (creates `.vsix`)
+**Dev launch:** Open Void with `--extensionDevelopmentPath=./ralph-vscode`
 
-**Current state:** Start and Stop buttons are functional. Pause and Flush are UI stubs (TODO).
+**Features:**
+- Activity bar icon opening Ralph AI sidebar
+- Sidebar: objective, run state, iteration progress, model, Wheeler Memory count, llama-server status
+- Commands: Start, Stop, Pause/Resume, Set Objective, Show Output, llama-server management
+- Status bar: state with icon (click to show output channel)
+- Output channel: real-time ralph_loop.sh stdout streaming
+- Wheeler Memory webview: reads `~/.wheeler_memory/memory.json`, shows last 10 entries
+- Completion notification when `<promise>COMPLETE</promise>` detected
+- llama-server auto-start (optional, configurable)
 
 ## Web UI (`ralph_ui/`)
 
@@ -87,8 +96,9 @@ Human Input → [qwen3-coder-next] → Wheeler Memory ↔ Stability Scoring → 
                All cognitive roles    (hit_count, frame_persistence, compression_survival)
 ```
 
-**Model:** `qwen3-coder-next` (80B MoE, 3B active per pass, 256K context)
+**Model:** `qwen3:8b` (8B dense, 32K context, thinking + tool use)
 **Entry point:** `ralph_simple.py` via `ralph_loop.sh`
+**VRAM budget:** ~8GB model weights + ~8GB KV cache (32K ctx) on 16GB GPU
 
 ### SCM Foundation
 
