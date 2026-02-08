@@ -70,3 +70,19 @@ wget-log*
 .env
 *.pem
 *.key
+
+# Agent/tool configs (user-specific)
+.goose/
+.claude/
+GEMINI.md
+CLAUDE.md
+
+# Dev logs and scratch
+RALPH_PROGRESS.md
+RALPH_TASK.md
+ralph_epistemology_track.md
+
+# Notes / scratch
+memory/
+rhalphwheelermemory.txt
+hello.py

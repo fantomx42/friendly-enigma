@@ -106,7 +106,6 @@ export class RalphRunner extends EventEmitter {
                 RALPH_MODEL: config.getModel(),
                 RALPH_NUM_CTX: String(config.getNumCtx()),
                 OLLAMA_HOST: ollamaHost,
-                HSA_OVERRIDE_GFX_VERSION: "12.0.0",
                 PYTHONUNBUFFERED: "1",
             },
         });

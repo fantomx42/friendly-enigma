@@ -121,8 +121,8 @@
         },
         "ralph-ai.llamaServer.modelPath": {
           "type": "string",
-          "default": "~/VoidAI/models/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf",
-          "description": "Path to the GGUF model file for llama-server"
+          "default": "",
+          "description": "Path to your GGUF model file for llama-server (e.g. ~/models/my-model.gguf)"
         },
         "ralph-ai.llamaServer.port": {
           "type": "number",

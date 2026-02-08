@@ -1,190 +1,161 @@
 # Ralph AI
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Version](https://img.shields.io/badge/version-3.0.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Python](https://img.shields.io/badge/python-3.10+-yellow)
-![Rust](https://img.shields.io/badge/rust-1.75+-orange)
+An autonomous agent that pairs any local LLM (via [Ollama](https://ollama.com)) with **Wheeler Memory** — a cellular automata system that stores patterns as stable attractors instead of text.
 
-> **Ralph is a local, hierarchical autonomous agent system that pairs a single LLM with "Wheeler Memory" — a cellular automata-based spatial memory system — to achieve iterative task completion and true epistemological independence.**
+```
+Task → Wheeler Memory (encode → dynamics → attractor → recall)
+           ↕ weighted context
+        Your LLM (via Ollama)
+           ↓
+     Result feeds back into Wheeler Memory
+```
 
----
-
-## Description
-
-Ralph AI is an experimental autonomous agent designed to run entirely on local hardware (AMD GPUs, Intel NPUs). Unlike traditional agents that rely on vector databases (RAG) for memory, Ralph uses **Wheeler Memory**, a neural-spatial system that encodes text into 2D grid patterns (attractors).
-
-The system follows the **"Ralph Wiggum Protocol"**: a persistent autonomous loop where the agent iterates, reasons, and executes tools until it self-verifies completion with a strict `<promise>COMPLETE</promise>` signal.
-
-### Key Features
-
-*   **Tri-Brid Architecture**: Optimized for heterogenous compute.
-    *   **Chalmers (GPU)**: Heavy reasoning and code generation (e.g., Qwen3).
-    *   **Wiggum (CPU)**: Reflexive responses and speculative decoding.
-    *   **Librarian (NPU)**: Wheeler Memory dynamics and context management.
-*   **Wheeler Memory**: A non-RAG memory system where text collapses into stable 2D attractors via cellular automata dynamics. Meaning is defined by what "survives" the dynamics.
-*   **Epistemological Independence**: Ralph tracks confidence metrics to form its own "beliefs," preventing sycophancy (blindly agreeing with the user) and allowing for genuine disagreement based on established knowledge.
-*   **Local-First Design**: Built for privacy and performance on consumer hardware (CachyOS, ROCm, Ollama).
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Configuration](#configuration)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Installation
-
-### Prerequisites
-
-*   **OS**: Linux (CachyOS/Arch recommended)
-*   **Python**: 3.10 or higher
-*   **Rust**: Latest stable (for GUI)
-*   **Ollama**: Running locally with `qwen3` models pulled
-*   **Hardware**: GPU recommended (AMD ROCm or NVIDIA CUDA)
-
-### Step-by-Step
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yourusername/ralph.git
-    cd ralph
-    ```
-
-2.  **Set up the Python environment:**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    ```
-
-3.  **Install Rust dependencies (optional, for GUI):**
-    ```bash
-    cd ai_tech_stack/ralph_gui
-    cargo build --release
-    ```
-
-4.  **Verify Ollama:**
-    Ensure Ollama is running and pull the necessary models:
-    ```bash
-    ollama pull qwen3:8b
-    ollama pull nomic-embed-text
-    ```
+The LLM is an interface layer. Wheeler Memory is the intelligence.
 
 ## Quick Start
 
-### CLI Loop (Primary)
+### 1. Prerequisites
 
-The fastest way to use Ralph is via the terminal loop script.
+- **Linux** (tested on Arch/CachyOS, should work on Ubuntu/Fedora)
+- **Python 3.10+**
+- **[Ollama](https://ollama.com)** running locally
+- Any model you want — Ralph works with whatever you pull into Ollama
+
+### 2. Install
+
+```bash
+git clone https://github.com/fantomx42/friendly-enigma.git ralph
+cd ralph/ai_tech_stack
+
+# Create venv and install deps
+python3 -m venv venv
+source venv/bin/activate
+pip install numpy requests
+```
+
+### 3. Pull a model
+
+Use whatever Ollama model fits your hardware:
+
+```bash
+# Small (4GB VRAM)
+ollama pull qwen2.5:3b
+
+# Medium (8GB VRAM) — default
+ollama pull qwen3:8b
+
+# Large (16GB+ VRAM)
+ollama pull qwen2.5-coder:14b
+```
+
+### 4. Run
 
 ```bash
 cd ai_tech_stack
-./ralph_loop.sh "Create a snake game in Python using Pygame"
+./ralph_loop.sh "Your objective here"
 ```
 
-### Web UI
-
-For a visual dashboard of the neural memory and task progress:
+Override the model or context window:
 
 ```bash
-./start_ui.sh
+RALPH_MODEL=qwen2.5-coder:14b ./ralph_loop.sh "Your objective"
+RALPH_NUM_CTX=16384 ./ralph_loop.sh "Your objective"   # smaller context to save VRAM
 ```
-*   **Dashboard**: http://localhost:8000
-*   **Neural View**: http://localhost:8001
 
-## Architecture
+Ralph iterates until the LLM outputs `<promise>COMPLETE</promise>` or hits max iterations.
 
-Ralph executes tasks through a cyclic process:
+## Wheeler Memory
 
-1.  **Input**: User defines an objective.
-2.  **Wheeler Encoding**: Input is converted to a 128x128 2D frame.
-3.  **Dynamics**: The frame evolves via cellular automata until it settles into a stable "attractor."
-4.  **Recall**: Stable patterns trigger associated memories (weighted by hit count, persistence, and compression survival).
-5.  **Reasoning**: The LLM (Qwen3) receives the weighted context and generates a response/action.
-6.  **Feedback**: The result acts as new sensory input, reinforcing or modifying the memory grid.
+This is not RAG. There's no "save text, search later" step.
 
-### Directory Structure
+1. Text encodes to a 128x128 spatial frame (each character stamps an 8x8 pattern)
+2. Cellular automata dynamics run until the frame settles into a stable attractor
+3. The attractor IS the memory — the dynamics created it
+4. Recall compares attractor patterns, not text strings
+5. Similar meanings collapse to similar attractors, even with different words
 
-*   `ai_tech_stack/`: Core Python logic, Ollama client, and loop scripts.
-*   `wheeler_ai_training/`: The neural network and cellular automata logic for memory.
-*   `conductor/`: Project management and TDD workflow tracking.
-*   `ralph_gui/`: Native Rust-based desktop interface.
+### Stability Scoring
+
+Memories get weighted by how well they survive pressure:
+
+| Metric | Weight | Meaning |
+|--------|--------|---------|
+| hit_count | 40% | Activation frequency (sigmoid normalized) |
+| frame_persistence | 30% | Re-encoding produces the same frame |
+| compression_survival | 30% | Pattern survives 10 ticks of dynamics |
+
+Higher stability = more context budget when building prompts.
+
+## Void Editor Extension
+
+The `ralph-vscode/` directory contains a VS Code / [Void Editor](https://voideditor.com) extension with:
+
+- Sidebar: run state, iteration progress, Wheeler Memory panel
+- Live Wheeler Memory viewer: heatmap patterns + full scrollable text
+- Instant refresh when new memories are stored
+- llama-server management (optional)
+
+```bash
+cd ralph-vscode
+npm install && npm run compile
+```
+
+Open Void/VS Code with the extension in dev mode:
+
+```bash
+code --extensionDevelopmentPath=./ralph-vscode ~/ralph
+```
 
 ## Configuration
 
-Configuration is primarily handled via environment variables passed to the execution scripts.
-
-**Common Options:**
-
 | Variable | Description | Default |
-| :--- | :--- | :--- |
-| `RALPH_MODEL` | The Ollama model to use | `qwen3:8b` |
-| `RALPH_NUM_CTX` | Context window size | `32768` |
-| `WHEELER_DEVICE` | Compute device for memory | `cpu` (or `npu`/`cuda`) |
+|----------|-------------|---------|
+| `RALPH_MODEL` | Ollama model name | `qwen3:8b` |
+| `RALPH_NUM_CTX` | Context window (tokens) | `32768` |
+| `OLLAMA_HOST` | Ollama server URL | `http://localhost:11434` |
 
-**Example:**
-```bash
-RALPH_MODEL=qwen2.5-coder:14b RALPH_NUM_CTX=16384 ./ralph_loop.sh "Analyze this code"
-```
+### GPU Setup
 
-## Examples
+Ralph uses Ollama for inference — configure your GPU through Ollama's setup:
 
-**Task**: "Fix the bug in the login function."
+- **AMD (ROCm):** Set `HSA_OVERRIDE_GFX_VERSION` for your GPU in your shell profile
+- **NVIDIA (CUDA):** Works out of the box with Ollama
+- **CPU only:** Works fine, just slower
 
-1.  **Ralph analyzes** the file structure.
-2.  **Ralph reads** `login.py`.
-3.  **Wheeler Memory** recalls similar debugging patterns or previous context about `login.py`.
-4.  **Ralph writes** a test case to reproduce the bug.
-5.  **Ralph implements** the fix.
-6.  **Ralph verifies** with the test.
-7.  **Ralph signals** `<promise>COMPLETE</promise>`.
+## Directory Structure
+
+| Directory | What it is |
+|-----------|-----------|
+| `ai_tech_stack/` | Core loop, Ollama client, security, tools |
+| `wheeler_ai_training/` | Wheeler Memory — text-to-grid encoder, dynamics |
+| `ralph-vscode/` | Void/VS Code editor extension |
+| `conductor/` | TDD project management framework |
+| `docs/` | SCM axioms and architecture docs |
+
+## How It Works
+
+1. Task arrives (human input)
+2. Wheeler Memory encodes text → runs dynamics → finds attractor
+3. Stability scoring weights retrieved patterns
+4. Weighted context + task → your LLM via Ollama
+5. Model generates response
+6. Result feeds back into Wheeler Memory
+7. Patterns strengthen or fade based on outcomes
+8. Loop repeats until `<promise>COMPLETE</promise>` or max iterations
 
 ## Development
 
-### Running Tests
-
-To ensure core functionality:
-
 ```bash
+cd ai_tech_stack
 source venv/bin/activate
-PYTHONPATH=. pytest ai_tech_stack/ralph_core/tests/ -v
+
+# Run tests
+PYTHONPATH=. pytest ralph_core/tests/ -v
+
+# Lint
+flake8 ralph_core/ --max-line-length=127
 ```
-
-### Training Wheeler Memory
-
-If you are modifying the memory dynamics:
-
-```bash
-cd wheeler_ai_training
-python wheeler_ai.py
-```
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1.  Fork the repository.
-2.  Create a feature branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the branch (`git push origin feature/AmazingFeature`).
-5.  Open a Pull Request.
-
-Please review `conductor/product-guidelines.md` for coding standards.
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## Authors & Acknowledgments
-
-*   **Tristan** - *Lead Developer*
-*   **Ralph Team** - *Architecture & Design*
-
-Special thanks to the open-source community behind **Ollama**, **CachyOS**, and **Rust**.
-
-## Support
-
-For issues, please open a ticket in the GitHub Issue Tracker.
+MIT

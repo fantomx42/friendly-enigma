@@ -8,9 +8,9 @@ import * as config from "../config";
 /**
  * Manages an optional local llama-server process.
  *
- * Matches the args from ~/VoidAI/scripts/launch.sh:
- *   --model, --mmap, -ngl 18, --ctx-size 8192,
- *   --cache-type-k q8_0, --cache-type-v q8_0, --threads 16
+ * Spawns llama-server with settings from VS Code config.
+ * All GPU-specific env vars (HSA_OVERRIDE_GFX_VERSION, etc.)
+ * are inherited from the user's shell environment.
  *
  * Emits "state" with LlamaServerState on changes.
  */
@@ -71,8 +71,6 @@ export class LlamaServer extends EventEmitter {
             {
                 env: {
                     ...process.env,
-                    HSA_OVERRIDE_GFX_VERSION: "12.0.0",
-                    PYTORCH_ROCM_ARCH: "gfx1200",
                 },
             }
         );

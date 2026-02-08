@@ -31,7 +31,7 @@ export function getLlamaServerEnabled(): boolean {
 export function getLlamaServerModelPath(): string {
     const raw = cfg().get<string>(
         "llamaServer.modelPath",
-        "~/VoidAI/models/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf"
+        ""
     );
     return raw.replace(/^~/, process.env.HOME || "");
 }
