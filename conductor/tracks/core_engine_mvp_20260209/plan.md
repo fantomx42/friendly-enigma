@@ -9,9 +9,9 @@
     - [x] Create `pytest.ini`.
 
 ## Phase 2: Dynamics Engine (The "Physics")
-- [ ] Task: Implement Text Codec
-    - [ ] Write Tests: Ensure string <-> grid conversion is deterministic.
-    - [ ] Implement `TextCodec` (128x128 grid encoding).
+- [x] Task: Implement Text Codec [24bfe98]
+    - [x] Write Tests: Ensure string <-> grid conversion is deterministic.
+    - [x] Implement `TextCodec` (128x128 grid encoding).
 - [ ] Task: Implement Cellular Automata Engine
     - [ ] Write Tests: Verify determinism (Same Input + Same Seed = Same Output).
     - [ ] Implement `DynamicsEngine` using PyTorch.
