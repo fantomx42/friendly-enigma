@@ -4,9 +4,9 @@
 - [x] Task: Initialize Poetry project structure [ef5aff0]
     - [x] Initialize `pyproject.toml` with dependencies (pytorch, numpy, aiosqlite, click).
     - [x] Create directory structure (`wheeler/core`, `wheeler/cli`, `tests`).
-- [ ] Task: Configure Code Quality Tools
-    - [ ] Configure `ruff` and `mypy`.
-    - [ ] Create `pytest.ini`.
+- [x] Task: Configure Code Quality Tools [3197fa5]
+    - [x] Configure `ruff` and `mypy`.
+    - [x] Create `pytest.ini`.
 
 ## Phase 2: Dynamics Engine (The "Physics")
 - [ ] Task: Implement Text Codec
