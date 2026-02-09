@@ -12,9 +12,9 @@
 - [x] Task: Implement Text Codec [24bfe98]
     - [x] Write Tests: Ensure string <-> grid conversion is deterministic.
     - [x] Implement `TextCodec` (128x128 grid encoding).
-- [ ] Task: Implement Cellular Automata Engine
-    - [ ] Write Tests: Verify determinism (Same Input + Same Seed = Same Output).
-    - [ ] Implement `DynamicsEngine` using PyTorch.
+- [x] Task: Implement Cellular Automata Engine [d8d9cf7]
+    - [x] Write Tests: Verify determinism (Same Input + Same Seed = Same Output).
+    - [x] Implement `DynamicsEngine` using PyTorch.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Dynamics Engine' (Protocol in workflow.md)
 
 ## Phase 3: Persistence Layer (The "Hard Drive")
