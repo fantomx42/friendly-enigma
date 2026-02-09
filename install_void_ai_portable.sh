@@ -522,6 +522,59 @@ install_ralph_extension() {
 }
 
 #-------------------------------------------------------------------------------
+# Ralph Backend Installation
+#-------------------------------------------------------------------------------
+
+install_ralph_backend() {
+    print_header "Installing Ralph Backend Scripts"
+
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    # Source paths
+    local src_stack="$script_dir/ai_tech_stack"
+    local src_recall="$script_dir/wheeler_recall.py"
+    local src_store="$script_dir/wheeler_store.py"
+    local src_training="$script_dir/wheeler_ai_training"
+
+    # Destination paths
+    local dest_stack="$VOID_HOME/ai_tech_stack"
+    
+    # Check if sources exist
+    if [[ ! -d "$src_stack" ]]; then
+        print_warn "ai_tech_stack not found, skipping backend install"
+        return 0
+    fi
+
+    print_step "Copying scripts to $VOID_HOME..."
+    cp -r "$src_stack" "$VOID_HOME/"
+    cp -r "$src_training" "$VOID_HOME/" 2>/dev/null || true
+    cp "$src_recall" "$VOID_HOME/" 2>/dev/null || true
+    cp "$src_store" "$VOID_HOME/" 2>/dev/null || true
+
+    cp "$src_stack/ralph_proxy.py" "$VOID_HOME/ai_tech_stack/" 2>/dev/null || true
+
+    # Setup Python venv
+    if check_command python3; then
+        print_step "Setting up Python virtual environment..."
+        local venv_dir="$dest_stack/venv"
+        
+        if [[ ! -d "$venv_dir" ]]; then
+            python3 -m venv "$venv_dir"
+            print_success "Created venv at $venv_dir"
+        fi
+
+        # Install dependencies
+        print_step "Installing Python dependencies (numpy, requests, fastapi, uvicorn, httpx)..."
+        "$venv_dir/bin/pip" install --upgrade pip >/dev/null
+        "$venv_dir/bin/pip" install numpy requests fastapi uvicorn httpx >/dev/null
+        print_success "Dependencies installed"
+    else
+        print_warn "python3 not found, skipping venv setup. Scripts may not run."
+    fi
+}
+
+#-------------------------------------------------------------------------------
 # Launcher Script
 #-------------------------------------------------------------------------------
 
@@ -558,10 +611,21 @@ NC='\033[0m'
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}Shutting down...${NC}"
+    # Kill llama-server
     if [[ -n "${SERVER_PID:-}" ]]; then
         kill "$SERVER_PID" 2>/dev/null || true
-        wait "$SERVER_PID" 2>/dev/null || true
     fi
+    # Kill Proxy
+    if [[ -n "${PROXY_PID:-}" ]]; then
+        kill "$PROXY_PID" 2>/dev/null || true
+    fi
+    # Kill Void if it was started and is still running
+    if [[ -n "${VOID_PID:-}" ]]; then
+        kill "$VOID_PID" 2>/dev/null || true
+    fi
+    # Final sweep of process group
+    trap - EXIT INT TERM
+    kill 0 2>/dev/null || true
     echo -e "${GREEN}Goodbye!${NC}"
 }
 
@@ -576,7 +640,7 @@ else
     llama-server \
         --model "$MODEL" \
         --mmap \
-        -ngl 18 \
+        -ngl 0 \
         --ctx-size 8192 \
         --cache-type-k q8_0 \
         --cache-type-v q8_0 \
@@ -602,21 +666,35 @@ else
     echo ""
 
     echo -e "${GREEN}Server ready on port $PORT${NC}"
+
+    # Start Ralph Memory Proxy
+    echo -e "${CYAN}Starting Ralph Memory Proxy...${NC}"
+    "$VOID_HOME/ai_tech_stack/venv/bin/python3" "$VOID_HOME/ai_tech_stack/ralph_proxy.py" > "$VOID_HOME/logs/proxy.log" 2>&1 &
+    PROXY_PID=$!
+    echo -e "${GREEN}Proxy ready on port 8001${NC}"
 fi
 
 # Launch Void Editor
+VOID_PID=""
 if [[ -x "$VOID_HOME/void/void" ]]; then
     echo -e "${CYAN}Launching Void Editor...${NC}"
     "$VOID_HOME/void/void" --ozone-platform=x11 &
+    VOID_PID=$!
 elif [[ -x "$VOID_HOME/void/Void" ]]; then
     echo -e "${CYAN}Launching Void Editor...${NC}"
     "$VOID_HOME/void/Void" --ozone-platform=x11 &
+    VOID_PID=$!
 else
     echo -e "${YELLOW}Void Editor not found, server running at http://127.0.0.1:$PORT${NC}"
 fi
 
-# Keep script running to maintain server
-if [[ -n "${SERVER_PID:-}" ]]; then
+# Keep script running until Void exits or Server exits
+# We prioritize waiting for Void because its closure is the user's signal to stop.
+if [[ -n "${VOID_PID:-}" ]]; then
+    echo -e "${CYAN}Waiting for Void Editor to close...${NC}"
+    wait "$VOID_PID"
+elif [[ -n "${SERVER_PID:-}" ]]; then
+    echo -e "${CYAN}Waiting for llama-server...${NC}"
     wait "$SERVER_PID"
 fi
 LAUNCHER_EOF
@@ -746,7 +824,7 @@ export HSA_OVERRIDE_GFX_VERSION=12.0.0
 llama-server \
   --model ~/VoidAI/models/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf \
   --mmap \
-  -ngl 18 \
+  -ngl 0 \
   --ctx-size 8192 \
   --cache-type-k q8_0 \
   --cache-type-v q8_0 \
@@ -801,6 +879,7 @@ BANNER
     download_model
     install_void_editor
     install_ralph_extension
+    install_ralph_backend
     create_launcher
     create_desktop_entry
     create_readme

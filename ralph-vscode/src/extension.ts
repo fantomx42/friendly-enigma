@@ -5,6 +5,7 @@ import { LlamaServer } from "./ralph/llamaServer";
 import { SidebarProvider } from "./views/sidebarProvider";
 import { StatusBar } from "./views/statusBar";
 import { WheelerWebviewProvider } from "./views/wheelerWebview";
+import { ChatProvider } from "./views/chatProvider";
 import { ParsedEvent } from "./types";
 import * as config from "./config";
 
@@ -27,6 +28,15 @@ export function activate(context: vscode.ExtensionContext) {
     // Sidebar tree view
     const sidebarProvider = new SidebarProvider(runner, llamaServer);
     vscode.window.registerTreeDataProvider("ralph-ai.sidebar", sidebarProvider);
+
+    // Chat webview
+    const chatProvider = new ChatProvider(context.extensionPath);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            "ralph-ai.chat",
+            chatProvider
+        )
+    );
 
     // Wheeler Memory webview
     const wheelerProvider = new WheelerWebviewProvider();
@@ -134,6 +144,33 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand("ralph-ai.showWheelerMemory", () => {
             // Focus the Wheeler webview panel in the sidebar
             vscode.commands.executeCommand("ralph-ai.wheeler.focus");
+        }),
+
+        vscode.commands.registerCommand("ralph-ai.storeMemory", async () => {
+            const text = await vscode.window.showInputBox({
+                prompt: "Enter text to store in Wheeler Memory",
+                placeHolder: "Important lesson or context...",
+            });
+            if (text) {
+                await manualStore(text, "lesson", context.extensionPath);
+                wheelerProvider.refresh();
+            }
+        }),
+
+        vscode.commands.registerCommand("ralph-ai.storeSelection", async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage("No active editor found.");
+                return;
+            }
+            const selection = editor.document.getText(editor.selection);
+            if (!selection) {
+                vscode.window.showWarningMessage("No text selected.");
+                return;
+            }
+            await manualStore(selection, "input", context.extensionPath);
+            wheelerProvider.refresh();
+            vscode.window.showInformationMessage("Selection stored in Wheeler Memory.");
         })
     );
 
@@ -147,6 +184,31 @@ export function activate(context: vscode.ExtensionContext) {
             wheelerProvider.dispose();
             outputChannel.dispose();
         },
+    });
+}
+
+/** Helper to call wheeler_store.py manually */
+async function manualStore(text: string, type: string, extensionPath: string) {
+    const { spawn } = require("child_process");
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    let scriptPath = "";
+    
+    if (workspaceFolders) {
+        scriptPath = path.join(workspaceFolders[0].uri.fsPath, "wheeler_store.py");
+    }
+    
+    // Fallback to portable install location
+    if (!require("fs").existsSync(scriptPath)) {
+        const homeDir = process.env.HOME || "";
+        scriptPath = path.join(homeDir, "VoidAI", "wheeler_store.py");
+    }
+
+    return new Promise((resolve, reject) => {
+        const proc = spawn("python3", [scriptPath, "--text", text, "--type", type, "--outcome", "success"]);
+        proc.on("close", (code: number) => {
+            if (code === 0) resolve(true);
+            else reject(new Error(`Store failed with code ${code}`));
+        });
     });
 }
 

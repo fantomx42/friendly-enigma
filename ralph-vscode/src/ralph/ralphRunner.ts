@@ -59,9 +59,19 @@ export class RalphRunner extends EventEmitter {
             // Check if we're in the ralph repo
             for (const folder of workspaceFolders) {
                 const candidate = path.join(folder.uri.fsPath, "ai_tech_stack");
-                return candidate;
+                if (require("fs").existsSync(candidate)) {
+                    return candidate;
+                }
             }
         }
+        
+        // Check portable install location (~/VoidAI/ai_tech_stack)
+        const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+        const portablePath = path.join(homeDir, "VoidAI", "ai_tech_stack");
+        if (require("fs").existsSync(portablePath)) {
+            return portablePath;
+        }
+
         // Fallback: assume extensionPath is inside ralph/ralph-vscode
         return path.join(this.extensionPath, "..", "ai_tech_stack");
     }

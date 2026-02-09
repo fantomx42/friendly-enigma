@@ -34,6 +34,11 @@
           "type": "tree"
         },
         {
+          "id": "ralph-ai.chat",
+          "name": "Chat",
+          "type": "webview"
+        },
+        {
           "id": "ralph-ai.wheeler",
           "name": "Wheeler Memory",
           "type": "webview"
