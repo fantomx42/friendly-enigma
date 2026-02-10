@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use futures_util::stream::BoxStream;
+use futures_util::StreamExt;
+use bytes::Bytes;
 
 pub struct OllamaClient {
     base_url: String,
@@ -13,7 +16,7 @@ struct GenerateRequest {
     stream: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct GenerateResponse {
     pub response: String,
     pub done: bool,
@@ -43,6 +46,22 @@ impl OllamaClient {
             .await?;
 
         Ok(response)
+    }
+
+    pub async fn generate_stream(&self, model: String, prompt: String) -> Result<BoxStream<'static, Result<Bytes, reqwest::Error>>> {
+        let url = format!("{}/api/generate", self.base_url);
+        let request = GenerateRequest {
+            model,
+            prompt,
+            stream: true,
+        };
+
+        let response = self.client.post(url)
+            .json(&request)
+            .send()
+            .await?;
+
+        Ok(response.bytes_stream().boxed())
     }
 }
 
