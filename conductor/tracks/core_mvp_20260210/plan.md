@@ -2,7 +2,7 @@
 
 ## Phase 1: Project Scaffolding & Backend Setup
 - [x] Task: Initialize Rust workspace and Axum backend structure e4af11b
-- [ ] Task: Implement basic health check and telemetry endpoints
+- [x] Task: Implement basic health check and telemetry endpoints 048dd57
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Project Scaffolding & Backend Setup' (Protocol in workflow.md)
 
 ## Phase 2: Local LLM Integration (Ollama)
