@@ -10,7 +10,7 @@
 - [x] Task: Create chat endpoint with streaming support 8940724
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Local LLM Integration (Ollama)' (Protocol in workflow.md)
 
-## Phase 3: Filesystem & Persistence (SurrealDB)
+## Phase 3: Filesystem ## Phase 3: Filesystem & Persistence (SurrealDB) Persistence (SurrealDB) [checkpoint: d522b69]
 - [x] Task: Set up SurrealDB and implement basic project indexing bf2b8c1
 - [x] Task: Implement filesystem service for reading and writing files b942b15
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Filesystem & Persistence (SurrealDB)' (Protocol in workflow.md)
