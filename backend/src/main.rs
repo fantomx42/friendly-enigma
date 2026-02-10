@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 mod db;
+mod fs;
 mod ollama;
 use db::Db;
 use ollama::OllamaClient;
