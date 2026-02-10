@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from typing import List
 
 class DynamicsEngine:
     def __init__(self, width: int = 128, height: int = 128, device: str = "cpu"):
@@ -74,6 +75,15 @@ class DynamicsEngine:
         for _ in range(steps):
             current = self.step(current)
         return current
+
+    def run_trajectory(self, grid: torch.Tensor, steps: int = 10) -> List[torch.Tensor]:
+        """Run dynamics and return all intermediate frames."""
+        current = grid
+        trajectory = [current]
+        for _ in range(steps):
+            current = self.step(current)
+            trajectory.append(current)
+        return trajectory
 
     def run_with_stats(self, grid: torch.Tensor, steps: int = 10) -> tuple[torch.Tensor, float]:
         """Run dynamics and return final grid + stability score."""
