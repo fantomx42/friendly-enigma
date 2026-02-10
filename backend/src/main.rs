@@ -11,17 +11,22 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+mod db;
 mod ollama;
+use db::Db;
 use ollama::OllamaClient;
 
 struct AppState {
     ollama: OllamaClient,
+    db: Db,
 }
 
 #[tokio::main]
 async fn main() {
+    let db = Db::new().await.unwrap();
     let state = Arc::new(AppState {
         ollama: OllamaClient::new("http://localhost:11434".to_string()),
+        db,
     });
 
     let app = app(state);
@@ -99,16 +104,18 @@ mod tests {
     };
     use tower::util::ServiceExt; // for `oneshot`
 
-    fn test_app() -> Router {
+    async fn test_app() -> Router {
+        let db = Db::new().await.unwrap();
         let state = Arc::new(AppState {
             ollama: OllamaClient::new("http://localhost:11434".to_string()),
+            db,
         });
         app(state)
     }
 
     #[tokio::test]
     async fn health_check() {
-        let app = test_app();
+        let app = test_app().await;
 
         let response = app
             .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
@@ -120,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     async fn telemetry() {
-        let app = test_app();
+        let app = test_app().await;
 
         let response = app
             .oneshot(Request::builder().uri("/telemetry").body(Body::empty()).unwrap())
