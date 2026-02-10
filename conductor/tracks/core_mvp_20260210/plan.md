@@ -16,7 +16,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 3: Filesystem & Persistence (SurrealDB)' (Protocol in workflow.md)
 
 ## Phase 4: Frontend Dashboard (Leptos/Yew)
-- [ ] Task: Scaffold Leptos/Yew frontend with a grid-based Bauhaus layout
+- [x] Task: Scaffold Leptos/Yew frontend with a grid-based Bauhaus layout da6742d
 - [ ] Task: Implement chat component and integrate with backend
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Frontend Dashboard (Leptos/Yew)' (Protocol in workflow.md)
 
