@@ -1,6 +1,6 @@
 # Implementation Plan: Core Orchestration & Mission Control MVP
 
-## Phase 1: Project Scaffolding & Backend Setup
+## Phase 1: Project Scaffolding ## Phase 1: Project Scaffolding & Backend Setup Backend Setup [checkpoint: 84221be]
 - [x] Task: Initialize Rust workspace and Axum backend structure e4af11b
 - [x] Task: Implement basic health check and telemetry endpoints 048dd57
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Project Scaffolding & Backend Setup' (Protocol in workflow.md)
