@@ -2,6 +2,8 @@ use axum::{routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
+mod ollama;
+
 #[tokio::main]
 async fn main() {
     let app = app();
