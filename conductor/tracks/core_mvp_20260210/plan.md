@@ -21,7 +21,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Frontend Dashboard (Leptos/Yew)' (Protocol in workflow.md)
 
 ## Phase 5: Visual Systems Mapping
-- [ ] Task: Implement interactive file tree/map using D3.js or Mermaid.js
+- [x] Task: Implement interactive file tree/map using D3.js or Mermaid.js 9f4c552
 - [ ] Task: Connect visual map to the filesystem backend service
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Visual Systems Mapping' (Protocol in workflow.md)
 
