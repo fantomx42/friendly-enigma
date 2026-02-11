@@ -1,48 +1,51 @@
 import hashlib
 import numpy as np
 import torch
-from typing import Tuple
+import re
+from typing import Tuple, List
 
 class TextCodec:
     def __init__(self, width: int = 128, height: int = 128):
         self.width = width
         self.height = height
-        self.stamp_size = 8
     
-    def _generate_stamp(self, char: str) -> np.ndarray:
-        """Generate a deterministic 8x8 stamp for a character."""
-        # Seed generator with character hash
-        seed = int(hashlib.sha256(char.encode('utf-8')).hexdigest()[:8], 16)
+    def _generate_word_pattern(self, word: str) -> np.ndarray:
+        """Generate a deterministic full-size grid for a word."""
+        # Normalize word
+        word = word.lower()
+        
+        # Seed generator with word hash
+        seed = int(hashlib.sha256(word.encode('utf-8')).hexdigest()[:8], 16)
         rng = np.random.RandomState(seed)
-        return rng.randn(self.stamp_size, self.stamp_size).astype(np.float32)
+        
+        # Generate full grid of noise
+        return rng.randn(self.width, self.height).astype(np.float32)
 
-    def _get_position(self, index: int, char: str) -> Tuple[int, int]:
-        """Determine deterministic position for a character based on index."""
-        # Simple spiral or hashed position?
-        # Hashed position ensures distributed encoding.
-        key = f"{index}:{char}"
-        h = int(hashlib.sha256(key.encode('utf-8')).hexdigest()[:8], 16)
-        
-        # Keep away from very edges to avoid OOB
-        max_x = self.width - self.stamp_size
-        max_y = self.height - self.stamp_size
-        
-        x = h % max_x
-        y = (h // max_x) % max_y
-        return x, y
+    def _tokenize(self, text: str) -> List[str]:
+        """Split text into words, removing punctuation."""
+        # Simple regex tokenizer
+        text = text.lower()
+        # Keep only alphanumeric
+        text = re.sub(r'[^a-z0-9\s]', '', text)
+        return text.split()
 
     def encode(self, text: str) -> torch.Tensor:
-        """Encode text into a 128x128 grid."""
+        """Encode text into a 128x128 grid using Bag-of-Words."""
         grid = np.zeros((self.width, self.height), dtype=np.float32)
         
-        if not text:
+        words = self._tokenize(text)
+        if not words:
             return torch.from_numpy(grid)
             
-        for i, char in enumerate(text):
-            stamp = self._generate_stamp(char)
-            x, y = self._get_position(i, char)
+        for word in words:
+            pattern = self._generate_word_pattern(word)
+            grid += pattern
             
-            # Add stamp to grid
-            grid[x:x+self.stamp_size, y:y+self.stamp_size] += stamp
-            
+        # Normalize to prevent explosion
+        # Tanh is good for squashing to [-1, 1] range, typical for neural/dynamic inputs
+        # But simple division by sqrt(N) maintains unit variance properties if inputs are unit variance
+        # Let's use sqrt(N) scaling
+        scale = np.sqrt(len(words)) if len(words) > 0 else 1.0
+        grid = (grid / scale).astype(np.float32)
+        
         return torch.from_numpy(grid)

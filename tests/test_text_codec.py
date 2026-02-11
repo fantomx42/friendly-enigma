@@ -30,14 +30,24 @@ def test_determinism():
 def test_sensitivity():
     codec = TextCodec()
     text1 = "Hello"
-    text2 = "hello" # Case difference
+    text2 = "Goodbye" # Different words
     
     enc1 = codec.encode(text1)
     enc2 = codec.encode(text2)
     
     assert not torch.allclose(enc1, enc2), "Different text must produce different encodings"
 
+def test_case_insensitivity():
+    codec = TextCodec()
+    text1 = "Hello"
+    text2 = "hello" 
+    
+    enc1 = codec.encode(text1)
+    enc2 = codec.encode(text2)
+    
+    assert torch.allclose(enc1, enc2), "Encoding should be case insensitive"
+
 def test_empty_string():
     codec = TextCodec()
     enc = codec.encode("")
-    assert torch.all(enc == 0), "Empty string should produce zero grid (or specific baseline)"
+    assert torch.all(enc == 0), "Empty string should produce zero grid"
