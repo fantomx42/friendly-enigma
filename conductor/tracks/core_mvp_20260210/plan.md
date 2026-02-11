@@ -25,7 +25,7 @@
 - [x] Task: Connect visual map to the filesystem backend service 17d72b3
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Visual Systems Mapping' (Protocol in workflow.md)
 
-## Phase 6: Final Integration & Polishing
-- [ ] Task: Wire all components together and perform end-to-end testing
+## Phase 6: Final Integration ## Phase 6: Final Integration & Polishing Polishing [checkpoint: e1f8ae7]
+- [~] Task: Wire all components together and perform end-to-end testing
 - [ ] Task: Final performance tuning for AMD hardware
 - [ ] Task: Conductor - User Manual Verification 'Phase 6: Final Integration & Polishing' (Protocol in workflow.md)
