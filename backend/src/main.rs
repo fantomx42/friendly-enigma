@@ -11,6 +11,7 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+mod api;
 mod db;
 mod fs;
 mod ollama;
@@ -43,6 +44,7 @@ fn app(state: Arc<AppState>) -> Router {
         .route("/health", get(health_check))
         .route("/telemetry", get(telemetry))
         .route("/chat", post(chat))
+        .nest("/api", api::router())
         .with_state(state)
 }
 
