@@ -40,8 +40,8 @@ pub fn App() -> impl IntoView {
     };
 
     view! {
-        <div class="chat-container">
-            <div class="messages" style="height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px;">
+        <div class="chat-container" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="messages" style="flex: 1; overflow-y: auto; border: 2px solid #000; padding: 15px; background: #fafafa; margin-bottom: 15px; font-family: 'Courier New', monospace;">
                 <For
                     each=move || messages.get()
                     key=|msg| format!("{}-{}", msg.role, msg.content)
@@ -49,8 +49,9 @@ pub fn App() -> impl IntoView {
                         let role = msg.role.clone();
                         let content = msg.content.clone();
                         view! {
-                            <div class=format!("message {}", role)>
-                                <strong>{role.clone()}: </strong> {content}
+                            <div class=format!("message {}", role) style="margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #ddd;">
+                                <strong style="text-transform: uppercase; color: #555;">{role}: </strong> 
+                                <span style="white-space: pre-wrap;">{content}</span>
                             </div>
                         }
                     }
@@ -59,7 +60,8 @@ pub fn App() -> impl IntoView {
             <div class="input-area" style="display: flex; gap: 10px;">
                 <input
                     type="text"
-                    style="flex: 1; padding: 10px;"
+                    style="flex: 1; padding: 12px; border: 2px solid #000; outline: none; font-family: inherit;"
+                    placeholder="Enter command or query..."
                     prop:value=input
                     on:input=move |ev| set_input.set(event_target_value(&ev))
                     on:keydown=move |ev| {
@@ -69,11 +71,11 @@ pub fn App() -> impl IntoView {
                     }
                 />
                 <button
-                    style="padding: 10px 20px; background: #000; color: #fff; border: none; cursor: pointer;"
+                    style="padding: 10px 25px; background: #000; color: #fff; border: none; cursor: pointer; font-weight: bold; text-transform: uppercase;"
                     on:click=move |_| send_message()
                     prop:disabled=move || is_loading.get()
                 >
-                    {move || if is_loading.get() { "..." } else { "Send" }}
+                    {move || if is_loading.get() { "..." } else { "Execute" }}
                 </button>
             </div>
         </div>
@@ -82,8 +84,13 @@ pub fn App() -> impl IntoView {
 
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn main() {
+    use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
-    leptos::mount::mount_to_body(App);
+    
+    // This tells Leptos to only mount the app inside the "leptos-app" div
+    let doc = web_sys::window().unwrap().document().unwrap();
+    let el = doc.get_element_by_id("leptos-app").unwrap();
+    leptos::mount::mount_to(el.unchecked_into(), App);
 }
 
 #[cfg(test)]
