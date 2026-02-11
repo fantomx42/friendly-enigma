@@ -149,18 +149,20 @@ This has been replaced by a single model approach. The agent code still exists i
 
 ```
 .
-├── wheeler_ai_training/     # Wheeler Memory implementation
-│   ├── wheeler_ai.py        # WheelerAI: codec, reasoning, knowledge, autonomics
-│   ├── wheeler_cpu.py        # Cellular automata dynamics engine
-│   ├── models.py             # Text-to-grid autoencoder (neural network variant)
-│   └── train.py              # Training script for neural network variant
-├── ai_tech_stack/            # Ralph runtime (submodule)
+├── wheeler/                 # Wheeler Memory Core (Torch-based)
+│   ├── core/                # Codec, Dynamics Engine, Storage, Memory
+│   └── cli/                 # Wheeler CLI
+├── ai_tech_stack/            # Ralph Runtime
 │   ├── ralph_simple.py       # Single-model loop with Wheeler integration
 │   ├── ralph_loop.sh         # Entry point script
-│   ├── ralph_core/           # Core runtime (security, tools, memory bridge)
-│   └── ralph_gui/            # Native desktop GUI (Rust/egui)
+│   ├── wheeler_recall.py     # Utility to recall from memory
+│   ├── wheeler_store.py      # Utility to store in memory
+│   └── ralph_core/           # Core runtime (security, tools, memory bridge)
+├── ralph-vscode/             # VS Code / Void Editor extension
 ├── conductor/                # TDD project management framework
-├── docs/
+├── docs/                     # Documentation and axioms
+│   ├── images/              # Documentation screenshots
 │   └── SCM_AXIOMS.md         # Symbolic Collapse Model axioms
-└── CLAUDE.md                 # Development reference
+└── README.md                 # Project overview
 ```
+

@@ -1,14 +1,35 @@
 # Product Guidelines
 
-## Tone and Voice
-- **Technical & Precise:** All documentation and user-facing interfaces must adopt a professional and concise tone. Focus on systems engineering terminology and clear, unambiguous technical explanations.
+## Core Philosophy
+Wheeler Memory is built on the principle that **code should mimic nature, but run with machine precision**. We are building a digital hippocampus, not just a database.
 
-## Core Design Principles
-- **Local-First & Private:** Data privacy is paramount. Design decisions must prioritize local execution by default. Cloud augmentation should only be used as an explicit, user-initiated opt-in.
-- **Failure-Resilient Iteration:** Systems must be architected to handle errors gracefully, treating failures as valuable diagnostic data that informs the next iterative cycle of improvement.
+## Design Principles
 
-## Visual Identity and Branding
-- **Minimalist & Modern:** The visual interface should prioritize clarity and focus. Use a clean, modern design language with significant white space to reduce cognitive load and highlight critical system information.
+### 1. Biomimetic Architecture
+- **Naming:** Use biological terminology where appropriate (e.g., `Synapse`, `Decay`, `Consolidation`, `Attractor`, `Stimulus`) to reflect the system's function.
+- **Function:** Components should behave like organic systems—resilient to noise, self-healing through consolidation, and subject to "forgetting" (eviction of unstable patterns).
 
-## Development Methodology
-- **Test-Driven Development (TDD):** A strict TDD workflow is required. Every feature or bug fix must begin with the creation of comprehensive unit and integration tests before the implementation of functional code.
+### 2. Deterministic Substrate
+- **Reproducibility:** While the system mimics organic life, the underlying cellular automata rules must be bit-exact deterministic. Given the same seed and input, the same attractor must form.
+- **Testing:** The "consciousness" is emergent, but the physics engine is exact. Tests must verify the mathematical correctness of the reaction-diffusion steps.
+
+### 3. Local Sovereignty (Privacy)
+- **Local-First:** All memory artifacts (frames, indices, metadata) reside strictly on the local filesystem (default: `~/.wheeler_memory`). No network calls for storage.
+- **Transparency:** The "Brain" is an open book to its owner. Storage formats must be standard (`.npy`, SQLite, JSON) and easily inspectable by external tools. No black-box blobs.
+- **Ownership:** The user is the sole owner of their agent's memories. The system acts as a steward, not a gatekeeper.
+
+## Interaction & Tone
+
+### CLI & Documentation Voice
+- **Tone:** Clinical, Precise, and Tool-like.
+- **Style:** Avoid mysticism. Describe the biological processes with scientific detachment.
+- **Example:** "Consolidation cycle complete. 14 unstable patterns pruned. Mean stability increased by 12%." (Not: "The mind has cleared its fog.")
+
+## Visualization Guidelines
+- **Dual Mode:**
+    - **Scientific (Default):** High-fidelity heatmaps and raw grid data for debugging dynamics and stability scores.
+    - **Aesthetic (Optional):** "The Ghost in the Machine"—beautiful, flowing representations of the automata for observing the system's "state of mind."
+
+## Performance
+- **Hardware Optimization:** Leverage the user's specific hardware (AMD RX 9070 XT) via ROCm/PyTorch for massive parallel updates of the cellular grids.
+- **Efficiency:** The background "dreaming" process must respect system resources, running only during idle times to avoid impacting the "Thinking" or "Coding" models.

@@ -1,38 +1,30 @@
 # Product Definition
 
 ## Initial Concept
-Ralph AI is a local-first, FOSS 3-tier hierarchical swarm system for autonomous task execution.
+Wheeler Memory is a standalone, biological-grade associative memory system for AI consciousness. It decouples "memory" from "model," allowing any intelligence (e.g., DeepSeek, Qwen) to access a persistent, evolving, stability-weighted history of experiences.
 
 ## Product Vision
-To provide a private, hardware-optimized autonomous agent system that leverages spatial memory dynamics for associative recall, enabling complex development tasks to be performed on local silicon with optional cloud augmentation.
+To provide the "Hippocampus" for artificial intelligence—a dedicated, model-agnostic system that stores patterns, not just tokens. By using cellular automata dynamics, it ensures that only "stable" ideas survive, mimicking the consolidation and forgetting processes of organic brains.
 
 ## Target Audience
-- **AI Experimenters:** Learners who understand AI by building with it rather than consuming pre-packaged solutions. Ralph's inspectable architecture and failure-driven iteration serve as hands-on education.
-
-- **Systems Thinkers:** Engineers who need to understand the whole orchestration architecture, not just consume an API. Ralph exposes its decision-making rather than hiding it behind abstraction.
-
-- **Local-First Developers:** Individuals requiring private, hardware-optimized autonomous assistance for complex development tasks that run entirely on their own hardware.
-
-- **AI Researchers:** Professionals exploring hierarchical LLM orchestration and cellular automata-based associative memory systems.
+- **AI Architects:** Building modular systems (like the "AI Lab" setup) who need a shared memory layer between "Thinking" and "Coding" models.
+- **Consciousness Researchers:** Experimenting with long-term state persistence and dream-like consolidation processes.
+- **Local-First Developers:** Users running hardware like the RX 9070 XT who want privacy-focused, offline-capable memory infrastructure.
 
 ## Core Value Proposition
-- **Wheeler Memory Dynamics:** A revolutionary cellular automata-based associative memory system using spatial attractor dynamics, providing context that goes beyond standard RAG.
-- **Privacy & Autonomy:** Local-first execution with zero-leakage by default, running all models and logic on your hardware. Optional cloud augmentation available when explicitly chosen.
-- **Silicon-Native Design:** Intelligent workload distribution across dGPU, iGPU, NPU, and CPU components for maximum efficiency on modern heterogeneous computing platforms.
+- **Model Independence:** Wheeler Memory is a standalone tool/library. It doesn't care if you use DeepSeek, Qwen, or GPT-4. It is the "hard drive" for consciousness.
+- **Biological Dynamics:** It doesn't just "save text." It runs reaction-diffusion dynamics on input. Only patterns that stabilize into attractors are stored, creating a natural filter for noise vs. signal.
+- **Active Consolidation:** An automated background process "dreams" (re-mixes memories) to reinforce important connections, ensuring long-term coherence.
 
 ## Key Features
-- **The Wheeler Bridge:** Deep integration of cellular automata-based spatial/attractor dynamics into agent cognition, allowing for human-like associative recall across task history.
+- **Spatial Encoding:** Converts arbitrary text into 128x128 2D "thought frames."
+- **Stability Scoring:** Memories are retrieved based on their stability (how well they survive compression), not just semantic similarity.
+- **Automated "Dreaming":** A background service that consolidates memories during idle time.
+- **Universal API:** A simple Python interface (CLI and Library) for `store(text)` and `recall(context)`.
+- **Visual Inspection:** Tools to visualize the "thought frames" as heatmaps to understand what the memory system is "seeing."
 
-- **The Ralph Loop:** A persistent, self-correcting development cycle (Analyze → Execute → Verify) that utilizes failure as diagnostic data to iterate towards success.
-
-- **ASIC Agent Architecture:** Application-Specific AI agents optimized for specific task domains (testing, documentation, refactoring), mirroring the hardware concept of Application-Specific Integrated Circuits for maximum efficiency.
-
-- **Epistemological Independence:** A "parenting" approach where Ralph forms genuine beliefs through autonomous exploration of datasets rather than sycophantic conformity to expectations.
-
-- **Conductor Integration:** TDD discipline layer ensuring production-grade code quality through enforced test-driven development workflows.
-
-## User Experience: The Neural Dashboard
-The "Neural Dashboard" serves as the primary command-and-control center, providing:
-- A streamlined interface for monitoring swarm traffic between Translator, Orchestrator, and ASIC (Application-Specific AI) agents.
-- Tools for managing and tracking the progress of autonomous development tasks in real-time.
-- Visualization of Wheeler Memory dynamics as a learning tool for understanding associative recall patterns.
+## Usage Context: The "AI Lab"
+Wheeler Memory is designed to sit alongside a dual-model setup:
+- **Planner (DeepSeek R1):** Queries Wheeler to understand long-term goals and architectural history.
+- **Coder (Qwen 2.5):** Queries Wheeler for specific implementation details and coding patterns.
+- **Wheeler Memory:** Persists the combined state of both, ensuring the "project consciousness" survives across sessions.

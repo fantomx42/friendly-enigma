@@ -1,24 +1,25 @@
 # Technology Stack
 
-## Backend & Core
-- **Python 3.8+:** Primary language for agent logic, memory management, and orchestration.
-- **FastAPI:** Web framework for the UI backend and local API endpoints.
-- **Pydantic:** Data validation and settings management.
+## Core Engine
+- **Language:** Python 3.10+
+- **Acceleration:** PyTorch (ROCm) for AMD RX 9070 XT optimization.
+- **Custom Kernels:** Triton / OpenCL for highly optimized cellular automata update steps.
+- **Math/Data:** NumPy for CPU fallback and general tensor manipulation.
 
-## Frontend & GUI
-- **Rust (eframe/egui):** Native desktop GUI for real-time monitoring and control.
-- **JavaScript (Vanilla):** Frontend for the web-based Neural Dashboard.
+## Persistence Layer (Hybrid)
+- **Metadata:** SQLite (via `aiosqlite` for async access) to store timestamps, stability scores, associations, and tags.
+- **Data Blobs:** Local Filesystem (`.npy` format) for storing the raw 128x128 spatial frames (attractors).
 
-## AI & Machine Learning
-- **Ollama:** Primary engine for local LLM inference.
-- **PyTorch (ROCm):** Used for training the Wheeler AI autoencoder on AMD hardware.
-- **OpenVINO:** Optimized execution for NPU and Intel CPU components.
-- **ROCm:** Native acceleration for AMD Radeon GPUs (RDNA4/9070 XT).
+## Visualization & Inspection
+- **Static:** Matplotlib for generating high-quality heatmaps and stability graphs for reports/debugging.
+- **Real-time:** Vispy (OpenGL) for high-performance, live rendering of the reaction-diffusion dynamics.
 
-## Memory & Data
-- **ChromaDB:** Vector database for associative memory and retrieval-augmented generation (RAG).
-- **Sentence-Transformers:** Local embedding generation for memory vectors.
+## Distribution & Tooling
+- **Package Manager:** Poetry
+- **Testing:** Pytest (with `hypothesis` for property-based testing of the deterministic rules).
+- **Linting/Formatting:** Ruff
 
-## Testing & Automation
-- **Pytest:** Unit and integration testing for Python components.
-- **Playwright:** End-to-end testing for the Web UI.
+## Hardware Targets
+- **Primary:** AMD Radeon RX 9070 XT (via ROCm).
+- **Secondary:** CUDA-capable NVIDIA GPUs (via standard PyTorch).
+- **Fallback:** CPU (via NumPy/PyTorch CPU).
