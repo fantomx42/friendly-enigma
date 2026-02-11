@@ -71,7 +71,9 @@ Memories get weighted by how well they survive pressure:
 | Directory | What it is |
 |-----------|-----------|
 | `wheeler/` | Core library: codec, dynamics engine, storage |
+| `twai/` | Next-gen Rust/Leptos frontend + SurrealDB backend |
 | `tests/` | Unit and integration tests |
+| `scripts/` | Verification and ingestion scripts |
 | `docs/` | Architectural axioms and specifications |
 | `conductor/` | Development tracks and planning |
 | `legacy_archive/` | Ralph AI integration and legacy scripts |
@@ -79,6 +81,10 @@ Memories get weighted by how well they survive pressure:
 ## Ralph AI Integration
 
 Wheeler Memory was originally developed as the "Hippocampus" for **Ralph AI**. The Ralph integration scripts, VS Code extension, and loop logic are available in `legacy_archive/`.
+
+## TWAI
+
+TWAI is the next-generation interface for Wheeler Memory, built with Rust. It provides a Leptos/WASM frontend and an Actix-web backend backed by SurrealDB. See `twai/` for details.
 
 ## License
 

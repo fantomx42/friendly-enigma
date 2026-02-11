@@ -55,6 +55,7 @@ metrics.jsonl
 # Build outputs
 ai_tech_stack/ralph_gui/target/
 void_ai/target/
+twai/target/
 ai_tech_stack/cmake-*/
 
 # Runtime output
