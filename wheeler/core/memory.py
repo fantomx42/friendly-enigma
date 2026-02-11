@@ -57,7 +57,8 @@ class WheelerMemory:
         query_attractor, _ = self.engine.run_with_stats(query_initial, steps=10)
         
         # 3. Search storage
-        all_meta = await self.storage.metadata.list_memories()
+        # Fetch a limited set of recent/stable memories to prevent DoS
+        all_meta = await self.storage.metadata.list_memories(limit=500)
         results = []
         
         for meta in all_meta:
@@ -69,8 +70,8 @@ class WheelerMemory:
             # Calculate similarity (correlation)
             similarity = self._calculate_similarity(query_attractor, stored_frame)
             
-            # Calculate dynamic stability
-            stability = self._calculate_stability(meta, stored_frame)
+            # Use cached stability
+            stability = meta.get("stability", 0.0)
             
             meta["similarity"] = similarity
             meta["stability"] = stability
@@ -86,7 +87,8 @@ class WheelerMemory:
 
     async def recall_by_frame(self, frame: torch.Tensor, limit: int = 5) -> List[Dict[str, Any]]:
         """Finds memories similar to a given attractor frame."""
-        all_meta = await self.storage.metadata.list_memories()
+        # Fetch a limited set of recent/stable memories to prevent DoS
+        all_meta = await self.storage.metadata.list_memories(limit=500)
         results = []
         
         for meta in all_meta:
@@ -95,7 +97,7 @@ class WheelerMemory:
             stored_frame = self.storage.blobs.load(blob_id)
             
             similarity = self._calculate_similarity(frame, stored_frame)
-            stability = self._calculate_stability(meta, stored_frame)
+            stability = meta.get("stability", 0.0)
             
             meta["similarity"] = similarity
             meta["stability"] = stability
@@ -121,7 +123,8 @@ class WheelerMemory:
         attractor = self.engine.run(blended, steps=10)
         
         # 4. Search memory using this new "inferred" attractor
-        all_meta = await self.storage.metadata.list_memories()
+        # Fetch a limited set of recent/stable memories to prevent DoS
+        all_meta = await self.storage.metadata.list_memories(limit=500)
         results = []
         for meta in all_meta:
             blob_filename = os.path.basename(meta["blob_path"])
@@ -129,7 +132,7 @@ class WheelerMemory:
             stored_frame = self.storage.blobs.load(blob_id)
             
             similarity = self._calculate_similarity(attractor, stored_frame)
-            stability = self._calculate_stability(meta, stored_frame)
+            stability = meta.get("stability", 0.0)
             
             meta["similarity"] = similarity
             meta["stability"] = stability

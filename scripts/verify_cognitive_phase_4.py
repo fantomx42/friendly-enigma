@@ -27,7 +27,9 @@ def verify():
         
     env = os.environ.copy()
     env["WHEELER_STORAGE"] = storage_dir
-    env["PYTHONPATH"] = os.getcwd()
+    # Ensure we can import 'wheeler' from the 'ralph' directory
+    ralph_dir = os.path.join(os.getcwd(), "ralph")
+    env["PYTHONPATH"] = ralph_dir + (":" + env.get("PYTHONPATH", "") if env.get("PYTHONPATH") else "")
 
     # 1. Store concepts
     print("1. Storing concepts...")

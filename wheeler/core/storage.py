@@ -119,10 +119,12 @@ class MetadataStore:
                 )
             await db.commit()
 
-    async def list_memories(self) -> List[Dict[str, Any]]:
+    async def list_memories(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         async with self.connection() as db:
             db.row_factory = aiosqlite.Row
-            async with db.execute("SELECT * FROM memories") as cursor:
+            query = "SELECT * FROM memories" + (" LIMIT ?" if limit else "")
+            args = (limit,) if limit else ()
+            async with db.execute(query, args) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 

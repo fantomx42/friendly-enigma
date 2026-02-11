@@ -83,7 +83,7 @@ class AutonomicSystem:
             # Strengthen that memory
             best = results[0]
             await self.memory.storage.metadata.increment_confidence(best["id"], amount=0.02)
-            logger.info(f"Dream resonated with: {best['key']}")
+            logger.info(f"Dream resonated with memory UUID: {best['uuid']}")
             return best
             
         return None

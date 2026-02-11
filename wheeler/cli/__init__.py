@@ -180,8 +180,8 @@ def dashboard(storage, port):
         # Set environment variable for app to read
         os.environ["WHEELER_STORAGE"] = storage
         
-        click.echo(f"Starting dashboard on http://localhost:{port}")
-        app.run(host='0.0.0.0', port=port)
+        click.echo(f"Starting dashboard on http://127.0.0.1:{port}")
+        app.run(host='127.0.0.1', port=port)
     except ImportError as e:
         click.echo(f"Error importing dashboard: {e}")
         click.echo("Make sure flask is installed: pip install flask")

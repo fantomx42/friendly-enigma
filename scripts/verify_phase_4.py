@@ -23,7 +23,9 @@ def verify():
     storage_dir = os.path.abspath("verification_cli_storage")
     env = os.environ.copy()
     env["WHEELER_STORAGE"] = storage_dir
-    env["PYTHONPATH"] = os.getcwd() # Ensure we can import 'wheeler'
+    # Ensure we can import 'wheeler' from the 'ralph' directory
+    ralph_dir = os.path.join(os.getcwd(), "ralph")
+    env["PYTHONPATH"] = ralph_dir + (":" + env.get("PYTHONPATH", "") if env.get("PYTHONPATH") else "")
 
     # 1. Store
     print("1. Testing 'store' command...")

@@ -59,7 +59,7 @@ HTML = """
 @app.route('/')
 def index():
     # Sync wrapper for async call
-    memories = asyncio.run(get_memories())
+    memories = asyncio.run(get_memories())[:50]
     return render_template_string(HTML, memories=memories, storage=MEMORY_DIR)
 
 @app.route('/image/<uuid>')
@@ -98,9 +98,9 @@ async def get_frame(uuid):
     return None
 
 def start_server():
-    print(f"Starting dashboard on http://localhost:5000")
+    print(f"Starting dashboard on http://127.0.0.1:5000")
     print(f"Reading from: {MEMORY_DIR}")
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='127.0.0.1', port=5000)
 
 if __name__ == '__main__':
     start_server()
