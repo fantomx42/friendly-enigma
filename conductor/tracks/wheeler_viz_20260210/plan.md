@@ -21,7 +21,7 @@
     - [x] Ensure tensors can reside on GPU for faster dynamics and rendering.
     - [x] Detect RX 9070 XT and optimize (Torch handles this via .to(device)).
 
-## Phase 4: Web Dashboard (The "Monitor") [checkpoint: pending]
+## Phase 4: Web Dashboard (The "Monitor") [checkpoint: a4fa884]
 - [x] Task: Implement Web Server
     - [x] Create `wheeler/web/app.py` (Flask/FastAPI).
     - [x] Endpoint `/` (Home): List recent memories.
