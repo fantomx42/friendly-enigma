@@ -24,8 +24,8 @@ This track focuses on populating the memory system with general knowledge and cl
 - [x] Task: Conductor - User Manual Verification 'Phase 3: System Cleanup' (Protocol in workflow.md) [9f9f4e6]
 
 ## Phase 4: Final Validation
-- [ ] Task: Run recall test
-    - [ ] Perform `recall` on a general topic (e.g., "science" or "history")
-- [ ] Task: Run autonomic cycle
-    - [ ] Execute `dream --ticks 5` to verify consolidation of new data
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Final Validation' (Protocol in workflow.md)
+- [x] Task: Run recall test [dfb27e1]
+    - [x] Perform `recall` on a general topic (e.g., "science" or "history")
+- [x] Task: Run autonomic cycle [dfb27e1]
+    - [x] Execute `dream --ticks 5` to verify consolidation of new data
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Final Validation' (Protocol in workflow.md) [dfb27e1]
