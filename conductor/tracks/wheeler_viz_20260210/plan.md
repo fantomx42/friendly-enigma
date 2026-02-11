@@ -21,12 +21,12 @@
     - [x] Ensure tensors can reside on GPU for faster dynamics and rendering.
     - [x] Detect RX 9070 XT and optimize (Torch handles this via .to(device)).
 
-## Phase 4: Web Dashboard (The "Monitor")
-- [ ] Task: Implement Web Server
-    - [ ] Create `wheeler/web/app.py` (Flask/FastAPI).
-    - [ ] Endpoint `/` (Home): List recent memories.
-    - [ ] Endpoint `/memory/<uuid>`: Render memory as PNG.
-- [ ] Task: Real-Time Dream Monitor
-    - [ ] Add "Live View" page that refreshes to show what the Autonomic System is doing.
-- [ ] Task: CLI Integration
-    - [ ] Add `wheeler.cli dashboard` command to launch the web server.
+## Phase 4: Web Dashboard (The "Monitor") [checkpoint: pending]
+- [x] Task: Implement Web Server
+    - [x] Create `wheeler/web/app.py` (Flask/FastAPI).
+    - [x] Endpoint `/` (Home): List recent memories.
+    - [x] Endpoint `/memory/<uuid>`: Render memory as PNG.
+- [x] Task: Real-Time Dream Monitor
+    - [x] Add "Live View" page that refreshes to show what the Autonomic System is doing.
+- [x] Task: CLI Integration
+    - [x] Add `wheeler.cli dashboard` command to launch the web server.

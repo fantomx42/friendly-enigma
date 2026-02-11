@@ -10,5 +10,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [x] **Track: Wheeler Cognitive Functions**
   *Link: [./tracks/wheeler_cognitive_20260210/](./tracks/wheeler_cognitive_20260210/)*
 
-- [~] **Track: Visualization & Diagnostics**
+- [x] **Track: Visualization & Diagnostics**
   *Link: [./tracks/wheeler_viz_20260210/](./tracks/wheeler_viz_20260210/)*

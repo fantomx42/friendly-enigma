@@ -168,5 +168,23 @@ async def dream(storage, ticks):
     await system.stop()
     click.echo("Autonomic cycle complete.")
 
+@main.command()
+@click.option('--storage', envvar='WHEELER_STORAGE', default='./.wheeler', help='Storage directory.')
+@click.option('--port', default=5000, help='Port to run dashboard on.')
+def dashboard(storage, port):
+    """Launch the Web Dashboard."""
+    try:
+        from wheeler.web.app import app
+        import os
+        
+        # Set environment variable for app to read
+        os.environ["WHEELER_STORAGE"] = storage
+        
+        click.echo(f"Starting dashboard on http://localhost:{port}")
+        app.run(host='0.0.0.0', port=port)
+    except ImportError as e:
+        click.echo(f"Error importing dashboard: {e}")
+        click.echo("Make sure flask is installed: pip install flask")
+
 if __name__ == "__main__":
     main()
