@@ -30,7 +30,7 @@
     - [x] Implement `StorageController` combining Metadata and Blob stores.
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Persistence Layer' (Protocol in workflow.md)
 
-## Phase 4: Public API & CLI
+## Phase 4: Public API & CLI [checkpoint: 0adebc0]
 - [x] Task: Implement WheelerMemory Main Class [e9b8f1a]
     - [x] Write Tests: End-to-end `store` and `recall` flow.
     - [x] Implement `WheelerMemory` class (wiring Engine + Storage).
