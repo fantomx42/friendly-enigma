@@ -25,7 +25,8 @@ async def ingest(limit=100):
     
     print(f"Ingesting first {limit} entries into Wheeler Memory...")
     count = 0
-    async for entry in tqdm(dataset):
+    # Streaming dataset is a standard iterable, not async iterable
+    for entry in tqdm(dataset, total=limit):
         if count >= limit:
             break
         
