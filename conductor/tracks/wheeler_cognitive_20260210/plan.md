@@ -28,10 +28,10 @@
     - [x] Implement `_dream()`: Random blends + stability check.
     - [x] Write Tests: Mock storage to verify "dreams" occur.
 
-## Phase 4: CLI & Verification
+## Phase 4: CLI & Verification [checkpoint: 3d3c3e5]
 - [x] Task: Update CLI [1a2b3c4]
     - [x] Add `wheeler.cli dream` command.
     - [x] Add `wheeler.cli reason` command.
-- [ ] Task: Conductor - User Manual Verification 'Reasoning & Dreaming'
-    - [ ] Verify `reason` command outputs logical blends.
-    - [ ] Verify `dream` command strengthens memories over time.
+- [x] Task: Conductor - User Manual Verification 'Reasoning & Dreaming'
+    - [x] Verify `reason` command outputs logical blends.
+    - [x] Verify `dream` command strengthens memories over time.
