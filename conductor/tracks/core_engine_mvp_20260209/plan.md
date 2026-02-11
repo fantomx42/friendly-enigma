@@ -39,7 +39,7 @@
     - [x] Implement Click-based CLI (`store`, `recall`).
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Public API & CLI' (Protocol in workflow.md)
 
-## Phase 5: Stability Scoring & Ralph Integration
+## Phase 5: Stability Scoring & Ralph Integration [checkpoint: beeaf43]
 - [x] Task: Implement Advanced Stability Scoring [3c8b9a1]
     - [x] Update `WheelerMemory.recall` to calculate stability (hit_count, persistence, survival).
     - [x] Add tests for stability weighting in recall.
