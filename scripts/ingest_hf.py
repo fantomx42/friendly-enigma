@@ -41,9 +41,8 @@ async def ingest(limit=100):
         await wm.store(text)
         count += 1
         
-    print(f"
-Successfully ingested {count} memories.")
-    print("You can now use 'python -m wheeler recall "your query"' to see the results!")
+    print(f"\nSuccessfully ingested {count} memories.")
+    print("You can now use 'python -m wheeler recall \"your query\"' to see the results!")
 
 if __name__ == "__main__":
     # Default to 100 for a quick start
