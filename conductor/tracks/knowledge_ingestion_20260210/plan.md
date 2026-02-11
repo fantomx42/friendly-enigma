@@ -11,11 +11,11 @@ This track focuses on populating the memory system with general knowledge and cl
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Environment & Script Finalization' (Protocol in workflow.md) [44eeed1]
 
 ## Phase 2: Knowledge Ingestion
-- [ ] Task: Execute ingestion
-    - [ ] Run `PYTHONPATH=. .venv/bin/python3 scripts/ingest_hf.py 100`
-- [ ] Task: Verify memory count
-    - [ ] Check `wheeler.db` or use `recall` to confirm data presence
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Knowledge Ingestion' (Protocol in workflow.md)
+- [x] Task: Execute ingestion [420ba82]
+    - [x] Run `PYTHONPATH=. .venv/bin/python3 scripts/ingest_hf.py 100`
+- [x] Task: Verify memory count [420ba82]
+    - [x] Check `wheeler.db` or use `recall` to confirm data presence
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Knowledge Ingestion' (Protocol in workflow.md) [420ba82]
 
 ## Phase 3: System Cleanup
 - [ ] Task: Remove test artifacts
