@@ -13,5 +13,3 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [x] **Track: Visualization & Diagnostics**
   *Link: [./tracks/wheeler_viz_20260210/](./tracks/wheeler_viz_20260210/)*
 
-- [x] **Track: Knowledge Ingestion & System Cleanup**
-  *Link: [./tracks/knowledge_ingestion_20260210/](./tracks/knowledge_ingestion_20260210/)*
