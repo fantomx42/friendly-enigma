@@ -20,7 +20,7 @@
 - [x] Task: Implement chat component and integrate with backend d323f25
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Frontend Dashboard (Leptos/Yew)' (Protocol in workflow.md)
 
-## Phase 5: Visual Systems Mapping
+## Phase 5: Visual Systems Mapping [checkpoint: a642681]
 - [x] Task: Implement interactive file tree/map using D3.js or Mermaid.js 9f4c552
 - [x] Task: Connect visual map to the filesystem backend service 17d72b3
 - [ ] Task: Conductor - User Manual Verification 'Phase 5: Visual Systems Mapping' (Protocol in workflow.md)
