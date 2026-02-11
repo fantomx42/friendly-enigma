@@ -9,7 +9,10 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::RwLock;
+use tower_http::cors::{Any, CorsLayer};
 
 mod api;
 mod db;
@@ -18,17 +21,21 @@ mod ollama;
 use db::Db;
 use ollama::OllamaClient;
 
-struct AppState {
-    ollama: OllamaClient,
-    db: Db,
+pub struct AppState {
+    pub ollama: OllamaClient,
+    pub db: Db,
+    pub project_root: RwLock<PathBuf>,
 }
 
 #[tokio::main]
 async fn main() {
     let db = Db::new().await.unwrap();
+    let project_root = RwLock::new(std::env::current_dir().unwrap());
+    
     let state = Arc::new(AppState {
         ollama: OllamaClient::new("http://localhost:11434".to_string()),
         db,
+        project_root,
     });
 
     let app = app(state);
@@ -39,12 +46,18 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-fn app(state: Arc<AppState>) -> Router {
+pub fn app(state: Arc<AppState>) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(health_check))
         .route("/telemetry", get(telemetry))
         .route("/chat", post(chat))
         .nest("/api", api::router())
+        .layer(cors)
         .with_state(state)
 }
 
@@ -105,13 +118,14 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
-    use tower::util::ServiceExt; // for `oneshot`
+    use tower::util::ServiceExt;
 
     async fn test_app() -> Router {
         let db = Db::new().await.unwrap();
         let state = Arc::new(AppState {
             ollama: OllamaClient::new("http://localhost:11434".to_string()),
             db,
+            project_root: RwLock::new(PathBuf::from(".")),
         });
         app(state)
     }
