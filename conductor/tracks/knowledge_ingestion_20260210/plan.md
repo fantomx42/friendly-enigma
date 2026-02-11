@@ -18,10 +18,10 @@ This track focuses on populating the memory system with general knowledge and cl
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Knowledge Ingestion' (Protocol in workflow.md) [420ba82]
 
 ## Phase 3: System Cleanup
-- [~] Task: Remove test artifacts
-    - [ ] Delete `./.wheeler_test` directory
-    - [ ] Ensure any other temporary speed test files are gone
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: System Cleanup' (Protocol in workflow.md)
+- [x] Task: Remove test artifacts [9f9f4e6]
+    - [x] Delete `./.wheeler_test` directory
+    - [x] Ensure any other temporary speed test files are gone
+- [x] Task: Conductor - User Manual Verification 'Phase 3: System Cleanup' (Protocol in workflow.md) [9f9f4e6]
 
 ## Phase 4: Final Validation
 - [ ] Task: Run recall test
