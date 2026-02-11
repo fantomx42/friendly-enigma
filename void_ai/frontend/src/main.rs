@@ -81,7 +81,7 @@ pub fn App() -> impl IntoView {
 
         spawn_local(async move {
             let payload = serde_json::json!({
-                "model": "qwen3:8b",
+                "model": "gpt-oss:20b",
                 "prompt": prompt
             });
 
