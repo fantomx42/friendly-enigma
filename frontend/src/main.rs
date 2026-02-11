@@ -6,6 +6,7 @@ use gloo_net::eventsource::futures::EventSource;
 #[allow(unused_imports)]
 use futures::StreamExt;
 use gloo_net::http::Request;
+use wasm_bindgen::JsCast; // Added this import!
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct ChatMessage {
@@ -49,6 +50,11 @@ fn FileTree(node: FileNode) -> impl IntoView {
     }
 }
 
+#[derive(Deserialize)]
+struct ChatResponse {
+    response: String,
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let (input, set_input) = signal(String::new());
@@ -61,16 +67,57 @@ pub fn App() -> impl IntoView {
             return;
         }
 
+        // Add user message
         set_messages.update(|msgs| {
             msgs.push(ChatMessage {
-                role: "user".to_string(),
+                role: "User".to_string(),
                 content: current_input.clone(),
             });
         });
+        
+        let prompt = current_input.clone();
         set_input.set(String::new());
         set_is_loading.set(true);
 
         spawn_local(async move {
+            let payload = serde_json::json!({
+                "model": "qwen3:8b",
+                "prompt": prompt
+            });
+
+            match Request::post("http://127.0.0.1:3000/chat")
+                .json(&payload)
+                .unwrap()
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if let Ok(data) = resp.json::<ChatResponse>().await {
+                        set_messages.update(|msgs| {
+                            msgs.push(ChatMessage {
+                                role: "TWAI".to_string(),
+                                content: data.response,
+                            });
+                        });
+                    } else {
+                        set_messages.update(|msgs| {
+                            msgs.push(ChatMessage {
+                                role: "System".to_string(),
+                                content: "Error parsing response".to_string(),
+                            });
+                        });
+                    }
+                }
+                Err(e) => {
+                    set_messages.update(|msgs| {
+                        msgs.push(ChatMessage {
+                            role: "System".to_string(),
+                            content: format!("Network Error: {:?}", e),
+                        });
+                    });
+                }
+            }
+            
             set_is_loading.set(false);
         });
     };
@@ -80,7 +127,7 @@ pub fn App() -> impl IntoView {
             <div class="messages" style="flex: 1; overflow-y: auto; border: 2px solid #000; padding: 15px; background: #fafafa; margin-bottom: 15px; font-family: 'Courier New', monospace;">
                 <For
                     each=move || messages.get()
-                    key=|msg| format!("{}-{}", msg.role, msg.content)
+                    key=|msg| format!("{}-{}", msg.role, msg.content.len())
                     children=|msg| {
                         let role = msg.role.clone();
                         let content = msg.content.clone();
@@ -119,7 +166,6 @@ pub fn App() -> impl IntoView {
 }
 
 fn main() {
-    use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
     
     let doc = web_sys::window().unwrap().document().unwrap();
@@ -174,7 +220,6 @@ fn main() {
                 });
             };
 
-            // Initial fetch
             Effect::new(move |_| fetch_map());
 
             view! {

@@ -1,13 +1,9 @@
 use axum::{
     extract::State,
-    response::sse::{Event, Sse},
     routing::{get, post},
     Json, Router,
 };
-use futures_util::stream::Stream;
-use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -86,29 +82,21 @@ struct ChatRequest {
     prompt: String,
 }
 
+#[derive(Serialize)]
+struct ChatResponse {
+    response: String,
+}
+
 async fn chat(
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     Json(payload): Json<ChatRequest>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = state
-        .ollama
-        .generate_stream(payload.model, payload.prompt)
-        .await
-        .unwrap();
-
-    let sse_stream = stream.map(|result| {
-        match result {
-            Ok(bytes) => {
-                let text = String::from_utf8_lossy(&bytes).to_string();
-                Ok(Event::default().data(text))
-            }
-            Err(e) => {
-                Ok(Event::default().event("error").data(e.to_string()))
-            }
-        }
-    });
-
-    Sse::new(sse_stream)
+) -> Json<ChatResponse> {
+    println!("Received chat request: {}", payload.prompt);
+    
+    // Simple echo for verification
+    Json(ChatResponse {
+        response: format!("Echo: {}", payload.prompt),
+    })
 }
 
 #[cfg(test)]
