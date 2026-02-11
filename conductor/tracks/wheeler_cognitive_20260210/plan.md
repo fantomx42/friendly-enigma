@@ -1,11 +1,11 @@
 # Implementation Plan - Wheeler Cognitive Functions
 
-## Phase 1: Foundation Upgrades (The "Smarter" Codec)
-- [ ] Task: Implement Position-Invariant TextCodec
-    - [ ] Update `TextCodec` to use a position-independent encoding (e.g., distributed hash summation or cyclic binding).
-    - [ ] Goal: "permanent memory" should have high similarity to "This is my first permanent memory".
-- [ ] Task: Verify Improved Similarity Scores
-    - [ ] Write a script to compare similarity of "A B" vs "B A" vs "A ... B".
+## Phase 1: Foundation Upgrades (The "Smarter" Codec) [checkpoint: 7dfddcf]
+- [x] Task: Implement Position-Invariant TextCodec
+    - [x] Update `TextCodec` to use a position-independent encoding (e.g., distributed hash summation or cyclic binding).
+    - [x] Goal: "permanent memory" should have high similarity to "This is my first permanent memory".
+- [x] Task: Verify Improved Similarity Scores
+    - [x] Write a script to compare similarity of "A B" vs "B A" vs "A ... B".
 
 ## Phase 2: The Reasoning Engine
 - [x] Task: Implement Tensor Operations [5c8d9e2]
