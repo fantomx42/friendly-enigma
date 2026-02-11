@@ -3,12 +3,12 @@
 This track focuses on populating the memory system with general knowledge and cleaning up test artifacts.
 
 ## Phase 1: Environment & Script Finalization
-- [ ] Task: Install dependencies (`datasets`, `tqdm`)
-    - [ ] Run `.venv/bin/pip install datasets tqdm`
-- [ ] Task: Verify ingestion script (`scripts/ingest_hf.py`)
-    - [ ] Ensure the script correctly targets `databricks/databricks-dolly-15k`
-    - [ ] Ensure the script truncates text to 300 chars
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Environment & Script Finalization' (Protocol in workflow.md)
+- [x] Task: Install dependencies (`datasets`, `tqdm`) [005eb98]
+    - [x] Run `.venv/bin/pip install datasets tqdm`
+- [x] Task: Verify ingestion script (`scripts/ingest_hf.py`) [94fdece]
+    - [x] Ensure the script correctly targets `databricks/databricks-dolly-15k`
+    - [x] Ensure the script truncates text to 300 chars
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Environment & Script Finalization' (Protocol in workflow.md) [44eeed1]
 
 ## Phase 2: Knowledge Ingestion
 - [ ] Task: Execute ingestion
