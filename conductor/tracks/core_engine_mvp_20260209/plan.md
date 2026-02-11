@@ -18,7 +18,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Dynamics Engine' (Protocol in workflow.md)
     *Note: Verification pending user confirmation.*
 
-## Phase 3: Persistence Layer (The "Hard Drive")
+## Phase 3: Persistence Layer (The "Hard Drive") [checkpoint: 3e723e5]
 - [x] Task: Implement SQLite Metadata Store [8c7a2b1]
     - [x] Write Tests: CRUD operations for memory metadata.
     - [x] Implement `MetadataStore` (aiosqlite).
