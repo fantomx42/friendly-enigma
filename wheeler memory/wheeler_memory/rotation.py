@@ -45,6 +45,8 @@ def store_with_rotation_retry(
     max_rotations: int = 4,
     save: bool = True,
     data_dir: str | Path | None = None,
+    *,
+    chunk: str | None = None,
 ) -> dict:
     """Try 0/90/180/270 degree rotations, return first converged result.
 
@@ -73,7 +75,7 @@ def store_with_rotation_retry(
             update_rotation_stats(angle, True, d)
             if save:
                 brick = MemoryBrick.from_evolution_result(result, {"input_text": text})
-                store_memory(text, result, brick, d)
+                store_memory(text, result, brick, d, chunk=chunk)
             return result
 
         update_rotation_stats(angle, False, d)
