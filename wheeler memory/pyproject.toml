@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wheeler-memory"
+version = "0.1.0"
+description = "Cellular automata-based associative memory system"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "matplotlib>=3.9",
+]
+
+[project.scripts]
+wheeler-store = "scripts.wheeler_store:main"
+wheeler-recall = "scripts.wheeler_recall:main"
+wheeler-diversity = "scripts.test_diversity:main"
+wheeler-scrub = "scripts.scrub_brick:main"
+
+[tool.setuptools.packages.find]
+include = ["wheeler_memory*", "scripts*"]
