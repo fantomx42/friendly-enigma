@@ -18,6 +18,7 @@ wheeler-store = "scripts.wheeler_store:main"
 wheeler-recall = "scripts.wheeler_recall:main"
 wheeler-diversity = "scripts.test_diversity:main"
 wheeler-scrub = "scripts.scrub_brick:main"
+wheeler-temps = "scripts.wheeler_temps:main"
 
 [tool.setuptools.packages.find]
 include = ["wheeler_memory*", "scripts*"]

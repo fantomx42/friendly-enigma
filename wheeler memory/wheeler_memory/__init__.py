@@ -1,11 +1,27 @@
 """Wheeler Memory: cellular automata-based associative memory system."""
 
 from .brick import MemoryBrick
+from .chunking import (
+    CHUNK_KEYWORDS,
+    DEFAULT_CHUNK,
+    find_brick_across_chunks,
+    list_existing_chunks,
+    select_chunk,
+    select_recall_chunks,
+)
 from .dynamics import apply_ca_dynamics, evolve_and_interpret
 from .hashing import hash_to_frame, text_to_hex
 from .oscillation import detect_oscillation, get_cell_roles
 from .rotation import store_with_rotation_retry
 from .storage import list_memories, recall_memory, store_memory
+from .temperature import (
+    HALF_LIFE_DAYS,
+    HIT_SATURATION,
+    TIER_HOT,
+    TIER_WARM,
+    compute_temperature,
+    temperature_tier,
+)
 
 __all__ = [
     "hash_to_frame",
@@ -19,4 +35,16 @@ __all__ = [
     "recall_memory",
     "list_memories",
     "store_with_rotation_retry",
+    "CHUNK_KEYWORDS",
+    "DEFAULT_CHUNK",
+    "select_chunk",
+    "select_recall_chunks",
+    "find_brick_across_chunks",
+    "list_existing_chunks",
+    "compute_temperature",
+    "temperature_tier",
+    "HALF_LIFE_DAYS",
+    "HIT_SATURATION",
+    "TIER_HOT",
+    "TIER_WARM",
 ]

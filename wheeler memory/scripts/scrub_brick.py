@@ -3,6 +3,7 @@
 Usage:
     wheeler-scrub path/to/brick.npz
     wheeler-scrub --text "some text"  # auto-locate brick by hash
+    wheeler-scrub --text "some text" --chunk code  # look in specific chunk
 """
 
 import argparse
@@ -12,6 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
 from wheeler_memory.brick import MemoryBrick
+from wheeler_memory.chunking import find_brick_across_chunks, get_chunk_dir
 from wheeler_memory.hashing import text_to_hex
 from wheeler_memory.storage import DEFAULT_DATA_DIR
 
@@ -22,16 +24,26 @@ def main():
     group.add_argument("path", nargs="?", help="Path to brick .npz file")
     group.add_argument("--text", help="Look up brick by original text")
     parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)")
+    parser.add_argument("--chunk", default=None, help="Chunk to search in (default: search all)")
     args = parser.parse_args()
 
     if args.text:
         data_dir = Path(args.data_dir) if args.data_dir else DEFAULT_DATA_DIR
         hex_key = text_to_hex(args.text)
-        brick_path = data_dir / "bricks" / f"{hex_key}.npz"
-        if not brick_path.exists():
-            print(f"No brick found for text: {args.text!r}")
-            print(f"  Expected: {brick_path}")
-            return
+
+        if args.chunk:
+            chunk_dir = get_chunk_dir(data_dir, args.chunk)
+            brick_path = chunk_dir / "bricks" / f"{hex_key}.npz"
+            if not brick_path.exists():
+                print(f"No brick found for text: {args.text!r} in chunk '{args.chunk}'")
+                print(f"  Expected: {brick_path}")
+                return
+        else:
+            brick_path = find_brick_across_chunks(hex_key, data_dir)
+            if brick_path is None:
+                print(f"No brick found for text: {args.text!r}")
+                print(f"  Searched all chunks in: {data_dir / 'chunks'}")
+                return
     else:
         brick_path = Path(args.path)
         if not brick_path.exists():
