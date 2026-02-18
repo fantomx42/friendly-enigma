@@ -122,6 +122,44 @@ wheeler-diversity
 # PASS when avg correlation < 0.5 and max < 0.85.
 ```
 
+## Temperature Dynamics
+
+Every memory has a **temperature** reflecting how recently and frequently it's been accessed. Temperature is computed lazily on recall and listing — no background processes.
+
+```
+temp = base_from_hits × decay_from_time
+
+base_from_hits = min(1.0, 0.3 + 0.7 × (hit_count / 10))
+decay_from_time = 2 ^ (-days_since_last_access / 7.0)
+```
+
+**Tiers:**
+
+| Tier | Range | Meaning |
+|------|-------|---------|
+| hot  | >= 0.6 | Frequently accessed, recent |
+| warm | >= 0.3 | Default for new or moderately accessed |
+| cold | < 0.3  | Stale, candidate for archival |
+
+New memories start at temperature 0.3 (warm). Each recall bumps hit_count and resets last_accessed, keeping active memories hot. Unused memories decay with a 7-day half-life.
+
+### Inspect temperatures
+
+```bash
+wheeler-temps                     # all memories
+wheeler-temps --chunk code        # specific chunk
+wheeler-temps --tier hot          # filter by tier
+wheeler-temps --sort hits         # sort by hit count
+```
+
+### Temperature-boosted recall
+
+```bash
+wheeler-recall --temperature-boost 0.1 "python bug"
+```
+
+When `--temperature-boost` is nonzero, ranking uses `similarity + boost × temperature` — hotter memories get a slight ranking bonus. Default boost is 0.0 (pure similarity ranking, identical to previous behavior).
+
 ## Python API
 
 ```python
@@ -175,9 +213,11 @@ wheeler_memory/
     oscillation.py       # Epistemic uncertainty detection
     rotation.py          # Rotation retry with learning
     storage.py           # Store/recall/list with chunked storage
+    temperature.py       # Temperature dynamics (hot/warm/cold)
 scripts/
     wheeler_store.py     # CLI: store
     wheeler_recall.py    # CLI: recall
+    wheeler_temps.py     # CLI: temperature inspector
     scrub_brick.py       # CLI: brick timeline viewer
     test_diversity.py    # CLI: attractor diversity report
 ```
@@ -186,7 +226,6 @@ scripts/
 
 - **GPU acceleration** — HIP kernels for parallel chunk evolution on AMD GPUs (ROCm)
 - **Embedding-based routing** — semantic similarity for chunk selection instead of keywords
-- **Temperature dynamics** — time-decay on memories, hot/warm/cold access tiers
 - **Reconstructive recall** — memories influenced by current context (Darman architecture)
 
 ## License

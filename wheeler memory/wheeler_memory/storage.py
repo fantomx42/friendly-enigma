@@ -18,6 +18,7 @@ from .chunking import (
 )
 from .dynamics import evolve_and_interpret
 from .hashing import hash_to_frame, text_to_hex
+from .temperature import bump_access, compute_temperature, ensure_access_fields, temperature_tier
 
 DEFAULT_DATA_DIR = Path.home() / ".wheeler_memory"
 
@@ -63,12 +64,16 @@ def store_memory(
     brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
 
     index = _load_index(chunk_dir)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    base_metadata = result.get("metadata", {})
+    base_metadata["hit_count"] = 0
+    base_metadata["last_accessed"] = now_iso
     index[hex_key] = {
         "text": text,
         "state": result["state"],
         "convergence_ticks": result["convergence_ticks"],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "metadata": result.get("metadata", {}),
+        "timestamp": now_iso,
+        "metadata": base_metadata,
         "chunk": chunk,
     }
     _save_index(chunk_dir, index)
@@ -82,10 +87,12 @@ def recall_memory(
     data_dir: str | Path | None = None,
     *,
     chunk: str | None = None,
+    temperature_boost: float = 0.0,
 ) -> list[dict]:
     """Recall stored memories by Pearson correlation with the query's attractor.
 
-    Searches across matched chunks, merges results sorted by similarity.
+    Searches across matched chunks, merges results sorted by effective similarity.
+    When temperature_boost > 0, hotter memories get a ranking bonus.
     """
     d = _get_data_dir(data_dir)
 
@@ -118,20 +125,58 @@ def recall_memory(
             attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
             if not attractor_path.exists():
                 continue
+
+            ensure_access_fields(meta, meta["timestamp"])
+
             attractor = np.load(attractor_path)
             corr, _ = pearsonr(query_flat, attractor.flatten())
+            sim = float(corr)
+
+            temp = compute_temperature(
+                meta["metadata"]["hit_count"],
+                meta["metadata"]["last_accessed"],
+            )
+            tier = temperature_tier(temp)
+            effective = sim + temperature_boost * temp
+
             results.append({
                 "hex_key": hex_key,
                 "text": meta["text"],
-                "similarity": float(corr),
+                "similarity": sim,
+                "temperature": temp,
+                "temperature_tier": tier,
+                "effective_similarity": effective,
                 "state": meta["state"],
                 "convergence_ticks": meta["convergence_ticks"],
                 "timestamp": meta["timestamp"],
                 "chunk": c,
             })
 
-    results.sort(key=lambda r: r["similarity"], reverse=True)
-    return results[:top_k]
+    results.sort(key=lambda r: r["effective_similarity"], reverse=True)
+    top_results = results[:top_k]
+
+    _bump_recalled_memories(d, top_results)
+
+    return top_results
+
+
+def _bump_recalled_memories(data_dir: Path, results: list[dict]) -> None:
+    """Increment hit_count and update last_accessed for recalled memories."""
+    # Group results by chunk to minimise index loads
+    by_chunk: dict[str, list[str]] = {}
+    for r in results:
+        by_chunk.setdefault(r["chunk"], []).append(r["hex_key"])
+
+    for chunk_name, hex_keys in by_chunk.items():
+        chunk_dir = data_dir / "chunks" / chunk_name
+        index = _load_index(chunk_dir)
+        changed = False
+        for hk in hex_keys:
+            if hk in index:
+                bump_access(index[hk])
+                changed = True
+        if changed:
+            _save_index(chunk_dir, index)
 
 
 def list_memories(
@@ -154,6 +199,17 @@ def list_memories(
             continue
         index = _load_index(chunk_dir)
         for k, v in index.items():
-            all_memories.append({"hex_key": k, "chunk": c, **v})
+            ensure_access_fields(v, v["timestamp"])
+            temp = compute_temperature(
+                v["metadata"]["hit_count"],
+                v["metadata"]["last_accessed"],
+            )
+            all_memories.append({
+                "hex_key": k,
+                "chunk": c,
+                "temperature": temp,
+                "temperature_tier": temperature_tier(temp),
+                **v,
+            })
 
     return all_memories

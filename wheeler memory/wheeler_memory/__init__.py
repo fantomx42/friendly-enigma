@@ -14,6 +14,14 @@ from .hashing import hash_to_frame, text_to_hex
 from .oscillation import detect_oscillation, get_cell_roles
 from .rotation import store_with_rotation_retry
 from .storage import list_memories, recall_memory, store_memory
+from .temperature import (
+    HALF_LIFE_DAYS,
+    HIT_SATURATION,
+    TIER_HOT,
+    TIER_WARM,
+    compute_temperature,
+    temperature_tier,
+)
 
 __all__ = [
     "hash_to_frame",
@@ -33,4 +41,10 @@ __all__ = [
     "select_recall_chunks",
     "find_brick_across_chunks",
     "list_existing_chunks",
+    "compute_temperature",
+    "temperature_tier",
+    "HALF_LIFE_DAYS",
+    "HIT_SATURATION",
+    "TIER_HOT",
+    "TIER_WARM",
 ]
