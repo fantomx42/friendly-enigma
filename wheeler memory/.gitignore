@@ -4,5 +4,7 @@ __pycache__/
 dist/
 build/
 .venv/
-*.png
+/*.png
 .wheeler_memory/
+*.so
+.claude/

@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheeler Memory — Interactive Demo</title>
+<meta name="description" content="Interactive demo of Wheeler Memory: a cellular automata-based associative memory system where meaning is what survives symbolic pressure.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN SYSTEM
+   ============================================================ */
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: rgba(20, 20, 35, 0.7);
+  --bg-card-hover: rgba(30, 30, 50, 0.8);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-glow: rgba(120, 80, 255, 0.3);
+
+  --text-primary: #e8e6f0;
+  --text-secondary: #9590a8;
+  --text-muted: #5d5875;
+
+  --accent-violet: #8b5cf6;
+  --accent-violet-dim: rgba(139, 92, 246, 0.15);
+  --accent-cyan: #06d6a0;
+  --accent-cyan-dim: rgba(6, 214, 160, 0.15);
+  --accent-magenta: #e040a0;
+  --accent-magenta-dim: rgba(224, 64, 160, 0.15);
+  --accent-amber: #f59e0b;
+
+  --gradient-hero: linear-gradient(135deg, #0a0a0f 0%, #1a1030 50%, #0a0a0f 100%);
+  --gradient-card: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(6,214,160,0.04) 100%);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 0 1px rgba(139,92,246,0.2);
+  --shadow-glow: 0 0 40px rgba(139,92,246,0.15);
+
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+section {
+  padding: 80px 0;
+  position: relative;
+}
+
+section + section {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-hero);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  padding: 40px 0;
+}
+
+.hero-bg-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.12;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--accent-violet) 0%, var(--accent-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
+}
+
+.hero .tagline {
+  font-size: clamp(1rem, 2.2vw, 1.3rem);
+  font-weight: 300;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto 40px;
+  font-style: italic;
+}
+
+.hero .subtitle {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  max-width: 520px;
+  margin: 0 auto 48px;
+  line-height: 1.7;
+}
+
+.scroll-hint {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  animation: float 2.5s ease-in-out infinite;
+}
+
+.scroll-hint .arrow {
+  width: 20px;
+  height: 20px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(8px); }
+}
+
+/* ============================================================
+   SECTION HEADINGS
+   ============================================================ */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--accent-violet);
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.section-desc {
+  color: var(--text-secondary);
+  max-width: 600px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin-bottom: 48px;
+}
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.card:hover {
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+}
+
+/* ============================================================
+   PIPELINE SECTION (How It Works)
+   ============================================================ */
+.pipeline-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.pipeline-step {
+  text-align: center;
+  padding: 28px 20px;
+}
+
+.pipeline-step .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-violet-dim);
+  color: var(--accent-violet);
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.pipeline-step h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pipeline-step p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-top: 32px;
+}
+
+.rules-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rules-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.rules-table tr:last-child td { border-bottom: none; }
+
+.role-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+
+.role-max { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+.role-slope { background: var(--accent-violet-dim); color: var(--accent-violet); }
+.role-min { background: var(--accent-magenta-dim); color: var(--accent-magenta); }
+
+/* ============================================================
+   PLAYGROUND SECTION
+   ============================================================ */
+.playground-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .playground-layout { grid-template-columns: 1fr; }
+}
+
+.canvas-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  background: rgba(0,0,0,0.3);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  border-radius: var(--radius-md);
+}
+
+.playground-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.text-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+}
+
+.text-input:focus {
+  border-color: var(--accent-violet);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-violet), #6d28d9);
+  color: white;
+  box-shadow: 0 4px 16px rgba(139,92,246,0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(139,92,246,0.45);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-primary);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.speed-control input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-violet);
+  height: 4px;
+}
+
+.speed-label {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 36px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-box {
+  background: rgba(255,255,255,0.03);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-box .stat-value {
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.stat-box .stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.state-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.state-idle { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+.state-evolving { background: var(--accent-violet-dim); color: var(--accent-violet); animation: pulse 1s ease-in-out infinite; }
+.state-converged { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+.state-oscillating { background: rgba(245,158,11,0.15); color: var(--accent-amber); }
+.state-chaotic { background: var(--accent-magenta-dim); color: var(--accent-magenta); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ============================================================
+   COMPARE SECTION
+   ============================================================ */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .compare-grid { grid-template-columns: 1fr; }
+}
+
+.compare-panel h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.compare-canvas-wrap {
+  aspect-ratio: 1;
+  background: rgba(0,0,0,0.3);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.compare-canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.correlation-display {
+  text-align: center;
+  margin-top: 32px;
+}
+
+.correlation-value {
+  font-family: var(--font-mono);
+  font-size: 3rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent-violet), var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.correlation-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.correlation-bar {
+  width: 100%;
+  max-width: 400px;
+  height: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  margin: 16px auto 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.correlation-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet));
+  transition: width 0.5s ease;
+}
+
+/* ============================================================
+   CONCEPTS SECTION
+   ============================================================ */
+.concepts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.concept-card {
+  padding: 28px;
+}
+
+.concept-card .concept-icon {
+  font-size: 1.8rem;
+  margin-bottom: 16px;
+}
+
+.concept-card h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.concept-card p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.temp-bars {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.temp-bar {
+  flex: 1;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.temp-hot { background: linear-gradient(135deg, #ef4444, #f59e0b); color: white; }
+.temp-warm { background: linear-gradient(135deg, #f59e0b, #eab308); color: #1a1a2e; }
+.temp-cold { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; }
+
+/* ============================================================
+   BRICK SCRUBBER
+   ============================================================ */
+.scrubber-wrap {
+  margin-top: 24px;
+}
+
+.scrubber-canvas-row {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-violet) transparent;
+}
+
+.scrubber-frame {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.scrubber-frame:hover {
+  border-color: var(--accent-violet);
+  transform: scale(1.1);
+}
+
+.scrubber-frame.active {
+  border-color: var(--accent-cyan);
+  transform: scale(1.15);
+}
+
+.scrubber-slider {
+  width: 100%;
+  margin-top: 12px;
+  accent-color: var(--accent-violet);
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer {
+  text-align: center;
+  padding: 48px 0;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+footer a {
+  color: var(--accent-violet);
+  text-decoration: none;
+}
+
+footer a:hover { text-decoration: underline; }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+.fade-in {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section class="hero" id="hero">
+  <canvas class="hero-bg-canvas" id="heroBgCanvas" width="128" height="128"></canvas>
+  <div class="hero-content container">
+    <h1>Wheeler Memory</h1>
+    <p class="tagline">"Meaning is what survives symbolic pressure."</p>
+    <p class="subtitle">
+      A cellular automata-based associative memory system. Text goes in, gets hashed into a noisy grid,
+      and evolves under physical-like dynamics until it collapses to a unique stable pattern — the memory.
+    </p>
+    <a href="#how-it-works" class="btn btn-primary">See How It Works</a>
+  </div>
+  <div class="scroll-hint">
+    <span>scroll</span>
+    <div class="arrow"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     HOW IT WORKS
+     ============================================================ -->
+<section id="how-it-works">
+  <div class="container">
+    <div class="section-label fade-in">// pipeline</div>
+    <h2 class="section-title fade-in">How It Works</h2>
+    <p class="section-desc fade-in">
+      Every piece of text is transformed into a unique, stable pattern through
+      deterministic cellular automata evolution. No neural network, no embeddings — just physics.
+    </p>
+
+    <div class="pipeline-steps">
+      <div class="card pipeline-step fade-in">
+        <div class="step-num">1</div>
+        <h3>Hash → Seed</h3>
+        <p>Text is SHA-256 hashed to seed a 64×64 grid of values in [-1, +1]. Same text always produces the same seed.</p>
+      </div>
+      <div class="card pipeline-step fade-in">
+        <div class="step-num">2</div>
+        <h3>CA Evolution</h3>
+        <p>Cells update based on their neighbors: maxima push up, minima push down, slopes flow toward the dominant neighbor.</p>
+      </div>
+      <div class="card pipeline-step fade-in">
+        <div class="step-num">3</div>
+        <h3>Convergence</h3>
+        <p>After ~40 ticks (~3ms), the grid freezes into a unique attractor — a QR-code-like binary pattern that <em>is</em> the memory.</p>
+      </div>
+      <div class="card pipeline-step fade-in">
+        <div class="step-num">4</div>
+        <h3>Recall</h3>
+        <p>To find a memory, evolve the query and compare its attractor against stored ones via Pearson correlation.</p>
+      </div>
+    </div>
+
+    <div class="card fade-in" style="overflow-x: auto;">
+      <table class="rules-table">
+        <thead>
+          <tr>
+            <th>Cell Role</th>
+            <th>Condition</th>
+            <th>Update Rule</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="role-badge role-max">Local Max</span></td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">cell ≥ all 4 neighbors</td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">(1 − cell) × 0.35</td>
+            <td>Attractor basin center</td>
+          </tr>
+          <tr>
+            <td><span class="role-badge role-slope">Slope</span></td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">neither max nor min</td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">(max_nbr − cell) × 0.20</td>
+            <td>Transitional region</td>
+          </tr>
+          <tr>
+            <td><span class="role-badge role-min">Local Min</span></td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">cell ≤ all 4 neighbors</td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">(−1 − cell) × 0.35</td>
+            <td>Repellor / valley</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TRY IT LIVE
+     ============================================================ -->
+<section id="try-it">
+  <div class="container">
+    <div class="section-label fade-in">// playground</div>
+    <h2 class="section-title fade-in">Try It Live</h2>
+    <p class="section-desc fade-in">
+      Type any text and watch the 64×64 grid evolve in real-time.
+      Each unique input produces a unique attractor pattern.
+    </p>
+
+    <div class="card fade-in">
+      <div class="playground-layout">
+        <div class="canvas-wrap">
+          <canvas id="playCanvas" width="64" height="64"></canvas>
+        </div>
+        <div class="playground-controls">
+          <div class="input-group">
+            <label for="playInput">Input text</label>
+            <input type="text" id="playInput" class="text-input" placeholder="fix the python debug error" value="fix the python debug error">
+          </div>
+          <button class="btn btn-primary" id="playEvolveBtn" onclick="startPlayground()">▶ Evolve</button>
+          <button class="btn btn-secondary" id="playResetBtn" onclick="resetPlayground()">Reset</button>
+          <div class="input-group">
+            <label>Speed</label>
+            <div class="speed-control">
+              <span class="speed-label">slow</span>
+              <input type="range" id="playSpeed" min="1" max="60" value="15">
+              <span class="speed-label">fast</span>
+            </div>
+          </div>
+          <div id="playState" class="state-badge state-idle" style="text-align:center;">IDLE</div>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-value" id="playTick">0</div>
+              <div class="stat-label">Tick</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value" id="playDelta">—</div>
+              <div class="stat-label">Δ mean</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value" id="playTime">—</div>
+              <div class="stat-label">Time (ms)</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value" id="playGrid">64²</div>
+              <div class="stat-label">Grid</div>
+            </div>
+          </div>
+          <!-- Brick scrubber -->
+          <div class="input-group" id="scrubberSection" style="display:none;">
+            <label>Brick Timeline</label>
+            <input type="range" id="scrubberSlider" class="scrubber-slider" min="0" max="0" value="0">
+            <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.7rem;color:var(--text-muted);">
+              <span>tick 0</span>
+              <span id="scrubberMax">tick 0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COMPARE
+     ============================================================ -->
+<section id="compare">
+  <div class="container">
+    <div class="section-label fade-in">// uniqueness</div>
+    <h2 class="section-title fade-in">Compare Inputs</h2>
+    <p class="section-desc fade-in">
+      Different text → different attractor. See how two inputs produce entirely distinct memory patterns,
+      even when the words are similar.
+    </p>
+
+    <div class="card fade-in">
+      <div class="compare-grid">
+        <div class="compare-panel">
+          <h3>Input A</h3>
+          <input type="text" class="text-input" id="compareA" value="fix the python debug error" style="margin-bottom:12px;">
+          <div class="compare-canvas-wrap">
+            <canvas id="compareCanvasA" width="64" height="64"></canvas>
+          </div>
+          <div id="compareStateA" class="state-badge state-idle" style="text-align:center;">IDLE</div>
+        </div>
+        <div class="compare-panel">
+          <h3>Input B</h3>
+          <input type="text" class="text-input" id="compareB" value="buy groceries and schedule dentist" style="margin-bottom:12px;">
+          <div class="compare-canvas-wrap">
+            <canvas id="compareCanvasB" width="64" height="64"></canvas>
+          </div>
+          <div id="compareStateB" class="state-badge state-idle" style="text-align:center;">IDLE</div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:20px;">
+        <button class="btn btn-primary" onclick="startCompare()">▶ Evolve Both</button>
+        <button class="btn btn-secondary" onclick="resetCompare()" style="margin-left:8px;">Reset</button>
+      </div>
+      <div class="correlation-display" id="corrDisplay" style="display:none;">
+        <div class="correlation-value" id="corrValue">0.000</div>
+        <div class="correlation-label">Pearson Correlation (|r|) — lower = more unique</div>
+        <div class="correlation-bar">
+          <div class="correlation-bar-fill" id="corrBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CONCEPTS
+     ============================================================ -->
+<section id="concepts">
+  <div class="container">
+    <div class="section-label fade-in">// architecture</div>
+    <h2 class="section-title fade-in">Key Concepts</h2>
+    <p class="section-desc fade-in">
+      Beyond the core CA engine, Wheeler Memory implements chunked storage, temperature dynamics, and full temporal history.
+    </p>
+
+    <div class="concepts-grid">
+      <div class="card concept-card fade-in">
+        <div class="concept-icon">🧠</div>
+        <h3>Chunked Memory</h3>
+        <p>
+          Memories route to domain-specific chunks via keyword matching — like cortical regions.
+          <strong>"fix the python bug"</strong> → <span class="role-badge role-max">code</span>,
+          <strong>"buy groceries"</strong> → <span class="role-badge role-slope">daily_tasks</span>.
+          Recall searches matching chunks plus the <span class="role-badge role-min">general</span> catch-all.
+        </p>
+      </div>
+      <div class="card concept-card fade-in">
+        <div class="concept-icon">🌡️</div>
+        <h3>Temperature</h3>
+        <p>
+          Every memory has a temperature reflecting access frequency × recency.
+          Active memories stay hot; unused ones cool with a 7-day half-life.
+          Hot memories can get a ranking boost during recall.
+        </p>
+        <div class="temp-bars">
+          <div class="temp-bar temp-hot">HOT ≥ 0.6</div>
+          <div class="temp-bar temp-warm">WARM ≥ 0.3</div>
+          <div class="temp-bar temp-cold">COLD &lt; 0.3</div>
+        </div>
+      </div>
+      <div class="card concept-card fade-in">
+        <div class="concept-icon">🧱</div>
+        <h3>Memory Brick</h3>
+        <p>
+          Every memory stores its full temporal evolution as a 3D "brick" — width × height × ticks.
+          You can scrub through the timeline like a video to see exactly how the attractor formed.
+          Try it in the playground above!
+        </p>
+      </div>
+      <div class="card concept-card fade-in">
+        <div class="concept-icon">🔄</div>
+        <h3>Rotation Retry</h3>
+        <p>
+          If the initial CA evolution doesn't converge, the system rotates the seed frame (90°/180°/270°) and retries.
+          Rotation changes the neighbor topology, creating a different trajectory from the same information.
+        </p>
+      </div>
+      <div class="card concept-card fade-in">
+        <div class="concept-icon">⚡</div>
+        <h3>Convergence States</h3>
+        <p>
+          <span class="role-badge role-max">CONVERGED</span> — stable attractor found, memory is clear.<br>
+          <span class="role-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;">OSCILLATING</span> — epistemic uncertainty, the system can't decide.<br>
+          <span class="role-badge role-min">CHAOTIC</span> — input may need rephrasing.
+        </p>
+      </div>
+      <div class="card concept-card fade-in">
+        <div class="concept-icon">🔬</div>
+        <h3>Theoretical Foundation</h3>
+        <p>
+          Based on John Archibald Wheeler's "It from Bit" — information emerges from physical-like dynamics.
+          Implements the Symbolic Collapse Model: meaning is what survives symbolic pressure.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer>
+  <div class="container">
+    <p>
+      Wheeler Memory — <a href="https://github.com/fantomx42/friendly-enigma" target="_blank">GitHub</a>
+      · MIT License
+    </p>
+  </div>
+</footer>
+
+<!-- ============================================================
+     JAVASCRIPT ENGINE
+     ============================================================ -->
+<script>
+// ============================================================
+// SHA-256 HASHING → SEED FRAME
+// ============================================================
+
+async function sha256(text) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(hashBuffer);
+}
+
+// Mulberry32 PRNG - deterministic from a 32-bit seed
+function mulberry32(seed) {
+  return function() {
+    seed |= 0;
+    seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+async function textToFrame(text, size = 64) {
+  const digest = await sha256(text);
+  // Use first 4 bytes as seed (matching Python's first 8 bytes → int approach)
+  const seed = (digest[0] << 24) | (digest[1] << 16) | (digest[2] << 8) | digest[3];
+  const rng = mulberry32(seed);
+
+  const frame = new Float32Array(size * size);
+  for (let i = 0; i < size * size; i++) {
+    frame[i] = rng() * 2 - 1; // uniform(-1, 1)
+  }
+  return frame;
+}
+
+// ============================================================
+// 3-STATE CA DYNAMICS ENGINE
+// ============================================================
+
+const SIZE = 64;
+
+function applyCADynamics(frame) {
+  const next = new Float32Array(SIZE * SIZE);
+
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const idx = y * SIZE + x;
+      const cell = frame[idx];
+
+      // Von Neumann neighbors (wrapping)
+      const up    = frame[((y - 1 + SIZE) % SIZE) * SIZE + x];
+      const down  = frame[((y + 1) % SIZE) * SIZE + x];
+      const left  = frame[y * SIZE + ((x - 1 + SIZE) % SIZE)];
+      const right = frame[y * SIZE + ((x + 1) % SIZE)];
+
+      const isMax = cell >= up && cell >= down && cell >= left && cell >= right;
+      const isMin = cell <= up && cell <= down && cell <= left && cell <= right;
+
+      let delta;
+      if (isMax) {
+        delta = (1 - cell) * 0.35;
+      } else if (isMin) {
+        delta = (-1 - cell) * 0.35;
+      } else {
+        const maxNeighbor = Math.max(up, down, left, right);
+        delta = (maxNeighbor - cell) * 0.20;
+      }
+
+      next[idx] = Math.max(-1, Math.min(1, cell + delta));
+    }
+  }
+  return next;
+}
+
+function meanAbsDelta(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    sum += Math.abs(a[i] - b[i]);
+  }
+  return sum / a.length;
+}
+
+function pearsonCorrelation(a, b) {
+  const n = a.length;
+  let sumA = 0, sumB = 0, sumAB = 0, sumA2 = 0, sumB2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumA += a[i];
+    sumB += b[i];
+    sumAB += a[i] * b[i];
+    sumA2 += a[i] * a[i];
+    sumB2 += b[i] * b[i];
+  }
+  const num = n * sumAB - sumA * sumB;
+  const den = Math.sqrt((n * sumA2 - sumA * sumA) * (n * sumB2 - sumB * sumB));
+  if (den === 0) return 0;
+  return num / den;
+}
+
+// ============================================================
+// CANVAS RENDERING
+// ============================================================
+
+function renderFrame(canvas, frame) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.createImageData(SIZE, SIZE);
+
+  for (let i = 0; i < SIZE * SIZE; i++) {
+    const v = frame[i]; // -1 to +1
+    const t = (v + 1) / 2; // 0 to 1
+
+    let r, g, b;
+    if (t < 0.5) {
+      // Blue → dark (min → mid)
+      const s = t * 2;
+      r = Math.floor(20 + s * 15);
+      g = Math.floor(10 + s * 50);
+      b = Math.floor(120 + s * 80);
+    } else {
+      // Dark → cyan/hot (mid → max)
+      const s = (t - 0.5) * 2;
+      r = Math.floor(35 + s * 180);
+      g = Math.floor(60 + s * 170);
+      b = Math.floor(200 - s * 50);
+    }
+
+    const px = i * 4;
+    imageData.data[px] = r;
+    imageData.data[px + 1] = g;
+    imageData.data[px + 2] = b;
+    imageData.data[px + 3] = 255;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// ============================================================
+// PLAYGROUND
+// ============================================================
+
+let playState = { running: false, frame: null, tick: 0, history: [], animId: null, startTime: 0 };
+
+async function startPlayground() {
+  const text = document.getElementById('playInput').value.trim();
+  if (!text) return;
+
+  // Stop any existing animation
+  if (playState.animId) cancelAnimationFrame(playState.animId);
+
+  const frame = await textToFrame(text);
+  playState = {
+    running: true,
+    frame: new Float32Array(frame),
+    tick: 0,
+    history: [new Float32Array(frame)],
+    animId: null,
+    startTime: performance.now()
+  };
+
+  document.getElementById('playEvolveBtn').disabled = true;
+  updatePlayStats('EVOLVING', 'state-evolving');
+
+  renderFrame(document.getElementById('playCanvas'), playState.frame);
+  document.getElementById('scrubberSection').style.display = 'none';
+
+  playAnimationLoop();
+}
+
+function playAnimationLoop() {
+  if (!playState.running) return;
+
+  const speed = parseInt(document.getElementById('playSpeed').value);
+  const ticksPerFrame = Math.max(1, Math.floor(speed / 10));
+
+  for (let s = 0; s < ticksPerFrame; s++) {
+    if (!playState.running) break;
+
+    const prev = playState.frame;
+    playState.frame = applyCADynamics(playState.frame);
+    playState.tick++;
+    playState.history.push(new Float32Array(playState.frame));
+
+    const delta = meanAbsDelta(prev, playState.frame);
+    document.getElementById('playDelta').textContent = delta.toFixed(5);
+
+    if (delta < 1e-4) {
+      playState.running = false;
+      const elapsed = (performance.now() - playState.startTime).toFixed(1);
+      document.getElementById('playTime').textContent = elapsed;
+      updatePlayStats('CONVERGED', 'state-converged');
+      document.getElementById('playEvolveBtn').disabled = false;
+      showScrubber();
+      break;
+    }
+
+    if (playState.tick >= 1000) {
+      playState.running = false;
+      updatePlayStats('CHAOTIC', 'state-chaotic');
+      document.getElementById('playEvolveBtn').disabled = false;
+      showScrubber();
+      break;
+    }
+  }
+
+  document.getElementById('playTick').textContent = playState.tick;
+  const elapsed = (performance.now() - playState.startTime).toFixed(1);
+  document.getElementById('playTime').textContent = elapsed;
+  renderFrame(document.getElementById('playCanvas'), playState.frame);
+
+  if (playState.running) {
+    const delay = Math.max(8, 120 - parseInt(document.getElementById('playSpeed').value) * 2);
+    playState.animId = setTimeout(() => requestAnimationFrame(playAnimationLoop), delay);
+  }
+}
+
+function resetPlayground() {
+  if (playState.animId) {
+    cancelAnimationFrame(playState.animId);
+    clearTimeout(playState.animId);
+  }
+  playState = { running: false, frame: null, tick: 0, history: [], animId: null, startTime: 0 };
+
+  const canvas = document.getElementById('playCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  document.getElementById('playTick').textContent = '0';
+  document.getElementById('playDelta').textContent = '—';
+  document.getElementById('playTime').textContent = '—';
+  updatePlayStats('IDLE', 'state-idle');
+  document.getElementById('playEvolveBtn').disabled = false;
+  document.getElementById('scrubberSection').style.display = 'none';
+}
+
+function updatePlayStats(text, className) {
+  const el = document.getElementById('playState');
+  el.textContent = text;
+  el.className = 'state-badge ' + className;
+}
+
+function showScrubber() {
+  const section = document.getElementById('scrubberSection');
+  const slider = document.getElementById('scrubberSlider');
+  section.style.display = 'block';
+  slider.max = playState.history.length - 1;
+  slider.value = playState.history.length - 1;
+  document.getElementById('scrubberMax').textContent = 'tick ' + (playState.history.length - 1);
+}
+
+document.getElementById('scrubberSlider').addEventListener('input', function() {
+  const tick = parseInt(this.value);
+  if (playState.history[tick]) {
+    renderFrame(document.getElementById('playCanvas'), playState.history[tick]);
+    document.getElementById('playTick').textContent = tick;
+  }
+});
+
+// ============================================================
+// COMPARE
+// ============================================================
+
+let compareStateA = { running: false, frame: null, tick: 0, animId: null };
+let compareStateB = { running: false, frame: null, tick: 0, animId: null };
+
+async function startCompare() {
+  const textA = document.getElementById('compareA').value.trim();
+  const textB = document.getElementById('compareB').value.trim();
+  if (!textA || !textB) return;
+
+  // Stop existing
+  if (compareStateA.animId) clearTimeout(compareStateA.animId);
+  if (compareStateB.animId) clearTimeout(compareStateB.animId);
+
+  const frameA = await textToFrame(textA);
+  const frameB = await textToFrame(textB);
+
+  compareStateA = { running: true, frame: new Float32Array(frameA), tick: 0, animId: null, attractor: null };
+  compareStateB = { running: true, frame: new Float32Array(frameB), tick: 0, animId: null, attractor: null };
+
+  updateCompareState('A', 'EVOLVING', 'state-evolving');
+  updateCompareState('B', 'EVOLVING', 'state-evolving');
+  document.getElementById('corrDisplay').style.display = 'none';
+
+  renderFrame(document.getElementById('compareCanvasA'), compareStateA.frame);
+  renderFrame(document.getElementById('compareCanvasB'), compareStateB.frame);
+
+  compareAnimLoop();
+}
+
+function compareAnimLoop() {
+  const anyRunning = compareStateA.running || compareStateB.running;
+  if (!anyRunning) return;
+
+  // Evolve A
+  if (compareStateA.running) {
+    const prev = compareStateA.frame;
+    compareStateA.frame = applyCADynamics(compareStateA.frame);
+    compareStateA.tick++;
+    const delta = meanAbsDelta(prev, compareStateA.frame);
+    if (delta < 1e-4 || compareStateA.tick >= 1000) {
+      compareStateA.running = false;
+      compareStateA.attractor = compareStateA.frame;
+      updateCompareState('A', delta < 1e-4 ? 'CONVERGED' : 'CHAOTIC',
+        delta < 1e-4 ? 'state-converged' : 'state-chaotic');
+    }
+    renderFrame(document.getElementById('compareCanvasA'), compareStateA.frame);
+  }
+
+  // Evolve B
+  if (compareStateB.running) {
+    const prev = compareStateB.frame;
+    compareStateB.frame = applyCADynamics(compareStateB.frame);
+    compareStateB.tick++;
+    const delta = meanAbsDelta(prev, compareStateB.frame);
+    if (delta < 1e-4 || compareStateB.tick >= 1000) {
+      compareStateB.running = false;
+      compareStateB.attractor = compareStateB.frame;
+      updateCompareState('B', delta < 1e-4 ? 'CONVERGED' : 'CHAOTIC',
+        delta < 1e-4 ? 'state-converged' : 'state-chaotic');
+    }
+    renderFrame(document.getElementById('compareCanvasB'), compareStateB.frame);
+  }
+
+  if (compareStateA.running || compareStateB.running) {
+    const id = setTimeout(() => requestAnimationFrame(compareAnimLoop), 30);
+    if (compareStateA.running) compareStateA.animId = id;
+    if (compareStateB.running) compareStateB.animId = id;
+  } else {
+    // Both done — show correlation
+    showCorrelation();
+  }
+}
+
+function updateCompareState(side, text, className) {
+  const el = document.getElementById('compareState' + side);
+  el.textContent = text;
+  el.className = 'state-badge ' + className;
+}
+
+function showCorrelation() {
+  if (!compareStateA.attractor || !compareStateB.attractor) return;
+
+  const corr = pearsonCorrelation(compareStateA.attractor, compareStateB.attractor);
+  const absCorr = Math.abs(corr);
+
+  document.getElementById('corrDisplay').style.display = 'block';
+  document.getElementById('corrValue').textContent = absCorr.toFixed(4);
+  document.getElementById('corrBar').style.width = (absCorr * 100) + '%';
+}
+
+function resetCompare() {
+  if (compareStateA.animId) clearTimeout(compareStateA.animId);
+  if (compareStateB.animId) clearTimeout(compareStateB.animId);
+
+  compareStateA = { running: false, frame: null, tick: 0, animId: null };
+  compareStateB = { running: false, frame: null, tick: 0, animId: null };
+
+  const ctxA = document.getElementById('compareCanvasA').getContext('2d');
+  const ctxB = document.getElementById('compareCanvasB').getContext('2d');
+  ctxA.clearRect(0, 0, SIZE, SIZE);
+  ctxB.clearRect(0, 0, SIZE, SIZE);
+
+  updateCompareState('A', 'IDLE', 'state-idle');
+  updateCompareState('B', 'IDLE', 'state-idle');
+  document.getElementById('corrDisplay').style.display = 'none';
+}
+
+// ============================================================
+// HERO BACKGROUND ANIMATION
+// ============================================================
+
+(async function initHeroBg() {
+  const canvas = document.getElementById('heroBgCanvas');
+  const phrases = [
+    'meaning is what survives symbolic pressure',
+    'it from bit',
+    'wheeler memory demo',
+  ];
+
+  let frame = await textToFrame(phrases[0], 128);
+  const render = () => {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(128, 128);
+    for (let i = 0; i < 128 * 128; i++) {
+      const v = frame[i];
+      const t = (v + 1) / 2;
+      const px = i * 4;
+      // Very subtle purple-tinted render
+      imageData.data[px] = Math.floor(30 + t * 100);
+      imageData.data[px + 1] = Math.floor(15 + t * 40);
+      imageData.data[px + 2] = Math.floor(60 + t * 140);
+      imageData.data[px + 3] = 255;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  };
+
+  // Evolve slowly in background
+  const SIZE_BG = 128;
+  function stepBg() {
+    const next = new Float32Array(SIZE_BG * SIZE_BG);
+    for (let y = 0; y < SIZE_BG; y++) {
+      for (let x = 0; x < SIZE_BG; x++) {
+        const idx = y * SIZE_BG + x;
+        const cell = frame[idx];
+        const up    = frame[((y - 1 + SIZE_BG) % SIZE_BG) * SIZE_BG + x];
+        const down  = frame[((y + 1) % SIZE_BG) * SIZE_BG + x];
+        const left  = frame[y * SIZE_BG + ((x - 1 + SIZE_BG) % SIZE_BG)];
+        const right = frame[y * SIZE_BG + ((x + 1) % SIZE_BG)];
+        const isMax = cell >= up && cell >= down && cell >= left && cell >= right;
+        const isMin = cell <= up && cell <= down && cell <= left && cell <= right;
+        let delta;
+        if (isMax) delta = (1 - cell) * 0.35;
+        else if (isMin) delta = (-1 - cell) * 0.35;
+        else delta = (Math.max(up, down, left, right) - cell) * 0.20;
+        next[idx] = Math.max(-1, Math.min(1, cell + delta));
+      }
+    }
+    frame = next;
+    render();
+  }
+
+  render();
+  setInterval(stepBg, 80);
+})();
+
+// ============================================================
+// SCROLL ANIMATIONS (IntersectionObserver)
+// ============================================================
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// Allow Enter key to trigger evolve in playground
+document.getElementById('playInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') startPlayground();
+});
+</script>
+
+</body>
+</html>

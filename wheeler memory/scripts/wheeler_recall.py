@@ -21,6 +21,10 @@ def main():
         "--temperature-boost", type=float, default=0.0,
         help="Boost ranking by temperature (0.0 = no boost, default: 0.0)",
     )
+    parser.add_argument(
+        "--embed", action="store_true",
+        help="Use sentence embedding for query (enables fuzzy semantic recall)",
+    )
     args = parser.parse_args()
 
     results = recall_memory(
@@ -29,6 +33,7 @@ def main():
         data_dir=args.data_dir,
         chunk=args.chunk,
         temperature_boost=args.temperature_boost,
+        use_embedding=args.embed,
     )
 
     if not results:

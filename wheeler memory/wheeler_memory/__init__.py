@@ -23,6 +23,22 @@ from .temperature import (
     temperature_tier,
 )
 
+# GPU backend (optional — available only when libwheeler_ca.so is built)
+try:
+    from .gpu_dynamics import gpu_available, gpu_evolve_batch, gpu_evolve_single
+except ImportError:
+    gpu_available = lambda: False
+    gpu_evolve_single = None
+    gpu_evolve_batch = None
+
+# Embedding backend (optional — requires sentence-transformers)
+try:
+    from .embedding import embed_available, embed_to_frame, embed_to_frame_batch
+except ImportError:
+    embed_available = lambda: False
+    embed_to_frame = None
+    embed_to_frame_batch = None
+
 __all__ = [
     "hash_to_frame",
     "text_to_hex",
@@ -47,4 +63,13 @@ __all__ = [
     "HIT_SATURATION",
     "TIER_HOT",
     "TIER_WARM",
+    # GPU (optional)
+    "gpu_available",
+    "gpu_evolve_single",
+    "gpu_evolve_batch",
+    # Embedding (optional)
+    "embed_available",
+    "embed_to_frame",
+    "embed_to_frame_batch",
 ]
+

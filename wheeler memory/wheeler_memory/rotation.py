@@ -16,6 +16,12 @@ from .dynamics import evolve_and_interpret
 from .hashing import hash_to_frame
 from .storage import DEFAULT_DATA_DIR, store_memory
 
+def _get_frame_fn(use_embedding: bool):
+    if use_embedding:
+        from .embedding import embed_to_frame
+        return embed_to_frame
+    return hash_to_frame
+
 
 def _load_rotation_stats(data_dir: Path) -> dict:
     path = data_dir / "rotation_stats.json"
@@ -47,6 +53,7 @@ def store_with_rotation_retry(
     data_dir: str | Path | None = None,
     *,
     chunk: str | None = None,
+    use_embedding: bool = False,
 ) -> dict:
     """Try 0/90/180/270 degree rotations, return first converged result.
 
@@ -55,7 +62,8 @@ def store_with_rotation_retry(
       - metadata includes rotation_used, attempts, wall_time_seconds
     """
     d = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
-    base_frame = hash_to_frame(text)
+    frame_fn = _get_frame_fn(use_embedding)
+    base_frame = frame_fn(text)
     angles = [0, 90, 180, 270][:max_rotations]
     last_result = None
 
