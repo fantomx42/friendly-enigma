@@ -94,6 +94,8 @@ def recall_memory(
     chunk: str | None = None,
     temperature_boost: float = 0.0,
     use_embedding: bool = False,
+    reconstruct: bool = False,
+    reconstruct_alpha: float = 0.3,
 ) -> list[dict]:
     """Recall stored memories by Pearson correlation with the query's attractor.
 
@@ -101,6 +103,8 @@ def recall_memory(
     When temperature_boost > 0, hotter memories get a ranking bonus.
     When use_embedding is True, uses sentence embedding instead of SHA-256 hash
     for the query frame, enabling fuzzy semantic recall.
+    When reconstruct is True, each recalled memory's attractor is blended with
+    the query attractor and re-evolved through the CA (Darman architecture).
     """
     d = _get_data_dir(data_dir)
 
@@ -166,6 +170,23 @@ def recall_memory(
 
     results.sort(key=lambda r: r["effective_similarity"], reverse=True)
     top_results = results[:top_k]
+
+    # Reconstructive recall: blend each result with query context
+    if reconstruct and top_results:
+        from .reconstruction import reconstruct as _reconstruct
+        query_att = query_result["attractor"]
+        for r in top_results:
+            # Load the stored attractor for reconstruction
+            chunk_dir = d / "chunks" / r["chunk"]
+            att_path = chunk_dir / "attractors" / f"{r['hex_key']}.npy"
+            stored_att = np.load(att_path)
+            recon = _reconstruct(stored_att, query_att, alpha=reconstruct_alpha)
+            r["reconstructed_attractor"] = recon["attractor"]
+            r["reconstruction_state"] = recon["state"]
+            r["reconstruction_ticks"] = recon["convergence_ticks"]
+            r["reconstruction_alpha"] = recon["alpha"]
+            r["correlation_with_stored"] = recon["correlation_with_stored"]
+            r["correlation_with_query"] = recon["correlation_with_query"]
 
     _bump_recalled_memories(d, top_results)
 

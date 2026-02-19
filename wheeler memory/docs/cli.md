@@ -13,6 +13,7 @@ wheeler-store "fix the python debug error"
 
 wheeler-store --chunk hardware "solder the GPIO header"   # explicit chunk
 echo "piped input" | wheeler-store -                       # stdin
+wheeler-store --embed "fuzzy memory"                       # store with semantic embedding
 ```
 
 ## Recall memories
@@ -26,6 +27,7 @@ wheeler-recall "python bug"
 
 wheeler-recall --chunk code "debug error"   # search specific chunk
 wheeler-recall --top-k 10 "something"       # more results
+wheeler-recall --embed "debugging issues"   # fuzzy semantic search
 ```
 
 ### Temperature-boosted recall
