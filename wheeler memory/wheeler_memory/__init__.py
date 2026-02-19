@@ -39,6 +39,9 @@ except ImportError:
     embed_to_frame = None
     embed_to_frame_batch = None
 
+# Reconstructive recall
+from .reconstruction import reconstruct, reconstruct_batch
+
 __all__ = [
     "hash_to_frame",
     "text_to_hex",
@@ -71,5 +74,8 @@ __all__ = [
     "embed_available",
     "embed_to_frame",
     "embed_to_frame_batch",
+    # Reconstructive recall
+    "reconstruct",
+    "reconstruct_batch",
 ]
 

@@ -8,3 +8,13 @@ build/
 .wheeler_memory/
 *.so
 .claude/
+
+# Specific binaries
+libwheeler_ca.so
+
+# Model cache
+.cache/
+models/
+*.pt
+*.bin
+*.safetensors

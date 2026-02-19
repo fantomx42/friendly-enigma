@@ -11,6 +11,23 @@ SHA-256 → 64×64 seed frame (values in [-1, +1])
     ├→ CONVERGED   → Store attractor + brick
     ├→ OSCILLATING → Epistemic uncertainty detected
     └→ CHAOTIC     → Input needs rephrasing
+
+## Semantic vs. Exact Recall
+
+Wheeler Memory supports two modes of operation:
+
+1. **Exact Recall (SHA-256)**:
+   - The default mode.
+   - Text is hashed to a seed frame. Changing even one character completely changes the seed (avalanche effect).
+   - *Use case*: Exact password-like retrieval, "I want *exactly* this memory."
+
+2. **Semantic Recall (Embedding)**:
+   - Enabled via `--embed`.
+   - Text is converted to a vector using a sentence-transformer model (e.g., `all-MiniLM-L6-v2`).
+   - The 384-dimensional vector is projected onto the 64x64 grid using a fixed random matrix.
+   - *Result*: Similar meanings produce similar seed frames.
+   - *Use case*: Fuzzy search, "I want memories *like* this one."
+
 ```
 
 **The three cell roles** (von Neumann neighborhood):

@@ -37,7 +37,11 @@ def get_model():
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(MODEL_NAME)
+        from .hardware import get_optimal_device
+        
+        device = get_optimal_device()
+        print(f"Loading embedding model on {device}...")
+        _model = SentenceTransformer(MODEL_NAME, device=device)
     return _model
 
 
