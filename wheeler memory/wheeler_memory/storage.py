@@ -20,6 +20,11 @@ from .dynamics import evolve_and_interpret
 from .hashing import hash_to_frame, text_to_hex
 from .temperature import bump_access, compute_temperature, ensure_access_fields, temperature_tier
 
+# Lazy import for embedding (optional dependency)
+def _get_embed_to_frame():
+    from .embedding import embed_to_frame
+    return embed_to_frame
+
 DEFAULT_DATA_DIR = Path.home() / ".wheeler_memory"
 
 
@@ -88,11 +93,14 @@ def recall_memory(
     *,
     chunk: str | None = None,
     temperature_boost: float = 0.0,
+    use_embedding: bool = False,
 ) -> list[dict]:
     """Recall stored memories by Pearson correlation with the query's attractor.
 
     Searches across matched chunks, merges results sorted by effective similarity.
     When temperature_boost > 0, hotter memories get a ranking bonus.
+    When use_embedding is True, uses sentence embedding instead of SHA-256 hash
+    for the query frame, enabling fuzzy semantic recall.
     """
     d = _get_data_dir(data_dir)
 
@@ -106,7 +114,11 @@ def recall_memory(
             if c not in chunks_to_search:
                 chunks_to_search.append(c)
 
-    query_frame = hash_to_frame(text)
+    if use_embedding:
+        embed_fn = _get_embed_to_frame()
+        query_frame = embed_fn(text)
+    else:
+        query_frame = hash_to_frame(text)
     query_result = evolve_and_interpret(query_frame)
     query_flat = query_result["attractor"].flatten()
 

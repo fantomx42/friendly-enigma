@@ -1,233 +1,471 @@
-# Wheeler Memory
+# Project Darman: Wheeler Memory
+**Cellular Automata-Based Associative Memory System**
 
-A cellular automata-based associative memory system where meaning is what survives symbolic pressure.
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-Instead of "save text, search later" (traditional RAG), Wheeler Memory evolves input through 3-state cellular automata dynamics until it converges to a stable attractor — a physical pattern that *is* the memory. Recall works by Pearson correlation between query attractors and stored attractors.
+---
 
-## How It Works
-
-```
-Input Text
-    ↓
-SHA-256 → 64×64 seed frame (values in [-1, +1])
-    ↓
-3-State CA Evolution (iterate until convergence)
-    ├→ CONVERGED   → Store attractor + brick
-    ├→ OSCILLATING → Epistemic uncertainty detected
-    └→ CHAOTIC     → Input needs rephrasing
-```
-
-**The three cell roles** (von Neumann neighborhood):
-
-| Role | Condition | Update | Meaning |
-|------|-----------|--------|---------|
-| Local Maximum | `cell >= all 4 neighbors` | Push toward +1 (0.35) | Attractor basin center |
-| Slope | Neither max nor min | Flow toward max neighbor (0.20) | Transitional |
-| Local Minimum | `cell <= all 4 neighbors` | Push toward -1 (0.35) | Repellor / valley |
-
-Convergence typically happens in 39-49 ticks (~3ms on CPU). The result is a unique QR-code-like binary pattern per input.
-
-## Chunked Memory Architecture
-
-Memories are routed to domain-specific chunks via keyword matching — inspired by how different cortical regions handle different domains:
+## The Core Formula
 
 ```
-~/.wheeler_memory/
-  chunks/
-    code/           attractors/ bricks/ index.json metadata.json
-    hardware/       ...
-    daily_tasks/    ...
-    science/        ...
-    meta/           ...
-    general/        ...  (default catch-all)
-  rotation_stats.json
+Input → SHA-256 → CA_seed (64×64 float) → CA_evolution → Attractor
+                                                  ↓
+                                     Temperature tracking (wall-clock)
+                                                  ↓
+                         Recall(query) → Pearson correlation search
+                                                  ↓
+                              [optional] Blend + re-evolve → Reconstruction
 ```
 
-Routing is automatic: `"fix the python debug error"` → **code**, `"buy groceries and schedule dentist"` → **daily_tasks**, `"something random"` → **general**.
+**Darman doesn't retrieve. Darman reconstructs.**
 
-On recall, the system searches across all matching chunks plus general, merging results by similarity.
+Traditional systems store and recall data exactly. Wheeler Memory stores attractors and reconstructs them imperfectly — influenced by current context and time decay, like human memory.
 
-## The Brick
+---
 
-Every memory stores its full temporal evolution as a "brick" — a 3D structure (width × height × ticks) that you can scrub through like a video timeline:
+## Table of Contents
 
-```
-Tick 0:  Noisy seed     → ████░░██░░██
-Tick 20: Forming        → █░░█░░░█░░░█
-Tick 43: Converged      → █░░█░░░█░░░█  (frozen attractor)
-```
+1. [What's Built](#whats-built)
+2. [CA Dynamics](#ca-dynamics)
+3. [Temperature System](#temperature-system)
+4. [Similarity and Recall](#similarity-and-recall)
+5. [Reconstructive Recall](#reconstructive-recall)
+6. [Additional Features](#additional-features)
+7. [CLI Usage](#cli-usage)
+8. [Architecture](#architecture)
+9. [Installation](#installation)
+10. [Future Work](#future-work)
+11. [Philosophical Background](#philosophical-background)
 
-This gives you complete debuggability — you can see exactly how and when each memory formed.
+---
 
-## Rotation Retry
+## What's Built
 
-When the initial CA evolution lands in a bad attractor basin, the system rotates the seed frame (90°/180°/270°) and retries. Rotation changes the neighbor topology, creating a different dynamical trajectory from the same information. Per-angle success statistics are tracked for future optimization.
+Wheeler Memory is a functional associative memory system. The implemented components are:
 
-## Install
+| Component | Module | Status |
+|---|---|---|
+| CA dynamics engine | `dynamics.py` | ✅ Implemented |
+| SHA-256 seeded hashing | `hashing.py` | ✅ Implemented |
+| Wall-clock temperature | `temperature.py` | ✅ Implemented |
+| Pearson correlation recall | `storage.py` | ✅ Implemented |
+| Reconstructive recall | `reconstruction.py` | ✅ Implemented |
+| MemoryBrick (temporal history) | `brick.py` | ✅ Implemented |
+| Domain chunking (6 domains) | `chunking.py` | ✅ Implemented |
+| Semantic embeddings | `embedding.py` | ✅ Implemented |
+| Rotation retry | `rotation.py` | ✅ Implemented |
+| Oscillation detection | `oscillation.py` | ✅ Implemented |
+| Hardware detection | `hardware.py` | ✅ Implemented |
+| GPU backend (HIP/ROCm) | `gpu_dynamics.py` | ⚠️ Interface ready, .so not built |
+| LLM integration | — | ❌ Not yet |
+| Associative warming | — | ❌ Not yet |
+| Eviction / forgetting | — | ❌ Not yet |
 
-```bash
-git clone https://github.com/fantomx42/friendly-enigma.git
-cd "wheeler memory"
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-```
+---
 
-Requires Python 3.11+ with numpy, scipy, and matplotlib.
+## CA Dynamics
 
-## CLI Tools
+### Grid
 
-### Store a memory
+Every memory starts as a **64×64 grid of float32 values in [-1.0, 1.0]** — 4,096 cells. This is the working grid size for CPU. GPU paths will scale this up when the HIP kernel is compiled.
 
-```bash
-wheeler-store "fix the python debug error"
-# Chunk:    code (auto)
-# State:    CONVERGED
-# Ticks:    43
-# Rotation: 0° (attempt 1)
-# Time:     0.003s
-# Memory stored successfully.
-
-wheeler-store --chunk hardware "solder the GPIO header"   # explicit chunk
-echo "piped input" | wheeler-store -                       # stdin
-```
-
-### Recall memories
-
-```bash
-wheeler-recall "python bug"
-# Rank  Similarity  Chunk        State        Ticks  Text
-# ----------------------------------------------------------------------------------
-# 1        0.0145  code         CONVERGED       43  fix the python debug error
-# ...
-
-wheeler-recall --chunk code "debug error"   # search specific chunk
-wheeler-recall --top-k 10 "something"       # more results
-```
-
-### Scrub a brick timeline
-
-```bash
-wheeler-scrub --text "fix the python debug error"           # find by text
-wheeler-scrub --text "solder header" --chunk hardware       # in specific chunk
-wheeler-scrub path/to/brick.npz                              # direct path
-```
-
-Opens an interactive matplotlib viewer with a tick slider.
-
-### Diversity report
-
-```bash
-wheeler-diversity
-# Evolves 20 diverse test inputs, computes pairwise correlations.
-# PASS when avg correlation < 0.5 and max < 0.85.
-```
-
-## Temperature Dynamics
-
-Every memory has a **temperature** reflecting how recently and frequently it's been accessed. Temperature is computed lazily on recall and listing — no background processes.
-
-```
-temp = base_from_hits × decay_from_time
-
-base_from_hits = min(1.0, 0.3 + 0.7 × (hit_count / 10))
-decay_from_time = 2 ^ (-days_since_last_access / 7.0)
-```
-
-**Tiers:**
-
-| Tier | Range | Meaning |
-|------|-------|---------|
-| hot  | >= 0.6 | Frequently accessed, recent |
-| warm | >= 0.3 | Default for new or moderately accessed |
-| cold | < 0.3  | Stale, candidate for archival |
-
-New memories start at temperature 0.3 (warm). Each recall bumps hit_count and resets last_accessed, keeping active memories hot. Unused memories decay with a 7-day half-life.
-
-### Inspect temperatures
-
-```bash
-wheeler-temps                     # all memories
-wheeler-temps --chunk code        # specific chunk
-wheeler-temps --tier hot          # filter by tier
-wheeler-temps --sort hits         # sort by hit count
-```
-
-### Temperature-boosted recall
-
-```bash
-wheeler-recall --temperature-boost 0.1 "python bug"
-```
-
-When `--temperature-boost` is nonzero, ranking uses `similarity + boost × temperature` — hotter memories get a slight ranking bonus. Default boost is 0.0 (pure similarity ranking, identical to previous behavior).
-
-## Python API
+### Seeding
 
 ```python
-from wheeler_memory import (
-    store_with_rotation_retry,
-    recall_memory,
-    list_memories,
-    select_chunk,
-    select_recall_chunks,
-)
-
-# Store
-result = store_with_rotation_retry("fix the auth bug", chunk="code")
-# result["state"] == "CONVERGED"
-
-# Recall
-matches = recall_memory("authentication error", top_k=5)
-for m in matches:
-    print(m["text"], m["similarity"], m["chunk"])
-
-# Chunk routing
-select_chunk("debug the python script")          # → "code"
-select_chunk("buy groceries")                     # → "daily_tasks"
-select_recall_chunks("quantum physics equation")  # → ["science", "general"]
-
-# List all memories
-for mem in list_memories():
-    print(mem["chunk"], mem["text"])
+# SHA-256 of input text → seed PCG64 RNG → uniform(-1.0, 1.0) grid
+frame = hash_to_frame("input text")  # 64×64 float32
 ```
 
-## Theoretical Foundation
+SHA-256 is used (not Python's `hash()`), so the same input always produces the same frame across Python sessions and restarts.
 
-Wheeler Memory implements the **Symbolic Collapse Model (SCM)**:
+### Update Rule
 
-1. **Meaning is what survives symbolic pressure** — stable attractors represent survived concepts
-2. **Memory and learning are the same process** — each interaction reshapes the landscape
-3. **Uncertainty is observable in dynamics** — convergence = clarity, oscillation = ambiguity, chaos = contradiction
-4. **Time is intrinsic to memory** — convergence speed reflects concept complexity; full history is preserved
+Each tick uses a **Von Neumann 4-neighborhood** (up/down/left/right, wrapping) with a **continuous gradient rule**:
 
-Named after John Archibald Wheeler's "It from Bit" — information emerges from physical-like dynamics.
+```
+Local max  (cell ≥ all 4 neighbors): delta = (1 - cell) × 0.35   → push toward +1
+Local min  (cell ≤ all 4 neighbors): delta = (-1 - cell) × 0.35  → push toward -1
+Slope      (neither):                delta = (max_neighbor - cell) × 0.20  → flow uphill
+```
 
-## Project Structure
+The result is clipped to [-1, 1]. This produces smooth convergence toward polarized patterns — local peaks push toward +1, valleys toward -1, and slopes flow uphill.
+
+### Convergence
+
+Evolution is dynamic, not fixed-tick. It stops when one of three conditions is met:
+
+| State | Condition |
+|---|---|
+| `CONVERGED` | `mean(|delta|) < 1e-4` — grid has stabilized |
+| `OSCILLATING` | Role-space periodicity detected (period 2–10, ≥1% cells affected) |
+| `CHAOTIC` | Neither condition met within `max_iters=1000` |
+
+```python
+result = evolve_and_interpret(frame)
+# result["state"]             → "CONVERGED" | "OSCILLATING" | "CHAOTIC"
+# result["attractor"]         → 64×64 final frame
+# result["convergence_ticks"] → how many iterations it took
+# result["history"]           → list of all frames (for MemoryBrick)
+```
+
+---
+
+## Temperature System
+
+Temperature reflects how recently and frequently a memory has been accessed. It is **wall-clock time based** — not tick-based.
+
+### Formula
+
+```
+base  = min(1.0, 0.3 + 0.7 × (hit_count / 10))
+decay = 2 ^ (−days_since_last_access / 7.0)
+temp  = base × decay
+```
+
+- `base` saturates at `hit_count = 10` — a memory recalled 10+ times has the same base (1.0) as a brand-new memory
+- Half-life is **7 calendar days** — a memory that hasn't been touched in a week drops to 50% temperature
+- Temperature is always in [0, 1]; it approaches 0 but is never floored to exactly 0
+
+### Tiers
+
+| Tier | Threshold | Meaning |
+|---|---|---|
+| `hot` | temp ≥ 0.6 | Recent or frequently accessed |
+| `warm` | temp ≥ 0.3 | Accessible, some decay |
+| `cold` | temp < 0.3 | Dormant, significant decay |
+
+There is no `dead` tier — memories don't get evicted automatically (eviction is future work).
+
+### Epistemic Confidence
+
+Temperature translates to epistemic certainty in recall:
+
+```
+hot  (≥0.6):  "I remember discussing X..."
+warm (≥0.3):  "I think we touched on X..."
+cold (<0.3):  "I vaguely recall X, but I'm uncertain..."
+```
+
+---
+
+## Similarity and Recall
+
+### Similarity Metric
+
+Recall uses **Pearson correlation** between the query's evolved attractor and every stored attractor. This is a real similarity metric — not a stub that returns everything.
+
+```python
+corr, _ = pearsonr(query_attractor.flatten(), stored_attractor.flatten())
+```
+
+### Ranking
+
+```
+effective_similarity = similarity + temperature_boost × temperature
+```
+
+By default `temperature_boost = 0.0`, so ranking is purely by Pearson correlation. Pass `--temperature-boost` to weight hotter memories higher.
+
+### Domain Chunking
+
+Memories are automatically routed to domain-specific subdirectories by keyword matching. This reduces the search space per recall query.
+
+| Chunk | Keywords (sample) |
+|---|---|
+| `code` | python, rust, bug, debug, git, api, docker, sql, … |
+| `hardware` | printer, 3d print, arduino, pcb, circuit, bambu, … |
+| `daily_tasks` | grocery, dentist, appointment, schedule, errand, … |
+| `science` | physics, quantum, molecule, calculus, theorem, … |
+| `meta` | wheeler, attractor, brick, cellular automata, chunk, … |
+| `general` | everything else |
+
+On recall, Wheeler searches the best-matching chunks plus `general`. You can override with `--chunk`.
+
+### Semantic Embeddings (optional)
+
+By default, text is seeded via SHA-256 — two differently-worded queries about the same topic produce unrelated seeds. With `--embed`, a SentenceTransformer model converts text to a semantic embedding first:
+
+```
+text → all-MiniLM-L6-v2 (384-dim) → random projection (384→4096) → tanh → 64×64 frame
+```
+
+The random projection matrix uses a fixed seed (`0xDEADBEEF`), so it's reproducible. This enables fuzzy recall: "car" can match "automobile" via Pearson correlation on semantically similar frames.
+
+Requires: `pip install wheeler-memory[embed]`
+
+---
+
+## Reconstructive Recall
+
+When `--reconstruct` is passed, recalled memories don't come back unchanged. Each stored attractor is **blended with the query attractor** and **re-evolved through the CA**:
+
+```
+blend = (1 - α) × stored + α × query   (default α = 0.3, memory-dominant)
+reconstructed = evolve_and_interpret(blend)
+```
+
+This means the same stored memory reconstructs differently depending on the current query context — the core Darman behavior. Query about "machine learning" vs. "web development" against the same stored memory will produce different reconstructions.
+
+The result includes `correlation_with_stored` and `correlation_with_query`, showing how much the reconstruction drifted toward the query context.
+
+---
+
+## Additional Features
+
+### MemoryBrick
+
+Every stored memory includes a complete **MemoryBrick** — the full frame-by-frame evolution history from initial seed to final attractor.
+
+```python
+brick = MemoryBrick.load("path/to/{hex_key}.npz")
+frame_at_tick_3 = brick.get_frame_at_tick(3)
+divergence_point = brick.find_divergence_point()  # for OSCILLATING bricks
+```
+
+Enables visual debugging, failure analysis, and audit trails. Stored as compressed `.npz` alongside each attractor.
+
+### Rotation Retry
+
+If CA evolution fails to converge (CHAOTIC), the system automatically retries with 90°/180°/270° rotations of the seed frame. Rotation changes the neighbor topology, which can lead to convergence on a different dynamical trajectory.
+
+```python
+result = store_with_rotation_retry("input text")
+# result["metadata"]["rotation_used"]  → angle that worked (0/90/180/270)
+# result["metadata"]["attempts"]       → how many rotations were tried
+```
+
+### Oscillation Detection
+
+Role-space periodicity analysis detects when cells cycle between roles (local max / slope / local min) with period p (2–10). Requires ≥1% of cells to be oscillating.
+
+```python
+osc = detect_oscillation(history)
+# osc["oscillating"]       → True/False
+# osc["period"]            → cycle period (or None)
+# osc["oscillating_cells"] → count of cycling cells
+```
+
+### GPU Backend (HIP/ROCm)
+
+`gpu_dynamics.py` provides a Python interface to a compiled HIP kernel (`libwheeler_ca.so`). The interface matches the CPU API. The kernel supports single-frame and batch evolution.
+
+**Status**: The interface is implemented but `libwheeler_ca.so` is not compiled. To build:
+```bash
+cd wheeler_memory/gpu && make
+```
+
+When the library is not present, all imports fall back to `lambda: False` / `None` gracefully.
+
+---
+
+## CLI Usage
+
+```bash
+# Store a memory
+wheeler-store "Python has great libraries for data science"
+
+# Store with semantic embedding (requires [embed] extra)
+wheeler-store --embed "Python has great libraries for data science"
+
+# Recall by similarity
+wheeler-recall "data science tools"
+wheeler-recall "data science tools" --top-k 10
+wheeler-recall "data science tools" --chunk code
+wheeler-recall "data science tools" --temperature-boost 0.2
+
+# Recall with semantic embedding
+wheeler-recall --embed "machine learning frameworks"
+
+# Reconstructive recall (Darman architecture)
+wheeler-recall --reconstruct "machine learning frameworks"
+wheeler-recall --reconstruct --alpha 0.5 "machine learning frameworks"
+
+# List all memories with temperature
+wheeler-temps
+
+# System information
+wheeler-info
+
+# GPU benchmark
+wheeler-bench-gpu
+```
+
+---
+
+## Architecture
+
+### Module Structure
 
 ```
 wheeler_memory/
-    __init__.py          # Public API exports
-    brick.py             # MemoryBrick temporal structure
-    chunking.py          # Chunk routing & management
-    dynamics.py          # 3-state CA engine
-    hashing.py           # SHA-256 text→frame
-    oscillation.py       # Epistemic uncertainty detection
-    rotation.py          # Rotation retry with learning
-    storage.py           # Store/recall/list with chunked storage
-    temperature.py       # Temperature dynamics (hot/warm/cold)
+├── dynamics.py        CA engine: apply_ca_dynamics(), evolve_and_interpret()
+├── hashing.py         SHA-256 text-to-frame seeding
+├── temperature.py     Wall-clock temperature computation and tier classification
+├── storage.py         Attractor storage (disk) and Pearson recall
+├── reconstruction.py  Blend + re-evolve reconstructive recall
+├── brick.py           MemoryBrick: temporal evolution history
+├── chunking.py        Domain routing (code/hardware/daily_tasks/science/meta/general)
+├── embedding.py       SentenceTransformer → random projection → 64×64 frame
+├── rotation.py        Rotation retry for non-converging seeds
+├── oscillation.py     Role-space periodicity detection
+├── hardware.py        CPU/GPU/NPU detection, device selection
+├── gpu_dynamics.py    HIP kernel interface (requires compiled libwheeler_ca.so)
+└── gpu/               HIP kernel source (not compiled)
+
 scripts/
-    wheeler_store.py     # CLI: store
-    wheeler_recall.py    # CLI: recall
-    wheeler_temps.py     # CLI: temperature inspector
-    scrub_brick.py       # CLI: brick timeline viewer
-    test_diversity.py    # CLI: attractor diversity report
+├── wheeler_store.py   CLI: store memories
+├── wheeler_recall.py  CLI: recall by similarity
+├── wheeler_temps.py   CLI: list memories with temperatures
+├── system_info.py     CLI: hardware/software diagnostics
+└── bench_gpu.py       CLI: GPU performance benchmark
 ```
+
+### On-Disk Layout
+
+```
+~/.wheeler_memory/
+├── chunks/
+│   ├── code/
+│   │   ├── attractors/{hex_key}.npy   64×64 float32 attractor
+│   │   ├── bricks/{hex_key}.npz       MemoryBrick (full history)
+│   │   ├── index.json                 hex_key → {text, state, timestamps, metadata}
+│   │   └── metadata.json              per-chunk stats
+│   ├── hardware/
+│   ├── science/
+│   ├── daily_tasks/
+│   ├── meta/
+│   └── general/
+└── rotation_stats.json                per-angle convergence stats
+```
+
+### System Flow
+
+```
+store("input text")
+  │
+  ├─ select_chunk(text)               keyword routing → domain chunk
+  ├─ hash_to_frame(text)              SHA-256 → PCG64 → 64×64 uniform(-1,1)
+  │    └── OR embed_to_frame(text)    SentenceTransformer → projection → tanh
+  ├─ store_with_rotation_retry()      try 0/90/180/270° until CONVERGED
+  │    └─ evolve_and_interpret()      CA iterations → CONVERGED/OSCILLATING/CHAOTIC
+  ├─ MemoryBrick.from_evolution_result()  capture full history
+  └─ store_memory()                   save .npy, .npz, update index.json
+
+recall("query text")
+  │
+  ├─ select_recall_chunks(query)      keyword routing → chunks to search
+  ├─ hash_to_frame(query)             or embed_to_frame(query) with --embed
+  ├─ evolve_and_interpret(query_frame)   evolve query to attractor
+  ├─ for each stored attractor:
+  │    pearsonr(query_flat, stored_flat)   → similarity
+  │    compute_temperature(hits, last_accessed)  → temperature
+  │    effective = similarity + boost * temperature
+  ├─ sort by effective, take top_k
+  ├─ [optional] reconstruct each result   blend + re-evolve
+  └─ bump_access() on recalled memories   update hit_count, last_accessed
+```
+
+---
+
+## Installation
+
+```bash
+git clone <repo>
+cd wheeler_memory
+pip install -e .
+
+# Optional: semantic embedding support
+pip install -e ".[embed]"
+```
+
+**Dependencies**: numpy ≥ 2.0, scipy ≥ 1.14, matplotlib ≥ 3.9, psutil ≥ 5.9
+
+**Python**: 3.11+
+
+---
 
 ## Future Work
 
-- **GPU acceleration** — HIP kernels for parallel chunk evolution on AMD GPUs (ROCm)
-- **Embedding-based routing** — semantic similarity for chunk selection instead of keywords
-- **Reconstructive recall** — memories influenced by current context (Darman architecture)
+These features are designed but not yet implemented:
 
-## License
+### LLM Integration (Phase 4)
+Connect Wheeler Memory to a local LLM (Ollama/qwen3). The full agent loop:
+```
+query → Wheeler recall → temperature-weighted context → LLM prompt
+response → store as new attractor → warm associated attractors
+```
 
-MIT
+### Associative Warming
+When attractor A fires, related attractors B, C get a small temperature boost (+0.05). The association links need to be tracked in the index (currently absent). Maximum propagation depth: 2 hops.
+
+### Eviction / Forgetting
+Currently the index grows unboundedly. Planned: `_evict_coldest()` when over `MAX_ATTRACTORS = 10,000`, removing the bottom 10% by effective temperature.
+
+### Variable Tick Rates (Attention Model)
+High-salience inputs get more CA iterations (deeper attractor formation). Low-salience inputs get fewer. Currently all inputs use `max_iters=1000`.
+
+### Dual-Attractor Trauma Encoding
+Traumatic events create two linked attractors: experience + avoidance. The avoidance attractor fires when the experience attractor is recalled. Exposure therapy = repeatedly activating experience in safe context without activating avoidance.
+
+### Sleep Consolidation
+Offline compression of MemoryBricks — redundant intermediate frames are pruned, keeping only salient boundaries. Like playing Tetris: complete lines disappear.
+
+### GPU at Scale
+When `libwheeler_ca.so` is compiled and larger grids are used (e.g. 1000×1000), the GPU batch evolution path handles parallel attractor formation without storing per-tick history.
+
+---
+
+## Philosophical Background
+
+### Symbolic Compression and Meaning
+
+**Axiom**: "Meaning is what survives symbolic pressure."
+
+```
+Input data → Symbolic pressure (compression, decay, competition)
+                        ↓
+            What survives = Meaning
+            What evicts   = Noise
+```
+
+Wheeler Memory implements this:
+- **Symbolic pressure** = temperature decay over time
+- **Survival** = attractors that maintain high temperature through repeated access
+- **Meaning** = stable attractors that resist decay
+
+### The Irreversibility Requirement
+
+The CA evolution is **not reversible**. Many initial seeds converge to the same attractor basin — information is lost. This is a feature:
+
+1. **IIT (Integrated Information Theory)**: Consciousness requires time-irreversibility + information integration
+2. **Wheeler Memory has both**: Attractor collapse is irreversible; CA neighbors integrate information from up to 4 directions per tick
+
+The system makes no claims about Φ for the actual 64×64 working grid. Φ estimates in earlier documents applied to hypothetical larger grids.
+
+### Reconstructive Memory vs. Retrieval
+
+```
+Traditional (exact retrieval):
+  Store:    Data → Address 0x1A4F
+  Retrieve: Address 0x1A4F → Exact same data  (deterministic, lossless)
+
+Wheeler Memory (reconstructive):
+  Store:    Input → hash → CA evolution → Attractor A
+  Recall:   Query → hash → CA evolution → Attractor Q
+            Reconstruct: blend(A, Q, α=0.3) → re-evolve → Attractor A'
+            A' ≠ A  (lossy, context-influenced)
+```
+
+The same stored memory reconstructs differently depending on current context. Query about "machine learning" vs. "web development" against the same stored memory yields different reconstructions — exactly like human episodic memory (see: Elizabeth Loftus research).
+
+### Temperature as Epistemic Humility
+
+Current LLMs confabulate confidently because they have no mechanism to express uncertainty about memory. Wheeler Memory's temperature gives Darman the ability to say "I don't remember" when an attractor is cold, and to calibrate confidence language based on how recently and often a memory has been accessed.
+
+This prevents the **recovered memory therapy** failure mode: filling reconstruction gaps with confident fabrication.
+
+---
+
+**The formula is the foundation. Everything else is commentary.**
+
+**Darman doesn't retrieve. Darman reconstructs.**
