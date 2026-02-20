@@ -1,246 +1,349 @@
 /*
  * Wheeler Memory — HIP GPU Kernel for Cellular Automata Evolution
  *
- * Batch-parallel 3-state CA dynamics on AMD GPUs via ROCm/HIP.
- * Each thread handles one cell in one frame. A batch of B frames
- * with 64×64 = 4096 cells uses B × 4096 threads per kernel launch.
+ * Exactly replicates dynamics.py + oscillation.py on AMD GPUs via ROCm/HIP.
+ * One block per frame, 256 threads, 16 cells/thread (4096 / 256 = 16).
  *
- * Build:  hipcc --offload-arch=gfx1201 -shared -fPIC -O3 -o libwheeler_ca.so ca_kernel.hip
- * Fallback: hipcc --offload-arch=gfx1100 ...  (RDNA 3 compat mode)
+ * Shared memory per block (~37 KB, fits in 64 KB RDNA4 LDS):
+ *   sframe[4096]  float   16 KB  – current frame
+ *   snext[4096]   float   16 KB  – next frame
+ *   sdelta[256]   float    1 KB  – reduction scratch
+ *   sroles[4096]  int8_t   4 KB  – roles / change-flags (reused)
+ *   sdone / sfinal_state / sfinal_ticks  (3 ints, 12 B)
+ *
+ * Global memory role-history ring:  batch_size × 20 × 4096  int8_t
+ *   Roles are stored from the OUTPUT frame (snext) to match
+ *   Python's get_cell_roles(history[i]) called on post-update frames.
+ *   Storage starts at iter = 41 in slot (iter-41) % 20.
+ *   At oscillation check (iter ≥ 60, every 10): oldest_slot = (iter-60) % 20.
+ *
+ * Build:
+ *   hipcc --offload-arch=gfx1201 -O3 -shared -fPIC -o libwheeler_ca.so ca_kernel.hip
  */
 
 #include <hip/hip_runtime.h>
 #include <cstdio>
 #include <cmath>
-#include <cstring>
 
-#define GRID_W 64
-#define GRID_H 64
-#define GRID_SIZE (GRID_W * GRID_H)  /* 4096 */
+#define GRID_SIZE          4096   /* 64 × 64               */
+#define GRID_W             64
+#define THREADS_PER_BLOCK  256
+#define CELLS_PER_THREAD   16    /* GRID_SIZE / THREADS_PER_BLOCK */
+#define OSC_WINDOW         20    /* ring-buffer depth             */
+#define OSC_START          41    /* first iter whose roles we keep */
 #define STABILITY_THRESHOLD 1e-4f
+#define OSC_MIN_CELLS      41    /* 1 % of 4096, rounded up       */
 
-/* ─── CA step kernel ──────────────────────────────────────────────────
- * Layout: frames[batch_idx * GRID_SIZE + row * GRID_W + col]
- * One thread per cell per frame.  Wrapping (toroidal) boundaries.
- */
-__global__ void ca_step_kernel(const float* __restrict__ frames_in,
-                               float* __restrict__ frames_out,
-                               float* __restrict__ deltas,
-                               int batch_size)
+/* ─── Main evolution kernel ────────────────────────────────────────────────── */
+
+__global__ void ca_evolve_kernel(
+    const float* __restrict__ frames_in,   /* B × GRID_SIZE  float32 */
+    float*       __restrict__ frames_out,  /* B × GRID_SIZE  float32 */
+    int*         __restrict__ ticks_out,   /* B              int32   */
+    int*         __restrict__ states_out,  /* B              int32   */
+    int8_t*      __restrict__ role_hist,   /* B×20×GRID_SIZE int8_t  */
+    int max_iters)
 {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int total_cells = batch_size * GRID_SIZE;
-    if (tid >= total_cells) return;
+    /* ── Shared memory ─────────────────────────────────────────────────────── */
+    __shared__ float  sframe[GRID_SIZE];
+    __shared__ float  snext [GRID_SIZE];
+    __shared__ float  sdelta[THREADS_PER_BLOCK];
+    __shared__ int8_t sroles[GRID_SIZE];
+    __shared__ int    sdone;
+    __shared__ int    sfinal_state;
+    __shared__ int    sfinal_ticks;
 
-    int b   = tid / GRID_SIZE;
-    int idx = tid % GRID_SIZE;
-    int row = idx / GRID_W;
-    int col = idx % GRID_W;
+    int b         = (int)blockIdx.x;
+    int tid       = (int)threadIdx.x;
+    int base_cell = tid * CELLS_PER_THREAD;   /* first cell for this thread */
 
-    int base = b * GRID_SIZE;
-
-    /* Von Neumann neighbors with toroidal wrap */
-    int up_row    = (row == 0)          ? GRID_H - 1 : row - 1;
-    int down_row  = (row == GRID_H - 1) ? 0          : row + 1;
-    int left_col  = (col == 0)          ? GRID_W - 1 : col - 1;
-    int right_col = (col == GRID_W - 1) ? 0          : col + 1;
-
-    float cell  = frames_in[base + row * GRID_W + col];
-    float n_up    = frames_in[base + up_row   * GRID_W + col];
-    float n_down  = frames_in[base + down_row * GRID_W + col];
-    float n_left  = frames_in[base + row      * GRID_W + left_col];
-    float n_right = frames_in[base + row      * GRID_W + right_col];
-
-    /* Classify cell role */
-    bool is_max = (cell >= n_up) && (cell >= n_down) && (cell >= n_left) && (cell >= n_right);
-    bool is_min = (cell <= n_up) && (cell <= n_down) && (cell <= n_left) && (cell <= n_right);
-
-    float delta;
-    if (is_max) {
-        delta = (1.0f - cell) * 0.35f;
-    } else if (is_min) {
-        delta = (-1.0f - cell) * 0.35f;
-    } else {
-        /* Slope: flow toward max neighbor */
-        float max_n = fmaxf(fmaxf(n_up, n_down), fmaxf(n_left, n_right));
-        delta = (max_n - cell) * 0.20f;
+    /* Init control variables */
+    if (tid == 0) {
+        sdone        = 0;
+        sfinal_state = 2;          /* CHAOTIC default */
+        sfinal_ticks = max_iters;
     }
 
-    float new_val = fminf(fmaxf(cell + delta, -1.0f), 1.0f);  /* clip [-1, +1] */
-    frames_out[base + row * GRID_W + col] = new_val;
+    /* Load initial frame into shared memory */
+    for (int j = 0; j < CELLS_PER_THREAD; j++)
+        sframe[base_cell + j] = frames_in[(size_t)b * GRID_SIZE + base_cell + j];
 
-    /* Per-cell absolute delta (for convergence check) */
-    deltas[tid] = fabsf(new_val - cell);
-}
-
-
-/* ─── Reduction kernel ────────────────────────────────────────────────
- * Computes mean absolute delta per frame (for convergence detection).
- * One block per frame, shared-memory reduction.
- */
-__global__ void reduce_delta_kernel(const float* __restrict__ deltas,
-                                    float* __restrict__ mean_deltas,
-                                    int batch_size)
-{
-    int b = blockIdx.x;
-    if (b >= batch_size) return;
-
-    __shared__ float sdata[256];
-
-    int tid_local = threadIdx.x;
-    int base = b * GRID_SIZE;
-
-    /* Each thread sums multiple elements */
-    float sum = 0.0f;
-    for (int i = tid_local; i < GRID_SIZE; i += blockDim.x) {
-        sum += deltas[base + i];
-    }
-    sdata[tid_local] = sum;
     __syncthreads();
 
-    /* Tree reduction */
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid_local < s) {
-            sdata[tid_local] += sdata[tid_local + s];
+    /* ── Main iteration loop ─────────────────────────────────────────────── */
+    for (int iter = 0; iter < max_iters; iter++) {
+
+        /* ── Phase 1: CA update ──────────────────────────────────────────── *
+         * Each thread writes 16 cells of snext and accumulates local_delta.  *
+         * Roles (from sframe) are NOT stored here; see Phase 2b.             */
+        float local_delta = 0.0f;
+
+        for (int j = 0; j < CELLS_PER_THREAD; j++) {
+            int k   = base_cell + j;
+            int row = k / GRID_W;
+            int col = k % GRID_W;
+
+            int up_r    = (row == 0)          ? GRID_W - 1 : row - 1;
+            int dn_r    = (row == GRID_W - 1) ? 0          : row + 1;
+            int lf_c    = (col == 0)          ? GRID_W - 1 : col - 1;
+            int rt_c    = (col == GRID_W - 1) ? 0          : col + 1;
+
+            float v     = sframe[k];
+            float n_up  = sframe[up_r * GRID_W + col];
+            float n_dn  = sframe[dn_r * GRID_W + col];
+            float n_lf  = sframe[row  * GRID_W + lf_c];
+            float n_rt  = sframe[row  * GRID_W + rt_c];
+
+            bool is_max = (v >= n_up) & (v >= n_dn) & (v >= n_lf) & (v >= n_rt);
+            bool is_min = (v <= n_up) & (v <= n_dn) & (v <= n_lf) & (v <= n_rt);
+
+            float delta;
+            if (is_max) {
+                delta = (1.0f - v) * 0.35f;
+            } else if (is_min) {
+                delta = (-1.0f - v) * 0.35f;
+            } else {
+                float max_n = fmaxf(fmaxf(n_up, n_dn), fmaxf(n_lf, n_rt));
+                delta = (max_n - v) * 0.20f;
+            }
+
+            float new_v   = fminf(fmaxf(v + delta, -1.0f), 1.0f);
+            snext[k]      = new_v;
+            local_delta  += fabsf(new_v - v);
+        }
+
+        /* ── Phase 2: Delta reduction ────────────────────────────────────── *
+         * __syncthreads() here also ensures all snext values are visible.    */
+        sdelta[tid] = local_delta;
+        __syncthreads();
+
+        for (int s = THREADS_PER_BLOCK / 2; s > 0; s >>= 1) {
+            if (tid < s) sdelta[tid] += sdelta[tid + s];
+            __syncthreads();
+        }
+        /* sdelta[0] = sum of |delta| over all GRID_SIZE cells */
+
+        /* ── Phase 2b: Role computation from snext ───────────────────────── *
+         * Must use snext (post-update frame) to match Python's               *
+         * get_cell_roles(history[i]) which is called on output frames.       *
+         * snext is fully written + all-threads-visible after Phase 2 syncs.  */
+        for (int j = 0; j < CELLS_PER_THREAD; j++) {
+            int k   = base_cell + j;
+            int row = k / GRID_W;
+            int col = k % GRID_W;
+
+            int up_r = (row == 0)          ? GRID_W - 1 : row - 1;
+            int dn_r = (row == GRID_W - 1) ? 0          : row + 1;
+            int lf_c = (col == 0)          ? GRID_W - 1 : col - 1;
+            int rt_c = (col == GRID_W - 1) ? 0          : col + 1;
+
+            float v    = snext[k];
+            float n_up = snext[up_r * GRID_W + col];
+            float n_dn = snext[dn_r * GRID_W + col];
+            float n_lf = snext[row  * GRID_W + lf_c];
+            float n_rt = snext[row  * GRID_W + rt_c];
+
+            bool is_max = (v >= n_up) & (v >= n_dn) & (v >= n_lf) & (v >= n_rt);
+            bool is_min = (v <= n_up) & (v <= n_dn) & (v <= n_lf) & (v <= n_rt);
+
+            sroles[k] = is_max ? (int8_t)1 : (is_min ? (int8_t)-1 : (int8_t)0);
+        }
+        /* No sync needed: ring write reads only this thread's own cells */
+
+        /* ── Phase 3: Ring write ─────────────────────────────────────────── */
+        if (iter >= OSC_START) {
+            int slot = (iter - OSC_START) % OSC_WINDOW;
+            int8_t* rptr = role_hist
+                         + (size_t)b    * OSC_WINDOW * GRID_SIZE
+                         + (size_t)slot * GRID_SIZE;
+            for (int j = 0; j < CELLS_PER_THREAD; j++)
+                rptr[base_cell + j] = sroles[base_cell + j];
+        }
+
+        /* ── Phase 4: Swap sframe ← snext ───────────────────────────────── */
+        for (int j = 0; j < CELLS_PER_THREAD; j++)
+            sframe[base_cell + j] = snext[base_cell + j];
+        __syncthreads();   /* new sframe + global ring writes visible to all */
+
+        /* ── Phase 5: Convergence check ──────────────────────────────────── */
+        if (tid == 0) {
+            float mean_delta = sdelta[0] / (float)GRID_SIZE;
+            if (mean_delta < STABILITY_THRESHOLD) {
+                sdone        = 1;
+                sfinal_state = 0;       /* CONVERGED */
+                sfinal_ticks = iter + 1;
+            }
         }
         __syncthreads();
-    }
+        if (sdone) break;
 
-    if (tid_local == 0) {
-        mean_deltas[b] = sdata[0] / (float)GRID_SIZE;
+        /* ── Phase 6: Oscillation check (iter > 50, every 10 iters) ──────── *
+         * First possible check: iter = 60 (>50 and %10==0).                  *
+         * Ring holds iter=41..current (20 frames).                           */
+        if (iter > 50 && (iter % 10) == 0) {
+            int oldest_slot = (iter - 60) % OSC_WINDOW;  /* iter>=60, always ≥ 0 */
+            size_t bbase    = (size_t)b * OSC_WINDOW * GRID_SIZE;
+
+            /* Phase A: compute change flags into sroles.
+             * sroles[k] = 1 if any t in 1..19 has role[t][k] != role[oldest][k],
+             * i.e. the cell changed role at some point in the 20-frame window. */
+            for (int j = 0; j < CELLS_PER_THREAD; j++) {
+                int k           = base_cell + j;
+                int8_t oldest_r = role_hist[bbase + (size_t)oldest_slot * GRID_SIZE + k];
+                int8_t changed  = 0;
+                for (int t = 1; t < OSC_WINDOW; t++) {
+                    int slot_t = (oldest_slot + t) % OSC_WINDOW;
+                    if (role_hist[bbase + (size_t)slot_t * GRID_SIZE + k] != oldest_r) {
+                        changed = 1;
+                        break;
+                    }
+                }
+                sroles[k] = changed;
+            }
+            __syncthreads();  /* all change flags written before Phase B reads sroles */
+
+            /* Phase B: for each period p in 2..10, count oscillating cells.
+             * oscillating[k] = sroles[k] && (roles[t] == roles[t+p] for all t). */
+            for (int p = 2; p <= 10; p++) {
+                int n_checks  = OSC_WINDOW - p;   /* = 20 - p */
+                int local_cnt = 0;
+
+                for (int j = 0; j < CELLS_PER_THREAD; j++) {
+                    int k = base_cell + j;
+                    if (!sroles[k]) continue;     /* constant cell, skip */
+
+                    bool matches = true;
+                    for (int t = 0; t < n_checks && matches; t++) {
+                        int slot_t  = (oldest_slot + t)     % OSC_WINDOW;
+                        int slot_tp = (oldest_slot + t + p) % OSC_WINDOW;
+                        int8_t rt   = role_hist[bbase + (size_t)slot_t  * GRID_SIZE + k];
+                        int8_t rtp  = role_hist[bbase + (size_t)slot_tp * GRID_SIZE + k];
+                        if (rt != rtp) matches = false;
+                    }
+                    if (matches) local_cnt++;
+                }
+
+                /* Reduce local_cnt across block (reuse sdelta) */
+                sdelta[tid] = (float)local_cnt;
+                __syncthreads();
+                for (int s = THREADS_PER_BLOCK / 2; s > 0; s >>= 1) {
+                    if (tid < s) sdelta[tid] += sdelta[tid + s];
+                    __syncthreads();
+                }
+
+                if (tid == 0) {
+                    if ((int)sdelta[0] >= OSC_MIN_CELLS) {
+                        sdone        = 1;
+                        sfinal_state = 1;       /* OSCILLATING */
+                        sfinal_ticks = iter + 1;
+                    }
+                }
+                __syncthreads();
+                if (sdone) break;
+            }
+        }
+
+        if (sdone) break;
+    } /* main loop */
+
+    /* Write final frame and metadata.
+     * sframe always holds the latest frame because the swap (Phase 4) happens
+     * before the convergence/oscillation break. */
+    for (int j = 0; j < CELLS_PER_THREAD; j++)
+        frames_out[(size_t)b * GRID_SIZE + base_cell + j] = sframe[base_cell + j];
+
+    if (tid == 0) {
+        ticks_out [b] = sfinal_ticks;
+        states_out[b] = sfinal_state;
     }
 }
 
 
-/* ─── Host API (C linkage for ctypes) ─────────────────────────────── */
+/* ─── Host C API (extern "C" for ctypes) ────────────────────────────────────── */
 
 extern "C" {
 
 /**
- * Evolve a batch of frames on GPU.
+ * ca_evolve_batch — evolve B frames in parallel on GPU.
  *
- * @param frames_in   Input: B × 4096 float32 array (row-major)
- * @param frames_out  Output: B × 4096 float32 array (converged attractors)
- * @param ticks_out   Output: B int32 array (convergence ticks per frame)
- * @param states_out  Output: B int32 array (0=CONVERGED, 1=OSCILLATING, 2=CHAOTIC)
- * @param batch_size  Number of frames in the batch
- * @param max_iters   Maximum iterations before declaring CHAOTIC
- * @return 0 on success, -1 on error
+ * @param frames_in   B × 4096  float32, row-major, values in [-1, 1]
+ * @param frames_out  B × 4096  float32, converged/oscillated attractors
+ * @param ticks_out   B         int32,   iterations until termination
+ * @param states_out  B         int32,   0=CONVERGED 1=OSCILLATING 2=CHAOTIC
+ * @param batch_size  Number of frames (= B)
+ * @param max_iters   Max iterations before declaring CHAOTIC
+ * @return 0 on success, -1 on HIP error
  */
 int ca_evolve_batch(const float* frames_in,
-                    float* frames_out,
-                    int* ticks_out,
-                    int* states_out,
-                    int batch_size,
-                    int max_iters)
+                    float*       frames_out,
+                    int*         ticks_out,
+                    int*         states_out,
+                    int          batch_size,
+                    int          max_iters)
 {
-    size_t frame_bytes = (size_t)batch_size * GRID_SIZE * sizeof(float);
-    size_t delta_bytes = (size_t)batch_size * GRID_SIZE * sizeof(float);
-    size_t mean_bytes  = (size_t)batch_size * sizeof(float);
+    if (batch_size <= 0) return 0;
 
-    float *d_buf_a   = nullptr;
-    float *d_buf_b   = nullptr;
-    float *d_deltas  = nullptr;
-    float *d_means   = nullptr;
-    bool  *converged = nullptr;
-    float *h_means   = nullptr;
-    int    retval    = 0;
+    size_t frame_bytes = (size_t)batch_size * GRID_SIZE  * sizeof(float);
+    size_t role_bytes  = (size_t)batch_size * OSC_WINDOW * GRID_SIZE * sizeof(int8_t);
+    size_t meta_bytes  = (size_t)batch_size * sizeof(int);
 
+    float*  d_in     = nullptr;
+    float*  d_out    = nullptr;
+    int*    d_ticks  = nullptr;
+    int*    d_states = nullptr;
+    int8_t* d_roles  = nullptr;
+    int     retval   = 0;
     hipError_t err;
 
-    /* Allocate device memory */
-    err = hipMalloc(&d_buf_a, frame_bytes);
-    if (err != hipSuccess) { fprintf(stderr, "hipMalloc A: %s\n", hipGetErrorString(err)); retval = -1; goto cleanup; }
-    err = hipMalloc(&d_buf_b, frame_bytes);
-    if (err != hipSuccess) { fprintf(stderr, "hipMalloc B: %s\n", hipGetErrorString(err)); retval = -1; goto cleanup; }
-    err = hipMalloc(&d_deltas, delta_bytes);
-    if (err != hipSuccess) { fprintf(stderr, "hipMalloc deltas: %s\n", hipGetErrorString(err)); retval = -1; goto cleanup; }
-    err = hipMalloc(&d_means, mean_bytes);
-    if (err != hipSuccess) { fprintf(stderr, "hipMalloc means: %s\n", hipGetErrorString(err)); retval = -1; goto cleanup; }
+#define HIP_CHECK(call)                                                      \
+    do {                                                                     \
+        err = (call);                                                        \
+        if (err != hipSuccess) {                                             \
+            fprintf(stderr, "HIP error %s:%d — %s\n",                       \
+                    __FILE__, __LINE__, hipGetErrorString(err));             \
+            retval = -1; goto cleanup;                                       \
+        }                                                                    \
+    } while (0)
 
-    /* Copy input to device */
-    (void)hipMemcpy(d_buf_a, frames_in, frame_bytes, hipMemcpyHostToDevice);
+    HIP_CHECK(hipMalloc(&d_in,     frame_bytes));
+    HIP_CHECK(hipMalloc(&d_out,    frame_bytes));
+    HIP_CHECK(hipMalloc(&d_ticks,  meta_bytes));
+    HIP_CHECK(hipMalloc(&d_states, meta_bytes));
+    HIP_CHECK(hipMalloc(&d_roles,  role_bytes));
 
-    /* Initialize outputs */
-    for (int b = 0; b < batch_size; b++) {
-        ticks_out[b] = max_iters;
-        states_out[b] = 2;  /* CHAOTIC until proven otherwise */
-    }
+    HIP_CHECK(hipMemcpy(d_in, frames_in, frame_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemset(d_roles, 0, role_bytes));
 
-    /* Track which frames have converged */
-    converged = new bool[batch_size]();
-    h_means   = new float[batch_size];
+    hipLaunchKernelGGL(ca_evolve_kernel,
+                       dim3(batch_size), dim3(THREADS_PER_BLOCK), 0, 0,
+                       d_in, d_out, d_ticks, d_states, d_roles, max_iters);
 
-    {
-        int total_cells = batch_size * GRID_SIZE;
-        int block_size = 256;
-        int grid_size = (total_cells + block_size - 1) / block_size;
+    HIP_CHECK(hipGetLastError());
+    HIP_CHECK(hipDeviceSynchronize());
 
-        float* src = d_buf_a;
-        float* dst = d_buf_b;
-
-        for (int iter = 0; iter < max_iters; iter++) {
-            /* Launch CA step */
-            hipLaunchKernelGGL(ca_step_kernel,
-                               dim3(grid_size), dim3(block_size), 0, 0,
-                               src, dst, d_deltas, batch_size);
-
-            /* Reduce deltas per frame */
-            hipLaunchKernelGGL(reduce_delta_kernel,
-                               dim3(batch_size), dim3(256), 0, 0,
-                               d_deltas, d_means, batch_size);
-
-            (void)hipDeviceSynchronize();
-
-            /* Read back mean deltas */
-            (void)hipMemcpy(h_means, d_means, mean_bytes, hipMemcpyDeviceToHost);
-
-            /* Check convergence for each frame */
-            bool all_done = true;
-            for (int b = 0; b < batch_size; b++) {
-                if (!converged[b]) {
-                    if (h_means[b] < STABILITY_THRESHOLD) {
-                        converged[b] = true;
-                        ticks_out[b] = iter + 1;
-                        states_out[b] = 0;  /* CONVERGED */
-                    } else {
-                        all_done = false;
-                    }
-                }
-            }
-
-            /* Swap buffers */
-            float* tmp = src;
-            src = dst;
-            dst = tmp;
-
-            if (all_done) break;
-        }
-
-        /* Copy final frames back (from src, which has the latest data) */
-        (void)hipMemcpy(frames_out, src, frame_bytes, hipMemcpyDeviceToHost);
-    }
+    HIP_CHECK(hipMemcpy(frames_out, d_out,    frame_bytes, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(ticks_out,  d_ticks,  meta_bytes,  hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(states_out, d_states, meta_bytes,  hipMemcpyDeviceToHost));
 
 cleanup:
-    delete[] converged;
-    delete[] h_means;
-    if (d_buf_a)  (void)hipFree(d_buf_a);
-    if (d_buf_b)  (void)hipFree(d_buf_b);
-    if (d_deltas) (void)hipFree(d_deltas);
-    if (d_means)  (void)hipFree(d_means);
+    if (d_in)     (void)hipFree(d_in);
+    if (d_out)    (void)hipFree(d_out);
+    if (d_ticks)  (void)hipFree(d_ticks);
+    if (d_states) (void)hipFree(d_states);
+    if (d_roles)  (void)hipFree(d_roles);
 
     return retval;
 }
 
 
 /**
- * Convenience: evolve a single frame.
+ * ca_evolve_single — convenience wrapper for a single frame.
  */
 int ca_evolve_single(const float* frame_in,
-                     float* frame_out,
-                     int* ticks_out,
-                     int* state_out,
-                     int max_iters)
+                     float*       frame_out,
+                     int*         ticks_out,
+                     int*         state_out,
+                     int          max_iters)
 {
     return ca_evolve_batch(frame_in, frame_out, ticks_out, state_out, 1, max_iters);
 }
