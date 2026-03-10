@@ -18,3 +18,11 @@ models/
 
 # Datasets (large, ~35GB total)
 datasets/
+
+# Pitch pack generated PDFs
+pitch_pack/output/
+
+# npm (marp-cli)
+node_modules/
+package-lock.json
+package.json
