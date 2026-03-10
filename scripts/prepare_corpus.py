@@ -156,6 +156,13 @@ def write_curated_ml(out) -> int:
         "Perplexity measures how well a language model predicts a held-out text corpus",
         "BLEU score evaluates machine translation quality by comparing n-gram overlap with references",
 
+        # Bridge sentences — connective tissue between concepts
+        "The transformer architecture is built around self-attention as its core mechanism allowing it to weigh relationships between all sequence positions simultaneously",
+        "BERT and GPT both use the transformer architecture for pretraining but BERT uses bidirectional masked prediction while GPT uses autoregressive left-to-right generation",
+        "The encoder-decoder architecture also called sequence-to-sequence maps variable-length inputs to variable-length outputs through an intermediate representation",
+        "Transformers replaced recurrent neural networks by using self-attention instead of sequential hidden state updates for parallel processing of sequences",
+        "Multi-head attention in transformers projects queries keys and values into multiple subspaces enabling the model to attend to different relationship types simultaneously",
+
         # Specific techniques
         "Word embeddings map discrete tokens to dense continuous vectors preserving semantic similarity",
         "Tokenization breaks text into subword units like byte-pair encoding for open vocabulary models",
@@ -218,6 +225,12 @@ def write_curated_science(out) -> int:
         "The immune system defends against pathogens using innate and adaptive responses",
         "Enzymes are biological catalysts that accelerate specific biochemical reactions",
         "Homeostasis maintains stable internal conditions despite changing external environments",
+
+        # Bridge sentences — connective tissue between concepts
+        "Newton's laws of motion and the conservation of energy are foundational principles of classical mechanics where force equals mass times acceleration and energy transforms between kinetic and potential forms",
+        "Photosynthesis in chloroplasts captures sunlight to produce glucose while mitochondria break down glucose through oxidative phosphorylation to produce ATP completing the cell's energy cycle",
+        "The energy flow in cells connects photosynthesis which stores solar energy in glucose to mitochondrial respiration which releases that energy as ATP for cellular work",
+        "The immune system relies on enzymes such as lysozyme and proteases to break down pathogen components as part of both innate and adaptive defense mechanisms",
 
         # Earth science / astronomy
         "Plate tectonics describes the movement of lithospheric plates on the asthenosphere",
