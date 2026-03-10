@@ -83,6 +83,12 @@ from .reconstruction import reconstruct, reconstruct_batch
 # LLM agent (optional — requires Ollama running locally)
 from .agent import WheelerAgent
 
+# Wheeler-primary decoder (small model as pure codec)
+from .decoder import DecoderState, WheelerPrimaryAgent, extract_state, format_state
+
+# Corpus crystallization pipeline
+from .crystallization import CrystallizationResult, crystallize, load_corpus
+
 __all__ = [
     "hash_to_frame",
     "text_to_hex",
@@ -150,5 +156,14 @@ __all__ = [
     "salience_from_temperature",
     # LLM agent
     "WheelerAgent",
+    # Wheeler-primary decoder
+    "WheelerPrimaryAgent",
+    "DecoderState",
+    "extract_state",
+    "format_state",
+    # Crystallization
+    "CrystallizationResult",
+    "crystallize",
+    "load_corpus",
 ]
 
