@@ -1,0 +1,36 @@
+# Changelog
+
+## v0.1.0 (Initial Release)
+
+### Features
+
+- **Cellular automata memory system** — 64x64 CA grid with 3-state dynamics, ~40-50 tick convergence
+- **Chunked storage** — domain-specific routing (code, hardware, daily_tasks, science, meta, general) via keyword matching
+- **Temperature dynamics** — access frequency + time decay (7-day half-life), hot/warm/cold/fading/dead tiers
+- **Reconstructive recall (Darman)** — stored attractors blend with query context and re-evolve through CA
+- **Sentence embedding** — `all-MiniLM-L6-v2` with Johnson-Lindenstrauss random projection to 64x64
+- **Attention model** — salience-driven variable tick rates (low/medium/high CA budget)
+- **Sleep consolidation** — temperature-tiered frame pruning within memory bricks
+- **Eviction / forgetting** — graceful memory degradation with fade, evict, and capacity phases
+- **Associative warming** — 2-hop spreading activation with fast-decay warmth
+- **Oscillation detection** — detect and classify oscillating CA states
+- **Cell polarity tracking** — polarity-based attractor avoidance
+- **GPU acceleration** — HIP/ROCm kernel for AMD GPUs (CUDA compatible)
+- **Wheeler-agent** — LLM chat agent with Wheeler context via Ollama (qwen3)
+- **Wheeler-primary** — small model (Qwen 2.5-1.5B) as pure language renderer for Wheeler's attractor state
+- **Corpus crystallization** — offline pre-training pipeline (JSONL, CSV, TXT, Parquet)
+- **Web dashboard** — browser-based memory browser, chat interface, and interactive CA demo
+- **Theory experiments** — basin analysis, Lichtenberg patterns, resonance, structured synthesis
+
+### CLI Tools
+
+- `wheeler-store`, `wheeler-recall`, `wheeler-forget`, `wheeler-temps`, `wheeler-sleep`
+- `wheeler-agent`, `wheeler-primary`, `wheeler-crystallize`
+- `wheeler-ui`, `wheeler-scrub`, `wheeler-info`, `wheeler-bench-gpu`
+
+### Evaluation
+
+- Semantic apple test (holdout topology validation)
+- Decoder confidence gradient analysis
+- Co-activation topology mapping
+- Bridge sentence experiments

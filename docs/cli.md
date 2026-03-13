@@ -117,13 +117,46 @@ Thresholds are temperature-tiered:
 
 Already-consolidated bricks are skipped (idempotent). This is distinct from eviction — consolidation reduces storage while preserving the formation story at key transition points.
 
+## Corpus crystallization
+
+```bash
+wheeler-crystallize corpus.jsonl                              # crystallize with embeddings
+wheeler-crystallize corpus.csv --chunk science                # force chunk
+wheeler-crystallize corpus.txt --max-items 10000 --verbose    # validation run
+wheeler-crystallize corpus.jsonl --batch-size 64              # larger batches
+wheeler-crystallize corpus.jsonl --no-resume                  # re-process everything
+wheeler-crystallize corpus.jsonl --no-embed                   # SHA-256 instead of embeddings
+wheeler-crystallize corpus.jsonl --fmt jsonl                  # explicit format
+```
+
+Pre-trains Wheeler by feeding a text corpus through the full encode-evolve-store pipeline at scale. Supported formats: JSONL, CSV, TXT, Parquet.
+
+Resume is on by default — re-running skips already-stored entries.
+
 ## LLM agent
 
 ```bash
 wheeler-agent                      # start the Ollama/qwen3 agent loop
+wheeler-agent --interactive        # explicit REPL mode
+wheeler-agent --model qwen3:8b     # override model
+wheeler-agent --ollama http://host:11434  # custom Ollama URL
 ```
 
-The agent recalls relevant memories before each response, stores the exchange afterward, and uses temperature to calibrate epistemic confidence language ("I remember…" vs. "I vaguely recall…"). Requires Ollama running locally.
+The agent recalls relevant memories before each response, stores the exchange afterward, and uses temperature to calibrate epistemic confidence language ("I remember..." vs. "I vaguely recall..."). Requires Ollama running locally.
+
+## Wheeler-primary agent
+
+```bash
+wheeler-primary "What is quantum entanglement?"     # single query
+wheeler-primary --interactive                        # REPL mode
+wheeler-primary --show-state "Tell me about Python"  # show Wheeler state before response
+wheeler-primary --model qwen2.5:1.5b                 # override decoder model
+wheeler-primary --confidence-floor 0.4               # stricter confidence threshold
+wheeler-primary --recall-k 10                        # recall more memories per query
+wheeler-primary --verbose                            # pipeline diagnostics
+```
+
+Wheeler-primary mode: Wheeler Memory is the cognitive system, the small model is a pure language renderer. The model reads Wheeler's attractor state and renders it as natural language — it does not reason or add its own knowledge.
 
 ## Web dashboard
 

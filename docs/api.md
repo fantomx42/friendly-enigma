@@ -674,3 +674,204 @@ salience = 0.1 + 0.9 × temperature
 ```
 
 `temp=0` → salience 0.1, `temp=1` → salience 1.0.
+
+---
+
+## Reconstructive Recall (Batch)
+
+```python
+from wheeler_memory import reconstruct_batch
+
+results = reconstruct_batch(
+    stored_attractors=[att1, att2, att3],
+    query_attractor=query_att,
+    alpha=0.3,
+)
+```
+
+`reconstruct_batch` applies `reconstruct()` to multiple stored attractors in one call. Returns a list of result dicts (same format as `reconstruct()`).
+
+---
+
+## Embedding (Batch)
+
+```python
+from wheeler_memory import embed_to_frame_batch, embed_available
+
+if embed_available():
+    frames = embed_to_frame_batch(["text one", "text two", "text three"])
+    # Returns list of (64, 64) numpy arrays
+```
+
+`embed_to_frame_batch` encodes multiple texts in a single pass through the sentence transformer for efficiency. `embed_available()` returns `True` if sentence-transformers is installed.
+
+---
+
+## Crystallization
+
+```python
+from wheeler_memory import crystallize, load_corpus, CrystallizationResult
+```
+
+### `crystallize`
+
+```python
+def crystallize(
+    corpus_path: Path,
+    data_dir: Path | None = None,
+    batch_size: int = 32,
+    chunk: str | None = None,
+    use_embedding: bool = True,
+    max_items: int | None = None,
+    resume: bool = True,
+    fmt: str = "auto",
+    verbose: bool = False,
+) -> CrystallizationResult:
+```
+
+Feed a text corpus through Wheeler's encode-evolve-store pipeline at scale. Forms an attractor landscape before deployment so the system boots with crystallized knowledge.
+
+**Parameters**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `corpus_path` | — | Path to corpus file (JSONL, CSV, TXT, or Parquet) |
+| `data_dir` | `~/.wheeler_memory` | Override the storage root |
+| `batch_size` | `32` | Texts per batch for embedding efficiency |
+| `chunk` | `None` | Force all texts into this chunk; auto-routes if `None` |
+| `use_embedding` | `True` | Use sentence embedding; if `False`, uses SHA-256 hashing |
+| `max_items` | `None` | Stop after N texts (for validation runs) |
+| `resume` | `True` | Skip texts whose hex key is already stored |
+| `fmt` | `"auto"` | Format: `"jsonl"`, `"csv"`, `"txt"`, `"parquet"`, or `"auto"` |
+| `verbose` | `False` | Print progress to stderr |
+
+**Returns** a `CrystallizationResult`:
+
+| Field | Type | Description |
+|---|---|---|
+| `stored` | `int` | Memories successfully stored |
+| `skipped` | `int` | Already-stored entries skipped (resume) |
+| `errors` | `int` | Entries that failed to store |
+| `saturation_pct` | `float` | Percentage of MAX_ATTRACTORS capacity used |
+| `elapsed_seconds` | `float` | Wall-clock time |
+| `chunks_used` | `dict[str, int]` | Per-chunk store counts |
+
+**Example**
+
+```python
+from pathlib import Path
+from wheeler_memory import crystallize
+
+result = crystallize(Path("corpus.jsonl"), max_items=10_000, verbose=True)
+print(result)
+# Crystallization complete:
+#   stored:     2711
+#   skipped:    0
+#   errors:     0
+#   saturation: 27.1%
+#   elapsed:    45.3s
+```
+
+---
+
+### `load_corpus`
+
+```python
+def load_corpus(path: Path, fmt: str = "auto") -> Iterator[str]:
+```
+
+Stream texts from a corpus file. Supports JSONL, CSV, TXT, and Parquet formats. Auto-detects format from file extension.
+
+**Example**
+
+```python
+from pathlib import Path
+from wheeler_memory import load_corpus
+
+for text in load_corpus(Path("corpus.jsonl")):
+    print(text[:80])
+```
+
+---
+
+## Wheeler-Primary Decoder
+
+```python
+from wheeler_memory import WheelerPrimaryAgent, DecoderState, extract_state, format_state
+```
+
+### `WheelerPrimaryAgent`
+
+```python
+class WheelerPrimaryAgent:
+    def __init__(
+        self,
+        model: str = "qwen2.5:1.5b",
+        ollama_url: str = "http://localhost:11434",
+        data_dir: str | Path | None = None,
+        recall_k: int = 5,
+        confidence_floor: float = 0.18,
+        reconstruct: bool = True,
+        reconstruct_alpha: float = 0.3,
+        verbose: bool = False,
+    ) -> None: ...
+
+    def run(self, user_message: str) -> str: ...
+    def run_stream(self, user_message: str) -> Iterator[dict]: ...
+```
+
+Wheeler-primary agent where Wheeler Memory is the cognitive system and the small model is a pure language renderer. Unlike `WheelerAgent`, this agent does not reason, plan, or use tools — it reads Wheeler's attractor state and renders it as natural language.
+
+**`run()`** executes the full pipeline: recall from Wheeler, extract structured state, format prompt, decode via small model.
+
+**`run_stream()`** yields typed events: `{"type": "recall"}`, `{"type": "state"}`, `{"type": "token"}`, `{"type": "done"}`.
+
+**Example**
+
+```python
+from wheeler_memory import WheelerPrimaryAgent
+
+agent = WheelerPrimaryAgent(verbose=True)
+reply = agent.run("What is quantum entanglement?")
+print(reply)
+```
+
+---
+
+### `extract_state`
+
+```python
+def extract_state(
+    query: str,
+    recall_results: list[dict],
+    confidence_floor: float = 0.18,
+) -> DecoderState:
+```
+
+Extract structured state from `recall_memory()` results. Computes confidence from max similarity, detects co-activation from shared chunks, and marks the state as uncertain if confidence falls below the floor.
+
+---
+
+### `format_state`
+
+```python
+def format_state(state: DecoderState) -> str:
+```
+
+Serialize a `DecoderState` into structured text for the small model. The output includes query, confidence label, ranked active memories with CA metadata, co-activation pairs, and uncertainty instructions.
+
+---
+
+### `DecoderState`
+
+```python
+@dataclass
+class DecoderState:
+    query: str
+    attractors: list[dict]
+    confidence: float = 0.0
+    co_activated: list[tuple[str, str]]
+    uncertain: bool = True
+```
+
+Structured representation of Wheeler's recall state for the decoder.

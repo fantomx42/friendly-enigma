@@ -313,6 +313,8 @@ datasets/                Training corpora (SWE-bench, mbpp, LongBench, curated)
 
 ## Documentation
 
+See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested reading order.
+
 | Guide | Description |
 |-------|-------------|
 | [Installation](docs/install.md) | venv setup, platform-specific notes, GPU acceleration, Ollama |
@@ -323,6 +325,8 @@ datasets/                Training corpora (SWE-bench, mbpp, LongBench, curated)
 | [CLI Reference](docs/cli.md) | Every flag documented |
 | [API Reference](docs/api.md) | Python library usage |
 | [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup |
+| [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
+| [Changelog](CHANGELOG.md) | Release history |
 
 ---
 
