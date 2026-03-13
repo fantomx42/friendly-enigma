@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 embed = ["sentence-transformers>=3.0"]
+train = ["scikit-learn>=1.0"]
 
 [project.scripts]
 wheeler-store = "scripts.wheeler_store:main"

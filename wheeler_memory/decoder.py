@@ -144,15 +144,41 @@ def format_state(state: DecoderState) -> str:
 
     if state.attractors:
         lines.append("ACTIVE MEMORIES (ranked by relevance):")
+        lines.append(
+            "  # H=entropy clust=clusters live=active "
+            "spd=convergence-speed(F/M/S) rdelta=reconstruction-drift"
+        )
         for i, att in enumerate(state.attractors, 1):
             sim = att.get("similarity", 0.0)
             tier = att.get("temperature_tier", "cold")
             text = att.get("text", "")
             ca_state = att.get("state", "UNKNOWN")
             ticks = att.get("convergence_ticks", "?")
+            entropy = att.get("grid_entropy")
+            clusters = att.get("cluster_count")
+            alive = att.get("alive_fraction")
+
+            # Convergence speed label (only meaningful for CONVERGED attractors)
+            if ca_state == "CONVERGED" and isinstance(ticks, int):
+                spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+            else:
+                spd = "?"
+
+            # Structural features string
+            struct = ""
+            if entropy is not None:
+                clust_s = str(clusters) if clusters is not None else "?"
+                alive_s = f"{alive:.2f}" if alive is not None else "?"
+                struct = f", H={entropy:.2f}, clust={clust_s}, live={alive_s}"
+
+            # Reconstruction delta (only present when reconstruct=True was used)
+            corr_stored = att.get("correlation_with_stored")
+            if corr_stored is not None:
+                struct += f", rdelta={1.0 - corr_stored:.2f}"
+
             lines.append(
                 f"  {i}. [sim={sim:.2f}, temp={tier}, "
-                f"CA={ca_state}/{ticks}] \"{text}\""
+                f"CA={ca_state}/{ticks}/{spd}{struct}] \"{text}\""
             )
         lines.append("")
     else:

@@ -17,7 +17,7 @@ from .chunking import (
     touch_chunk_metadata,
 )
 from .attention import compute_attention_budget, salience_from_temperature
-from .dynamics import evolve_and_interpret
+from .dynamics import compute_attractor_features, evolve_and_interpret
 from .hashing import hash_to_frame, text_to_hex
 from .temperature import (
     SALIENCE_DEFAULT,
@@ -206,6 +206,7 @@ def recall_memory(
             )
             tier = temperature_tier(temp)
             effective = sim + temperature_boost * temp
+            feats = compute_attractor_features(attractor)
 
             results.append({
                 "hex_key": hex_key,
@@ -218,6 +219,9 @@ def recall_memory(
                 "convergence_ticks": meta["convergence_ticks"],
                 "timestamp": meta["timestamp"],
                 "chunk": c,
+                "grid_entropy": feats["grid_entropy"],
+                "cluster_count": feats["cluster_count"],
+                "alive_fraction": feats["alive_fraction"],
             })
 
     results.sort(key=lambda r: r["effective_similarity"], reverse=True)

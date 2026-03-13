@@ -11,6 +11,8 @@ The key empirical question: how steep is the quality cliff between tiers?
 Usage:
     python scripts/eval_decoder.py                    # Wheeler state only
     python scripts/eval_decoder.py --decode           # Also run small model
+    python scripts/eval_decoder.py --features         # Print per-hit structural features
+    python scripts/eval_decoder.py --corpus my.jsonl  # Load test cases from file
     python scripts/eval_decoder.py --model qwen2.5:1.5b --decode
 """
 
@@ -95,12 +97,14 @@ def evaluate_case(
     """Evaluate a single test case against Wheeler's memory."""
     query = case["query"]
 
-    # Recall from Wheeler
+    # Recall from Wheeler with reconstruction so rdelta is populated
     hits = recall_memory(
         query,
         top_k=recall_k,
         data_dir=data_dir,
         use_embedding=True,
+        reconstruct=True,
+        reconstruct_alpha=0.3,
     )
 
     # Extract state
@@ -110,6 +114,14 @@ def evaluate_case(
     top_sim = hits[0]["similarity"] if hits else 0.0
     top_text = hits[0]["text"][:80] if hits else "(none)"
     avg_sim = sum(h["similarity"] for h in hits) / len(hits) if hits else 0.0
+
+    # Structural features from top hit
+    top = hits[0] if hits else {}
+    top_entropy = top.get("grid_entropy")
+    top_clusters = top.get("cluster_count")
+    top_alive = top.get("alive_fraction")
+    corr_stored = top.get("correlation_with_stored")
+    top_rdelta = round(1.0 - corr_stored, 3) if corr_stored is not None else None
 
     return {
         "query": query,
@@ -123,7 +135,19 @@ def evaluate_case(
         "n_hits": len(hits),
         "co_activated": len(state.co_activated),
         "formatted_state": format_state(state),
+        "top_grid_entropy": top_entropy,
+        "top_cluster_count": top_clusters,
+        "top_alive_fraction": top_alive,
+        "top_reconstruction_delta": top_rdelta,
     }
+
+
+def _separation_verdict(gap: float) -> str:
+    if gap > 0.05:
+        return "SEPARATED"
+    if gap > 0.02:
+        return "MARGINAL"
+    return "FLAT"
 
 
 def run_evaluation(
@@ -132,15 +156,19 @@ def run_evaluation(
     model: str = "qwen2.5:1.5b",
     ollama_url: str = "http://localhost:11434",
     confidence_floor: float = 0.3,
+    show_features: bool = False,
+    test_cases: list[dict] | None = None,
 ):
     """Run full evaluation across all test cases."""
+    cases = test_cases if test_cases is not None else TEST_CASES
+
     print("=" * 80)
     print("DECODER EVALUATION — Attractor Depth vs Response Quality")
     print("=" * 80)
     print()
 
     results = []
-    for case in TEST_CASES:
+    for case in cases:
         result = evaluate_case(case, data_dir=data_dir, confidence_floor=confidence_floor)
 
         # Optionally decode via small model
@@ -188,6 +216,14 @@ def run_evaluation(
             print(f"  Top hit: {r['top_hit']}")
             print(f"  Confidence: {r['confidence']:.3f} ({'uncertain' if r['uncertain'] else 'confident'})")
             print(f"  Top sim: {r['top_similarity']:.3f}, Avg sim: {r['avg_similarity']:.3f}")
+            if show_features and r["top_grid_entropy"] is not None:
+                rdelta_s = f"rdelta={r['top_reconstruction_delta']}" if r["top_reconstruction_delta"] is not None else "rdelta=n/a"
+                print(
+                    f"  Features: H={r['top_grid_entropy']:.2f}  "
+                    f"clust={r['top_cluster_count']}  "
+                    f"live={r['top_alive_fraction']:.2f}  "
+                    f"{rdelta_s}"
+                )
             if decode and "response_preview" in r:
                 print(f"  Response: {r['response_preview']}")
 
@@ -204,6 +240,10 @@ def run_evaluation(
                 "avg_similarity": r["avg_similarity"],
                 "uncertain": r["uncertain"],
                 "top_hit": r["top_hit"],
+                "top_grid_entropy": r["top_grid_entropy"],
+                "top_cluster_count": r["top_cluster_count"],
+                "top_alive_fraction": r["top_alive_fraction"],
+                "top_reconstruction_delta": r["top_reconstruction_delta"],
             }
             if decode and "response_preview" in r:
                 entry["response_preview"] = r["response_preview"]
@@ -215,6 +255,7 @@ def run_evaluation(
     print(f"\n{'=' * 80}")
     print("SUMMARY BY TIER")
     print(f"{'=' * 80}")
+    tier_avg_sim: dict[str, float] = {}
     for tier in ("deep", "shallow", "missing"):
         tier_results = [r for r in results if r["expected_depth"] == tier]
         if not tier_results:
@@ -222,10 +263,34 @@ def run_evaluation(
         avg_conf = sum(r["confidence"] for r in tier_results) / len(tier_results)
         avg_top = sum(r["top_similarity"] for r in tier_results) / len(tier_results)
         uncertain_pct = sum(1 for r in tier_results if r["uncertain"]) / len(tier_results) * 100
+        tier_avg_sim[tier] = avg_top
         print(
             f"  {tier:<10}: avg_confidence={avg_conf:.3f}  avg_top_sim={avg_top:.3f}  "
             f"uncertain={uncertain_pct:.0f}%"
         )
+
+    # Separation verdict
+    print(f"\n{'─' * 80}")
+    print("SEPARATION ANALYSIS")
+    print(f"{'─' * 80}")
+    deep = tier_avg_sim.get("deep", 0.0)
+    shallow = tier_avg_sim.get("shallow", 0.0)
+    missing = tier_avg_sim.get("missing", 0.0)
+    ds_gap = deep - shallow
+    sm_gap = shallow - missing
+    ds_verdict = _separation_verdict(ds_gap)
+    sm_verdict = _separation_verdict(sm_gap)
+    print(f"  Deep−Shallow gap:    {ds_gap:+.3f}  → {ds_verdict}")
+    print(f"  Shallow−Missing gap: {sm_gap:+.3f}  → {sm_verdict}")
+    if ds_verdict == "FLAT" or sm_verdict == "FLAT":
+        print(
+            "\n  ⚠  Attractor landscape lacks separation — "
+            "projection is the bottleneck. Fixing the decoder won't help."
+        )
+    elif ds_verdict == "MARGINAL" or sm_verdict == "MARGINAL":
+        print("\n  ⚡  Marginal separation — projection may be limiting recall quality.")
+    else:
+        print("\n  ✓  Tiers are well-separated. Decoder instrumentation should be meaningful.")
 
     return results
 
@@ -234,10 +299,27 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate Wheeler-primary decoder quality")
     parser.add_argument("--data-dir", default=None, help="Wheeler data directory")
     parser.add_argument("--decode", action="store_true", help="Also run small model decoder")
+    parser.add_argument("--features", action="store_true", help="Print per-hit structural features")
+    parser.add_argument("--corpus", default=None, help="JSONL file of test cases (query/expected_depth/description)")
     parser.add_argument("--model", default="qwen2.5:1.5b", help="Decoder model (default: qwen2.5:1.5b)")
     parser.add_argument("--ollama", default="http://localhost:11434", help="Ollama URL")
     parser.add_argument("--confidence-floor", type=float, default=0.18, help="Confidence floor")
     args = parser.parse_args()
+
+    test_cases = None
+    if args.corpus:
+        corpus_path = Path(args.corpus)
+        if not corpus_path.exists():
+            print(f"ERROR: corpus file not found: {corpus_path}", file=sys.stderr)
+            raise SystemExit(1)
+        with open(corpus_path, encoding="utf-8") as f:
+            test_cases = [json.loads(line) for line in f if line.strip()]
+        for i, case in enumerate(test_cases):
+            for key in ("query", "expected_depth", "description"):
+                if key not in case:
+                    print(f"ERROR: corpus line {i+1} missing key '{key}'", file=sys.stderr)
+                    raise SystemExit(1)
+        print(f"Loaded {len(test_cases)} test cases from {corpus_path}")
 
     run_evaluation(
         data_dir=args.data_dir,
@@ -245,6 +327,8 @@ def main():
         model=args.model,
         ollama_url=args.ollama,
         confidence_floor=args.confidence_floor,
+        show_features=args.features,
+        test_cases=test_cases,
     )
 
 

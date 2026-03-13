@@ -117,3 +117,58 @@ def evolve_and_interpret(
         "history": history,
         "metadata": {},
     }
+
+
+def compute_attractor_features(grid: np.ndarray) -> dict:
+    """Structural features of a converged attractor grid.
+
+    Returns
+    -------
+    dict with:
+        grid_entropy   : Shannon entropy (bits) over the 3-state distribution
+        cluster_count  : connected components of value==1 cells (von Neumann)
+        alive_fraction : fraction of non-zero cells
+    """
+    # Discretise continuous [-1, 1] values into three buckets for statistics
+    pos = grid > 0.33   # "positive" state
+    neg = grid < -0.33  # "negative" state
+    neutral = ~pos & ~neg
+
+    n = grid.size
+    counts = np.array([neg.sum(), neutral.sum(), pos.sum()], dtype=np.float64)
+    probs = counts / n
+    entropy = float(-np.sum(probs * np.log2(probs + 1e-10)))
+
+    # Alive fraction: cells not in the neutral bucket
+    alive = float((pos.sum() + neg.sum()) / n)
+
+    # Connected components of "positive" cells via BFS (von Neumann neighbourhood)
+    active = pos
+    visited = np.zeros_like(active)
+    rows, cols = grid.shape
+    clusters = 0
+    for r in range(rows):
+        for c in range(cols):
+            if active[r, c] and not visited[r, c]:
+                clusters += 1
+                queue = [(r, c)]
+                while queue:
+                    cr, cc = queue.pop()
+                    if visited[cr, cc]:
+                        continue
+                    visited[cr, cc] = True
+                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        nr, nc = cr + dr, cc + dc
+                        if (
+                            0 <= nr < rows
+                            and 0 <= nc < cols
+                            and not visited[nr, nc]
+                            and active[nr, nc]
+                        ):
+                            queue.append((nr, nc))
+
+    return {
+        "grid_entropy": round(entropy, 3),
+        "cluster_count": clusters,
+        "alive_fraction": round(alive, 3),
+    }

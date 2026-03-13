@@ -9,6 +9,8 @@ fuzzy recall through Wheeler Memory's Pearson correlation search.
 """
 
 import hashlib
+from pathlib import Path
+
 import numpy as np
 
 # Lazy-loaded model
@@ -20,7 +22,10 @@ MODEL_NAME = "all-MiniLM-L6-v2"
 EMBED_DIM = 384
 FRAME_SIZE = 64
 FRAME_CELLS = FRAME_SIZE * FRAME_SIZE  # 4096
-PROJECTION_SEED = 0xDEAD_BEEF  # fixed seed for reproducible projection
+PROJECTION_SEED = 0xDEAD_BEEF  # fixed seed for reproducible random projection
+
+# Path where train_projection.py saves the learned matrix
+_LEARNED_PROJECTION_PATH = Path.home() / ".wheeler_memory" / "learned_projection.npy"
 
 
 def embed_available() -> bool:
@@ -46,19 +51,24 @@ def get_model():
 
 
 def _get_projection_matrix() -> np.ndarray:
-    """Return the fixed 384→4096 random projection matrix.
+    """Return the 384→4096 projection matrix.
 
-    Uses Johnson-Lindenstrauss random projection to approximately
-    preserve cosine distances from embedding space to frame space.
-    The matrix is generated once from a fixed seed and cached.
+    Loads a learned projection from ~/.wheeler_memory/learned_projection.npy
+    if it exists (produced by scripts/train_projection.py).  Falls back to a
+    fixed Gaussian random projection that approximately preserves cosine
+    distances via the Johnson-Lindenstrauss lemma.
+
+    The matrix is cached in _projection_matrix after the first call.
     """
     global _projection_matrix
     if _projection_matrix is None:
-        rng = np.random.Generator(np.random.PCG64(PROJECTION_SEED))
-        # Gaussian random projection preserves distances
-        _projection_matrix = rng.standard_normal(
-            (EMBED_DIM, FRAME_CELLS)
-        ).astype(np.float32) / np.sqrt(FRAME_CELLS)
+        if _LEARNED_PROJECTION_PATH.exists():
+            _projection_matrix = np.load(_LEARNED_PROJECTION_PATH)
+        else:
+            rng = np.random.Generator(np.random.PCG64(PROJECTION_SEED))
+            _projection_matrix = rng.standard_normal(
+                (EMBED_DIM, FRAME_CELLS)
+            ).astype(np.float32) / np.sqrt(FRAME_CELLS)
     return _projection_matrix
 
 

@@ -38,8 +38,8 @@ def reconstruct(
           - state: convergence state of reconstruction
           - convergence_ticks: ticks to re-converge
           - alpha: the alpha used
-          - delta_from_stored: how much the reconstruction differs from stored
-          - delta_from_query: how much it differs from query
+          - correlation_with_stored: Pearson correlation with stored attractor
+          - correlation_with_query: Pearson correlation with query attractor
     """
     stored = stored_attractor.reshape(64, 64).astype(np.float32)
     query = query_attractor.reshape(64, 64).astype(np.float32)
