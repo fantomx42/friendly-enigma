@@ -61,6 +61,7 @@ class MemoryBrick:
         stacked = np.stack(self.evolution_history)
         np.savez_compressed(
             filepath,
+            format_version=np.array(2),
             history=stacked,
             attractor=self.final_attractor,
             convergence_ticks=np.array(self.convergence_ticks),

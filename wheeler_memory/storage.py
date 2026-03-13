@@ -1,6 +1,8 @@
 """Attractor storage, indexing, and recall by Pearson correlation."""
 
+import fcntl
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -53,13 +55,21 @@ def _get_data_dir(data_dir: str | Path | None = None) -> Path:
 def _load_index(chunk_dir: Path) -> dict:
     index_path = chunk_dir / "index.json"
     if index_path.exists():
-        return json.loads(index_path.read_text())
+        try:
+            return json.loads(index_path.read_text())
+        except (json.JSONDecodeError, ValueError):
+            import sys
+            print(f"Warning: corrupted index at {index_path}, treating as empty",
+                  file=sys.stderr)
+            return {}
     return {}
 
 
 def _save_index(chunk_dir: Path, index: dict) -> None:
     index_path = chunk_dir / "index.json"
-    index_path.write_text(json.dumps(index, indent=2))
+    tmp_path = index_path.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(index, indent=2))
+    tmp_path.replace(index_path)  # atomic on POSIX
 
 
 def store_memory(
@@ -88,22 +98,25 @@ def store_memory(
     np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
     brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
 
-    index = _load_index(chunk_dir)
-    now_iso = datetime.now(timezone.utc).isoformat()
-    base_metadata = result.get("metadata", {})
-    base_metadata["hit_count"] = 0
-    base_metadata["last_accessed"] = now_iso
-    if memory_type is not None:
-        base_metadata["memory_type"] = memory_type
-    index[hex_key] = {
-        "text": text,
-        "state": result["state"],
-        "convergence_ticks": result["convergence_ticks"],
-        "timestamp": now_iso,
-        "metadata": base_metadata,
-        "chunk": chunk,
-    }
-    _save_index(chunk_dir, index)
+    lock_path = chunk_dir / "index.json.lock"
+    with open(lock_path, "w") as lock_fd:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        index = _load_index(chunk_dir)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        base_metadata = result.get("metadata", {})
+        base_metadata["hit_count"] = 0
+        base_metadata["last_accessed"] = now_iso
+        if memory_type is not None:
+            base_metadata["memory_type"] = memory_type
+        index[hex_key] = {
+            "text": text,
+            "state": result["state"],
+            "convergence_ticks": result["convergence_ticks"],
+            "timestamp": now_iso,
+            "metadata": base_metadata,
+            "chunk": chunk,
+        }
+        _save_index(chunk_dir, index)
     touch_chunk_metadata(chunk_dir, stored=True)
     build_store_associations(chunk_dir, hex_key)
 
@@ -194,8 +207,15 @@ def recall_memory(
             ensure_access_fields(meta, meta["timestamp"])
 
             attractor = np.load(attractor_path)
-            corr, _ = pearsonr(query_flat, attractor.flatten())
+            if attractor.shape != (64, 64):
+                continue
+            try:
+                corr, _ = pearsonr(query_flat, attractor.flatten())
+            except Exception:
+                continue
             sim = float(corr)
+            if np.isnan(sim):
+                sim = 0.0
 
             w = warmth_data.get(hex_key, {})
             temp = effective_temperature(
@@ -290,14 +310,17 @@ def _bump_recalled_memories(data_dir: Path, results: list[dict]) -> None:
 
     for chunk_name, hex_keys in by_chunk.items():
         chunk_dir = data_dir / "chunks" / chunk_name
-        index = _load_index(chunk_dir)
-        changed = False
-        for hk in hex_keys:
-            if hk in index:
-                bump_access(index[hk])
-                changed = True
-        if changed:
-            _save_index(chunk_dir, index)
+        lock_path = chunk_dir / "index.json.lock"
+        with open(lock_path, "w") as lock_fd:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            index = _load_index(chunk_dir)
+            changed = False
+            for hk in hex_keys:
+                if hk in index:
+                    bump_access(index[hk])
+                    changed = True
+            if changed:
+                _save_index(chunk_dir, index)
         propagate_warmth(chunk_dir, hex_keys)
         if len(hex_keys) >= 2:
             build_co_recall_associations(chunk_dir, hex_keys)

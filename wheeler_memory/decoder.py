@@ -49,7 +49,11 @@ Ground your entire response in the MEMORY STATE provided with each query.
 
 DEFAULT_MODEL = "qwen2.5:1.5b"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
-CONFIDENCE_FLOOR = 0.18
+
+CONFIDENCE_HIGH = 0.40
+CONFIDENCE_MEDIUM = 0.30
+CONFIDENCE_LOW = 0.18
+CONFIDENCE_FLOOR = CONFIDENCE_LOW
 
 
 # ── State extraction ──────────────────────────────────────────────────────────
@@ -121,11 +125,11 @@ def extract_state(
 
 
 def _confidence_label(confidence: float) -> str:
-    if confidence >= 0.40:
+    if confidence >= CONFIDENCE_HIGH:
         return "high"
-    if confidence >= 0.30:
+    if confidence >= CONFIDENCE_MEDIUM:
         return "medium"
-    if confidence >= 0.18:
+    if confidence >= CONFIDENCE_LOW:
         return "low"
     return "uncertain"
 

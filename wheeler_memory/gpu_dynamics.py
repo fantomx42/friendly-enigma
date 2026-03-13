@@ -137,6 +137,9 @@ def gpu_evolve_single(
     if lib is None:
         raise RuntimeError("GPU library not available. Build with: cd wheeler_memory/gpu && make")
 
+    if frame.shape != (grid_w, grid_w):
+        raise ValueError(f"Expected frame shape ({grid_w}, {grid_w}), got {frame.shape}")
+
     cells = grid_w * grid_w
     frame_in = np.ascontiguousarray(frame.flatten(), dtype=np.float32)
     frame_out = np.zeros(cells, dtype=np.float32)

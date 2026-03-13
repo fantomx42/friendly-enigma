@@ -250,10 +250,12 @@ def _exec_list_memories(limit: int, data_dir: Path | None) -> str:
 
 
 def _exec_forget_memory(text: str, data_dir: Path | None) -> str:
-    result = forget_by_text(text, data_dir=data_dir)
-    if result.forgotten:
-        return json.dumps({"forgotten": True, "key": result.key})
-    return json.dumps({"forgotten": False, "reason": result.reason})
+    from .hashing import text_to_hex as _text_to_hex
+    hex_key = _text_to_hex(text)
+    found = forget_by_text(text, data_dir=data_dir)
+    if found:
+        return json.dumps({"forgotten": True, "key": hex_key})
+    return json.dumps({"forgotten": False, "reason": "Memory not found."})
 
 
 def _exec_polar_decay(text: str, top_k: int, data_dir: Path | None) -> str:
@@ -275,9 +277,10 @@ def _exec_polar_decay(text: str, top_k: int, data_dir: Path | None) -> str:
 def _exec_sleep_consolidate(data_dir: Path | None) -> str:
     result = _sleep_consolidate(data_dir=data_dir)
     return json.dumps({
-        "pruned": result.pruned,
-        "kept": result.kept,
-        "merged": getattr(result, "merged", 0),
+        "consolidated": len(result.memories_consolidated),
+        "skipped": len(result.memories_skipped),
+        "frames_before": result.total_frames_before,
+        "frames_after": result.total_frames_after,
     })
 
 
