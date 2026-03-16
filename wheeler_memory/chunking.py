@@ -9,6 +9,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
+
 CHUNK_KEYWORDS: dict[str, list[str]] = {
     "code": [
         "python", "rust", "code", "bug", "debug", "compile", "function",
@@ -68,8 +70,21 @@ def select_chunk(text: str) -> str:
 def select_recall_chunks(query: str, max_chunks: int = 3) -> list[str]:
     """Pick chunks to search when recalling *query*.
 
+    Uses embedding-based routing if available, falling back to keyword matching.
     Returns all matching chunks (up to *max_chunks*) plus "general".
     """
+    selected = _select_chunks_by_embedding(query, max_chunks)
+    if selected is None:
+        selected = _select_chunks_by_keywords(query, max_chunks)
+
+    if DEFAULT_CHUNK not in selected:
+        selected.append(DEFAULT_CHUNK)
+
+    return selected
+
+
+def _select_chunks_by_keywords(query: str, max_chunks: int) -> list[str]:
+    """Keyword-based chunk selection (original algorithm)."""
     lower = query.lower()
     scored: list[tuple[str, int]] = []
 
@@ -79,12 +94,99 @@ def select_recall_chunks(query: str, max_chunks: int = 3) -> list[str]:
             scored.append((chunk, hits))
 
     scored.sort(key=lambda t: t[1], reverse=True)
-    selected = [name for name, _ in scored[:max_chunks]]
+    return [name for name, _ in scored[:max_chunks]]
 
-    if DEFAULT_CHUNK not in selected:
-        selected.append(DEFAULT_CHUNK)
 
-    return selected
+def _select_chunks_by_embedding(query: str, max_chunks: int) -> list[str] | None:
+    """Embedding-based chunk selection using chunk centroid similarity.
+
+    Returns None if embedding is unavailable, triggering keyword fallback.
+    """
+    try:
+        from .embedding import embed_available, embed_text
+        if not embed_available():
+            return None
+    except ImportError:
+        return None
+
+    from .cache import cached_load_json
+    data_dir = Path.home() / ".wheeler_memory"
+    chunks_root = data_dir / "chunks"
+    if not chunks_root.exists():
+        return None
+
+    query_emb = embed_text(query)
+    query_norm = np.linalg.norm(query_emb)
+    if query_norm == 0:
+        return None
+
+    scored: list[tuple[str, float]] = []
+    for chunk_dir in chunks_root.iterdir():
+        if not chunk_dir.is_dir():
+            continue
+        chunk_name = chunk_dir.name
+        if chunk_name == DEFAULT_CHUNK:
+            continue  # general always included
+
+        meta_path = chunk_dir / "metadata.json"
+        meta = cached_load_json(meta_path, default={})
+        centroid = meta.get("centroid_embedding")
+        if centroid is None:
+            continue
+
+        centroid = np.array(centroid, dtype=np.float32)
+        centroid_norm = np.linalg.norm(centroid)
+        if centroid_norm == 0:
+            continue
+
+        cosine_sim = float(np.dot(query_emb, centroid) / (query_norm * centroid_norm))
+        scored.append((chunk_name, cosine_sim))
+
+    if not scored:
+        return None
+
+    scored.sort(key=lambda t: t[1], reverse=True)
+    # Only include chunks with positive similarity
+    return [name for name, sim in scored[:max_chunks] if sim > 0.0]
+
+
+def update_chunk_centroid(chunk_dir: Path) -> None:
+    """Recompute the centroid embedding for a chunk from its stored texts.
+
+    Saves the centroid as a list in metadata.json so it persists across runs.
+    Call this after bulk stores or periodically to keep routing fresh.
+    """
+    try:
+        from .embedding import embed_available, embed_text_batch
+        if not embed_available():
+            return
+    except ImportError:
+        return
+
+    index_path = chunk_dir / "index.json"
+    if not index_path.exists():
+        return
+    index = json.loads(index_path.read_text())
+    if not index:
+        return
+
+    texts = [entry["text"] for entry in index.values() if "text" in entry]
+    if not texts:
+        return
+
+    embeddings = embed_text_batch(texts)  # (N, 384)
+    centroid = embeddings.mean(axis=0)
+
+    meta_path = chunk_dir / "metadata.json"
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text())
+    else:
+        meta = {"created": datetime.now(timezone.utc).isoformat(), "store_count": 0}
+
+    meta["centroid_embedding"] = centroid.tolist()
+    meta["centroid_updated"] = datetime.now(timezone.utc).isoformat()
+    meta["centroid_memory_count"] = len(texts)
+    meta_path.write_text(json.dumps(meta, indent=2))
 
 
 def get_chunk_dir(data_dir: Path, chunk: str) -> Path:

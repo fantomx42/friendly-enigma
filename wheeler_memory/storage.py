@@ -1,6 +1,7 @@
 """Attractor storage, indexing, and recall by Pearson correlation."""
 
 import fcntl
+import heapq
 import json
 import sys
 from datetime import datetime, timezone
@@ -33,9 +34,11 @@ from .warming import (
     _load_associations,
     _save_associations,
     build_co_recall_associations,
+    build_cross_chunk_co_recall,
     build_store_associations,
     load_warmth,
     propagate_warmth,
+    propagate_warmth_cross_chunk,
 )
 
 # Lazy import for embedding (optional dependency)
@@ -53,23 +56,17 @@ def _get_data_dir(data_dir: str | Path | None = None) -> Path:
 
 
 def _load_index(chunk_dir: Path) -> dict:
-    index_path = chunk_dir / "index.json"
-    if index_path.exists():
-        try:
-            return json.loads(index_path.read_text())
-        except (json.JSONDecodeError, ValueError):
-            import sys
-            print(f"Warning: corrupted index at {index_path}, treating as empty",
-                  file=sys.stderr)
-            return {}
-    return {}
+    from .cache import cached_load_json
+    return cached_load_json(chunk_dir / "index.json", default={})
 
 
 def _save_index(chunk_dir: Path, index: dict) -> None:
+    from .cache import invalidate
     index_path = chunk_dir / "index.json"
     tmp_path = index_path.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(index, indent=2))
     tmp_path.replace(index_path)  # atomic on POSIX
+    invalidate(index_path)
 
 
 def store_memory(
@@ -106,6 +103,10 @@ def store_memory(
         base_metadata = result.get("metadata", {})
         base_metadata["hit_count"] = 0
         base_metadata["last_accessed"] = now_iso
+        # Cache attractor norm for faster Pearson during recall
+        flat = result["attractor"].flatten()
+        base_metadata["att_mean"] = float(flat.mean())
+        base_metadata["att_std"] = float(flat.std())
         if memory_type is not None:
             base_metadata["memory_type"] = memory_type
         index[hex_key] = {
@@ -183,7 +184,8 @@ def recall_memory(
     )
     query_flat = query_result["attractor"].flatten()
 
-    results = []
+    # Collect work items across all chunks, then score in parallel
+    work_items = []  # (hex_key, meta, attractor_path, warmth_entry, chunk_name)
     for c in chunks_to_search:
         chunk_dir = d / "chunks" / c
         if not chunk_dir.exists():
@@ -196,56 +198,81 @@ def recall_memory(
         warmth_data = load_warmth(chunk_dir)
 
         for hex_key, meta in index.items():
-            # Polar/avoidance attractors are never surfaced as independent results
             if meta.get("metadata", {}).get("memory_type") in ("avoidance", "polar"):
                 continue
-
             attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
             if not attractor_path.exists():
                 continue
-
             ensure_access_fields(meta, meta["timestamp"])
-
-            attractor = np.load(attractor_path)
-            if attractor.shape != (64, 64):
-                continue
-            try:
-                corr, _ = pearsonr(query_flat, attractor.flatten())
-            except Exception:
-                continue
-            sim = float(corr)
-            if np.isnan(sim):
-                sim = 0.0
-
             w = warmth_data.get(hex_key, {})
-            temp = effective_temperature(
-                meta["metadata"]["hit_count"],
-                meta["metadata"]["last_accessed"],
-                warmth_boost=w.get("boost", 0.0),
-                warmth_applied_at=w.get("applied_at"),
-            )
-            tier = temperature_tier(temp)
-            effective = sim + temperature_boost * temp
-            feats = compute_attractor_features(attractor)
+            work_items.append((hex_key, meta, attractor_path, w, c))
 
-            results.append({
-                "hex_key": hex_key,
-                "text": meta["text"],
-                "similarity": sim,
-                "temperature": temp,
-                "temperature_tier": tier,
-                "effective_similarity": effective,
-                "state": meta["state"],
-                "convergence_ticks": meta["convergence_ticks"],
-                "timestamp": meta["timestamp"],
-                "chunk": c,
-                "grid_entropy": feats["grid_entropy"],
-                "cluster_count": feats["cluster_count"],
-                "alive_fraction": feats["alive_fraction"],
-            })
+    # Pre-compute query norm for fast Pearson
+    query_mean = query_flat.mean()
+    query_centered = query_flat - query_mean
+    query_std = query_flat.std()
 
-    results.sort(key=lambda r: r["effective_similarity"], reverse=True)
-    top_results = results[:top_k]
+    def _score_item(item):
+        hex_key, meta, attractor_path, w, chunk_name = item
+        attractor = np.load(attractor_path, mmap_mode='r')
+        if attractor.shape != (64, 64):
+            return None
+        att_flat = attractor.flatten()
+        md = meta.get("metadata", {})
+        att_mean = md.get("att_mean")
+        att_std = md.get("att_std")
+        try:
+            if att_mean is not None and att_std is not None and att_std > 0 and query_std > 0:
+                att_centered = att_flat - att_mean
+                sim = float(np.dot(query_centered, att_centered) / (len(query_flat) * query_std * att_std))
+            else:
+                corr, _ = pearsonr(query_flat, att_flat)
+                sim = float(corr)
+        except Exception:
+            return None
+        if np.isnan(sim):
+            sim = 0.0
+        temp = effective_temperature(
+            meta["metadata"]["hit_count"],
+            meta["metadata"]["last_accessed"],
+            warmth_boost=w.get("boost", 0.0),
+            warmth_applied_at=w.get("applied_at"),
+        )
+        tier = temperature_tier(temp)
+        effective = sim + temperature_boost * temp
+        return {
+            "hex_key": hex_key,
+            "text": meta["text"],
+            "similarity": sim,
+            "temperature": temp,
+            "temperature_tier": tier,
+            "effective_similarity": effective,
+            "state": meta["state"],
+            "convergence_ticks": meta["convergence_ticks"],
+            "timestamp": meta["timestamp"],
+            "chunk": chunk_name,
+        }
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = [
+            r for r in executor.map(_score_item, work_items)
+            if r is not None
+        ]
+
+    top_results = heapq.nlargest(
+        top_k, results, key=lambda r: r["effective_similarity"],
+    )
+
+    # Lazy feature extraction: only compute for top_k results
+    for r in top_results:
+        chunk_dir = d / "chunks" / r["chunk"]
+        att_path = chunk_dir / "attractors" / f"{r['hex_key']}.npy"
+        att = np.load(att_path, mmap_mode='r')
+        feats = compute_attractor_features(att)
+        r["grid_entropy"] = feats["grid_entropy"]
+        r["cluster_count"] = feats["cluster_count"]
+        r["alive_fraction"] = feats["alive_fraction"]
 
     # Polar companion injection: batch by chunk to minimise disk reads.
     # For top_k results all in the same chunk this reduces 5–10 reads to 1–2.
@@ -324,6 +351,11 @@ def _bump_recalled_memories(data_dir: Path, results: list[dict]) -> None:
         propagate_warmth(chunk_dir, hex_keys)
         if len(hex_keys) >= 2:
             build_co_recall_associations(chunk_dir, hex_keys)
+
+    # Cross-chunk warmth: build edges and propagate across chunk boundaries
+    if len(by_chunk) >= 2:
+        build_cross_chunk_co_recall(data_dir, results)
+        propagate_warmth_cross_chunk(data_dir, results)
 
 
 def list_memories(
