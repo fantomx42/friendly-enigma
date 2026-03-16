@@ -105,8 +105,8 @@ def extract_state(
             # Same chunk and both reasonably similar = co-activated
             if (
                 a.get("chunk") == b.get("chunk")
-                and a.get("similarity", 0) > 0.18
-                and b.get("similarity", 0) > 0.18
+                and a.get("similarity", 0) > confidence_floor
+                and b.get("similarity", 0) > confidence_floor
             ):
                 co_activated.append(
                     (a["text"][:60], b["text"][:60])
