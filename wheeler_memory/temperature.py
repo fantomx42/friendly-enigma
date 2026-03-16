@@ -13,39 +13,66 @@ Tiers: hot >= 0.6, warm >= 0.3, cold < 0.3
 
 from datetime import datetime, timezone
 
-HALF_LIFE_DAYS = 7.0
-HIT_SATURATION = 10
-TIER_HOT = 0.6
-TIER_WARM = 0.3
-TIER_FADING = 0.05          # Below this → brick eligible for deletion
-TIER_DEAD = 0.01            # Below this → full eviction
-MAX_ATTRACTORS = 10_000     # Global capacity across all chunks
-EVICTION_RATIO = 0.10       # Remove bottom 10% when over capacity
-MIN_AGE_DAYS = 1.0          # Never evict memories younger than 1 day
+from .constants import (
+    CONSOLIDATION_DELTA_COLD,
+    CONSOLIDATION_DELTA_WARM,
+    CONSOLIDATION_MIN_FRAMES,
+    CONSOLIDATION_MIN_HISTORY,
+    CONSOLIDATION_ROLE_COLD,
+    CONSOLIDATION_ROLE_WARM,
+    EVICTION_RATIO,
+    HALF_LIFE_DAYS,
+    HIT_SATURATION,
+    MAX_ATTRACTORS,
+    MAX_WARMTH,
+    MIN_AGE_DAYS,
+    SALIENCE_DEFAULT,
+    SALIENCE_MAX_ITERS_HIGH,
+    SALIENCE_MAX_ITERS_LOW,
+    SALIENCE_MAX_ITERS_MED,
+    SALIENCE_THRESHOLD_HIGH,
+    SALIENCE_THRESHOLD_LOW,
+    SALIENCE_THRESHOLD_MED,
+    TIER_DEAD,
+    TIER_FADING,
+    TIER_HOT,
+    TIER_WARM,
+    WARMTH_FLOOR,
+    WARMTH_HALF_LIFE_DAYS,
+    WARMTH_HOP1,
+    WARMTH_HOP2,
+)
 
-# Associative warming constants
-WARMTH_HALF_LIFE_DAYS = 1.0   # Fast decay — warmth is short-term priming
-WARMTH_HOP1 = 0.05            # Boost for direct neighbors
-WARMTH_HOP2 = 0.025           # Boost for neighbors-of-neighbors
-MAX_WARMTH = 0.15             # Cap to prevent runaway accumulation
-WARMTH_FLOOR = 0.001          # Below this, warmth is garbage-collected
-
-# Sleep consolidation constants
-CONSOLIDATION_DELTA_WARM = 0.02   # Mean abs delta threshold for warm bricks
-CONSOLIDATION_DELTA_COLD = 0.05   # Mean abs delta threshold for cold bricks
-CONSOLIDATION_ROLE_WARM = 0.05    # Role-change fraction threshold for warm bricks
-CONSOLIDATION_ROLE_COLD = 0.10    # Role-change fraction threshold for cold bricks
-CONSOLIDATION_MIN_FRAMES = 3     # Minimum frames to keep: seed + 1 keyframe + attractor
-CONSOLIDATION_MIN_HISTORY = 5    # Don't consolidate bricks with fewer frames
-
-# Attention model (variable tick rates) constants
-SALIENCE_DEFAULT = 0.5
-SALIENCE_MAX_ITERS_LOW = 200
-SALIENCE_MAX_ITERS_MED = 1000
-SALIENCE_MAX_ITERS_HIGH = 3000
-SALIENCE_THRESHOLD_LOW = 5e-4
-SALIENCE_THRESHOLD_MED = 1e-4
-SALIENCE_THRESHOLD_HIGH = 1e-6
+# Re-export so that existing callers (`from .temperature import X`) keep working.
+__all__ = [
+    "CONSOLIDATION_DELTA_COLD",
+    "CONSOLIDATION_DELTA_WARM",
+    "CONSOLIDATION_MIN_FRAMES",
+    "CONSOLIDATION_MIN_HISTORY",
+    "CONSOLIDATION_ROLE_COLD",
+    "CONSOLIDATION_ROLE_WARM",
+    "EVICTION_RATIO",
+    "HALF_LIFE_DAYS",
+    "HIT_SATURATION",
+    "MAX_ATTRACTORS",
+    "MAX_WARMTH",
+    "MIN_AGE_DAYS",
+    "SALIENCE_DEFAULT",
+    "SALIENCE_MAX_ITERS_HIGH",
+    "SALIENCE_MAX_ITERS_LOW",
+    "SALIENCE_MAX_ITERS_MED",
+    "SALIENCE_THRESHOLD_HIGH",
+    "SALIENCE_THRESHOLD_LOW",
+    "SALIENCE_THRESHOLD_MED",
+    "TIER_DEAD",
+    "TIER_FADING",
+    "TIER_HOT",
+    "TIER_WARM",
+    "WARMTH_FLOOR",
+    "WARMTH_HALF_LIFE_DAYS",
+    "WARMTH_HOP1",
+    "WARMTH_HOP2",
+]
 
 
 def compute_temperature(

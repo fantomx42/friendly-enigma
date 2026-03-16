@@ -8,6 +8,7 @@ import logging
 
 import numpy as np
 
+from .constants import MAX_PUSH_STRENGTH, SALIENCE_MAX_ITERS_MED, SALIENCE_THRESHOLD_MED, SLOPE_FLOW_STRENGTH
 from .oscillation import detect_oscillation
 
 
@@ -31,9 +32,9 @@ def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
     max_neighbor = np.max(neighbors, axis=0)
 
     delta = np.zeros_like(frame)
-    delta = np.where(is_max, (1 - frame) * 0.35, delta)
-    delta = np.where(is_min, (-1 - frame) * 0.35, delta)
-    delta = np.where(~is_max & ~is_min, (max_neighbor - frame) * 0.20, delta)
+    delta = np.where(is_max, (1 - frame) * MAX_PUSH_STRENGTH, delta)
+    delta = np.where(is_min, (-1 - frame) * MAX_PUSH_STRENGTH, delta)
+    delta = np.where(~is_max & ~is_min, (max_neighbor - frame) * SLOPE_FLOW_STRENGTH, delta)
 
     return np.clip(frame + delta, -1, 1)
 
@@ -50,8 +51,8 @@ except ImportError:
 
 def evolve_and_interpret(
     frame: np.ndarray,
-    max_iters: int = 1000,
-    stability_threshold: float = 1e-4,
+    max_iters: int = SALIENCE_MAX_ITERS_MED,
+    stability_threshold: float = SALIENCE_THRESHOLD_MED,
 ) -> dict:
     """Run CA evolution until convergence, oscillation, or chaos.
 

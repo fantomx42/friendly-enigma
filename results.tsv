@@ -1,0 +1,2 @@
+iteration	timestamp	score	avg_correlation	convergence_ratio	median_ticks	alive_fraction	elapsed_s	improved	commit	changed	notes
+1	2026-03-16T06:46:56.335926+00:00	0.012844	0.01474	1.0	40.0	1.0	0.09		6c1aeec0	baseline	initial benchmark after constants.py refactor

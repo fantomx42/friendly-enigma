@@ -8,6 +8,7 @@ Association graph and warmth state are persisted per-chunk in
 associations.json alongside the existing index.json.
 """
 
+import fcntl
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,7 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import pearsonr
 
+from .constants import ASSOCIATION_THRESHOLD, CROSS_CHUNK_DECAY
 from .temperature import (
     MAX_WARMTH,
     WARMTH_FLOOR,
@@ -23,8 +25,6 @@ from .temperature import (
     compute_warmth,
 )
 
-ASSOCIATION_THRESHOLD = 0.5  # Minimum Pearson correlation for store-time edge
-
 
 # ---------------------------------------------------------------------------
 # I/O helpers
@@ -32,16 +32,24 @@ ASSOCIATION_THRESHOLD = 0.5  # Minimum Pearson correlation for store-time edge
 
 def _load_associations(chunk_dir: Path) -> dict:
     """Load associations.json for a chunk, returning default if absent."""
-    path = chunk_dir / "associations.json"
-    if path.exists():
-        return json.loads(path.read_text())
-    return {"edges": {}, "warmth": {}}
+    from .cache import cached_load_json
+    return cached_load_json(
+        chunk_dir / "associations.json",
+        default={"edges": {}, "warmth": {}},
+    )
 
 
 def _save_associations(chunk_dir: Path, assoc: dict) -> None:
-    """Write associations.json for a chunk."""
-    path = chunk_dir / "associations.json"
-    path.write_text(json.dumps(assoc, indent=2))
+    """Write associations.json for a chunk (locked + atomic)."""
+    from .cache import invalidate
+    lock_path = chunk_dir / "associations.json.lock"
+    with open(lock_path, "w") as lock_fd:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        path = chunk_dir / "associations.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(assoc, indent=2))
+        tmp.replace(path)  # atomic on POSIX
+    invalidate(path)
 
 
 def load_associations(chunk_dir: Path) -> dict:
@@ -250,3 +258,139 @@ def propagate_warmth(chunk_dir: Path, fired_keys: list[str]) -> dict[str, float]
         _save_associations(chunk_dir, assoc)
 
     return warmed
+
+
+# ---------------------------------------------------------------------------
+# Cross-chunk warmth propagation
+# ---------------------------------------------------------------------------
+
+_CROSS_CHUNK_INDEX = "cross_chunk_edges.json"
+
+
+def _load_cross_chunk_edges(data_dir: Path) -> dict:
+    """Load cross-chunk edge index from data_dir root."""
+    from .cache import cached_load_json
+    return cached_load_json(
+        data_dir / _CROSS_CHUNK_INDEX,
+        default={"edges": {}},
+    )
+
+
+def _save_cross_chunk_edges(data_dir: Path, edges: dict) -> None:
+    """Save cross-chunk edge index (locked + atomic)."""
+    from .cache import invalidate
+    path = data_dir / _CROSS_CHUNK_INDEX
+    lock_path = data_dir / "cross_chunk_edges.json.lock"
+    with open(lock_path, "w") as lock_fd:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(edges, indent=2))
+        tmp.replace(path)
+    invalidate(path)
+
+
+def build_cross_chunk_co_recall(
+    data_dir: Path,
+    results: list[dict],
+) -> int:
+    """Create cross-chunk edges between co-recalled memories in different chunks.
+
+    Called after recall when top-k results span multiple chunks.
+    Returns number of new edges created.
+    """
+    if len(results) < 2:
+        return 0
+
+    # Group by chunk
+    by_chunk: dict[str, list[str]] = {}
+    for r in results:
+        by_chunk.setdefault(r["chunk"], []).append(r["hex_key"])
+
+    if len(by_chunk) < 2:
+        return 0  # all results from same chunk, nothing to bridge
+
+    cross = _load_cross_chunk_edges(data_dir)
+    edges = cross.setdefault("edges", {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    count = 0
+
+    # Create edges between all cross-chunk pairs
+    chunks = list(by_chunk.keys())
+    for i, chunk_a in enumerate(chunks):
+        for chunk_b in chunks[i + 1:]:
+            for key_a in by_chunk[chunk_a]:
+                for key_b in by_chunk[chunk_b]:
+                    edge_id = f"{key_a}:{key_b}" if key_a < key_b else f"{key_b}:{key_a}"
+                    if edge_id not in edges:
+                        edges[edge_id] = {
+                            "chunks": sorted([chunk_a, chunk_b]),
+                            "keys": sorted([key_a, key_b]),
+                            "created": now_iso,
+                            "co_recall_count": 1,
+                        }
+                        count += 1
+                    else:
+                        edges[edge_id]["co_recall_count"] = (
+                            edges[edge_id].get("co_recall_count", 0) + 1
+                        )
+
+    if count > 0:
+        _save_cross_chunk_edges(data_dir, cross)
+    return count
+
+
+def propagate_warmth_cross_chunk(
+    data_dir: Path,
+    fired_results: list[dict],
+) -> dict[str, float]:
+    """Spread warmth across chunk boundaries via cross-chunk edges.
+
+    Returns dict of {hex_key: boost_applied} for warmed cross-chunk memories.
+    """
+    if not fired_results:
+        return {}
+
+    cross = _load_cross_chunk_edges(data_dir)
+    edges = cross.get("edges", {})
+    if not edges:
+        return {}
+
+    fired_keys = {r["hex_key"] for r in fired_results}
+    warmed: dict[str, tuple[str, float]] = {}  # hex_key → (chunk, boost)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    for edge_id, edge_data in edges.items():
+        keys = edge_data["keys"]
+        chunks = edge_data["chunks"]
+        for idx, key in enumerate(keys):
+            if key in fired_keys:
+                other_key = keys[1 - idx]
+                other_chunk = chunks[1 - idx] if chunks[0] != chunks[1] else chunks[0]
+                if other_key not in fired_keys:
+                    boost = WARMTH_HOP1 * CROSS_CHUNK_DECAY
+                    if other_key in warmed:
+                        _, existing = warmed[other_key]
+                        boost = min(existing + boost, MAX_WARMTH)
+                    warmed[other_key] = (other_chunk, boost)
+
+    # Apply warmth to each target chunk's associations
+    by_chunk: dict[str, dict[str, float]] = {}
+    for hk, (chunk, boost) in warmed.items():
+        by_chunk.setdefault(chunk, {})[hk] = boost
+
+    for chunk_name, boosts in by_chunk.items():
+        chunk_dir = data_dir / "chunks" / chunk_name
+        if not chunk_dir.exists():
+            continue
+        assoc = _load_associations(chunk_dir)
+        warmth = assoc.setdefault("warmth", {})
+        for hk, boost in boosts.items():
+            existing = warmth.get(hk, {})
+            existing_boost = existing.get("boost", 0.0)
+            if existing_boost > 0 and "applied_at" in existing:
+                existing_boost = compute_warmth(existing_boost, existing["applied_at"])
+            new_boost = min(existing_boost + boost, MAX_WARMTH)
+            warmth[hk] = {"boost": round(new_boost, 4), "applied_at": now_iso}
+        _save_associations(chunk_dir, assoc)
+
+    return {hk: boost for hk, (_, boost) in warmed.items()}
