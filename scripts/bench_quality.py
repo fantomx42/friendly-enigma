@@ -220,7 +220,11 @@ def main() -> None:
         return
 
     prev_score = _last_score(_RESULTS_TSV)
-    improved = None if prev_score is None else (result["score"] < prev_score)
+    improved = None if prev_score is None else (
+        True if result["score"] < prev_score else
+        None if result["score"] == prev_score else
+        False
+    )
 
     # Human-readable summary
     print(f"\n{'=' * 55}")
