@@ -28,7 +28,7 @@ WARMING (spreading activation)
 # ---------------------------------------------------------------------------
 # CA Dynamics
 # ---------------------------------------------------------------------------
-MAX_PUSH_STRENGTH = 0.40       # Local max/min pull toward ±1
+MAX_PUSH_STRENGTH = 0.45       # Local max/min pull toward ±1
 SLOPE_FLOW_STRENGTH = 0.20     # Gradient descent rate for slope cells
 
 # ---------------------------------------------------------------------------
