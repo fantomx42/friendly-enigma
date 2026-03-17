@@ -89,6 +89,9 @@ from .decoder import DecoderState, WheelerPrimaryAgent, extract_state, format_st
 # Corpus crystallization pipeline
 from .crystallization import CrystallizationResult, crystallize, load_corpus
 
+# Generative engine (IT from BIT)
+from .generation import GenerationResult, TickResult, trajectory_resonance
+
 __all__ = [
     "hash_to_frame",
     "text_to_hex",
@@ -165,5 +168,9 @@ __all__ = [
     "CrystallizationResult",
     "crystallize",
     "load_corpus",
+    # Generative engine
+    "GenerationResult",
+    "TickResult",
+    "trajectory_resonance",
 ]
 
