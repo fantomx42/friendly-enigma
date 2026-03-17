@@ -21,6 +21,8 @@ The system operates in two modes:
 
 Memories have **temperature** - frequently recalled memories stay warm, stale ones cool and can be archived. Recall is **reconstructive**: stored attractors blend with query context and re-evolve, so the same memory reconstructs differently depending on what you're thinking about.
 
+The long-term goal is to benchmark Wheeler against frontier models on [MMLU](https://huggingface.co/datasets/cais/mmlu), [GPQA](https://arxiv.org/abs/2311.12022), AIME, and SWE-bench — not as a language model, but as a **learning system**: learn on training data, consolidate overnight, test on held-out splits, measure the delta.
+
 ---
 
 ## Quick Start
@@ -50,6 +52,19 @@ wheeler-crystallize corpus.jsonl --verbose
 
 ```bash
 wheeler-primary --interactive --show-state --verbose
+```
+
+### Run the MMLU benchmark
+
+```bash
+# Pure semantic evaluation (no LLM)
+wheeler-mmlu --subjects high_school_physics conceptual_physics --mode semantic
+
+# Full learn → consolidate → test cycle
+wheeler-mmlu --subjects high_school_physics conceptual_physics --mode learn
+
+# All 57 subjects, save results
+wheeler-mmlu --all --mode semantic --output results.tsv
 ```
 
 ### Launch the web dashboard
@@ -132,6 +147,28 @@ The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slope
 ## Empirical Results
 
 Validated on a corpus of **2,711 memories** (26.9% grid saturation):
+
+### MMLU Benchmark (learn → consolidate → test)
+
+Wheeler now has a full learning loop: store correct Q&A facts from dev+validation splits,
+run sleep consolidation, then test on the held-out test split.
+
+**Physics subjects — 488 questions (test split):**
+
+| Subject | Correct / Total | Accuracy |
+|---------|----------------|----------|
+| conceptual_physics | 65/235 | 27.7% |
+| college_physics | 36/102 | 35.3% |
+| high_school_physics | 33/151 | 21.9% |
+| **OVERALL** | **134/488** | **27.5%** |
+
+Random chance for 4-choice MCQ is **25.0%**. Current scoring uses Pearson correlation
+between CA attractors — it measures attractor *shape* similarity, not *propositional content*.
+The stored Q&A facts are in the index; the scoring mechanism can't yet read them.
+
+**Next step:** Reconstruction scoring. Evolve the query → let the CA settle → read back
+what the attractor is saying → compare that to the choices as text. This is the path where
+"it from bit" becomes the scoring mechanism, not just the storage philosophy.
 
 ### Semantic Apple Test
 
@@ -232,6 +269,16 @@ python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 | `wheeler-info` | System info (hardware, GPU, paths) |
 | `wheeler-bench-gpu` | Benchmark GPU vs CPU evolution speed |
 
+### Benchmark
+
+| Command | Description |
+|---------|-------------|
+| `wheeler-mmlu --subjects SUBJECT` | Run MMLU on specific subjects |
+| `wheeler-mmlu --all` | Run all 57 MMLU subjects |
+| `wheeler-mmlu --mode learn` | Learn dev+val → consolidate → test on test split |
+| `wheeler-mmlu --mode decode --model qwen2.5:1.5b` | Decoder mode (requires Ollama) |
+| `wheeler-mmlu --list-subjects` | Print all 57 available subjects |
+
 ### Evaluation Scripts
 
 ```bash
@@ -296,6 +343,7 @@ wheeler_memory/          Core library
 scripts/                 CLI entry points + evaluation tools
   wheeler_primary.py       Wheeler-primary CLI
   wheeler_crystallize.py   Crystallization CLI
+  wheeler_mmlu.py          MMLU benchmark harness (semantic / decode / learn modes)
   apple_test_semantic.py   Semantic holdout test
   eval_decoder.py          Decoder quality evaluation
   topology_map.py          Co-activation mapping
@@ -337,4 +385,4 @@ See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested readi
 
 ---
 
-*Darman doesn't retrieve. Darman reconstructs.*
+*It from bit. The answer emerges from the attractor — not from lookup.*
