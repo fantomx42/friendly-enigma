@@ -28,7 +28,10 @@ WARMING (spreading activation)
 # ---------------------------------------------------------------------------
 # CA Dynamics
 # ---------------------------------------------------------------------------
-MAX_PUSH_STRENGTH = 0.25       # Local max/min pull toward ±1
+MAX_PUSH_STRENGTH = 0.35       # Local max/min pull toward ±1
+# NOTE: GPU path (gpu/ca_kernel*.hip) has these hardcoded as 0.35f / 0.20f.
+# Changing these constants only affects the CPU fallback path.
+# To tune CA dynamics on GPU hardware, rebuild the .so after editing the .hip files.
 SLOPE_FLOW_STRENGTH = 0.20     # Gradient descent rate for slope cells
 
 # ---------------------------------------------------------------------------
