@@ -25,6 +25,7 @@ import argparse
 import sys
 
 from wheeler_memory.agent import DEFAULT_MODEL, DEFAULT_OLLAMA_URL, WheelerAgent
+from wheeler_memory.embedding import embed_available
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -94,6 +95,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="N",
         help="Memories to inject per turn when --auto-recall is active (default: 3).",
     )
+    p.add_argument(
+        "--embed",
+        action=argparse.BooleanOptionalAction,
+        default=embed_available(),
+        help="Use semantic embeddings for store/recall (default: auto-detect).",
+    )
     return p.parse_args(argv)
 
 
@@ -112,6 +119,7 @@ def main(argv: list[str] | None = None) -> None:
         auto_store=do_store,
         auto_recall_k=args.recall_k,
         verbose=args.verbose,
+        use_embedding=args.embed,
     )
 
     if args.message and not args.interactive:

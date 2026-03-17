@@ -136,10 +136,12 @@ def recall_memory(
     chunk: str | None = None,
     temperature_boost: float = 0.0,
     use_embedding: bool = False,
+    query_frame: "np.ndarray | None" = None,
     reconstruct: bool = False,
     reconstruct_alpha: float = 0.3,
     salience: float | None = None,
     polar_decay: bool = False,
+    readonly: bool = False,
 ) -> list[dict]:
     """Recall stored memories by Pearson correlation with the query's attractor.
 
@@ -173,11 +175,12 @@ def recall_memory(
             if c not in chunks_to_search:
                 chunks_to_search.append(c)
 
-    if use_embedding:
-        embed_fn = _get_embed_to_frame()
-        query_frame = embed_fn(text)
-    else:
-        query_frame = hash_to_frame(text)
+    if query_frame is None:
+        if use_embedding:
+            embed_fn = _get_embed_to_frame()
+            query_frame = embed_fn(text)
+        else:
+            query_frame = hash_to_frame(text)
     query_result = evolve_and_interpret(
         query_frame, max_iters=budget.max_iters,
         stability_threshold=budget.stability_threshold,
@@ -323,7 +326,8 @@ def recall_memory(
             r["correlation_with_stored"] = recon["correlation_with_stored"]
             r["correlation_with_query"] = recon["correlation_with_query"]
 
-    _bump_recalled_memories(d, top_results)
+    if not readonly:
+        _bump_recalled_memories(d, top_results)
 
     return top_results
 
