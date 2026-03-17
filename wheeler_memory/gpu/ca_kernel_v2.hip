@@ -48,7 +48,9 @@ __global__ void ca_step_kernel(
     float*       __restrict__ delta_sums,  /* [B]         */
     const int*   __restrict__ status,      /* [B]         */
     int grid_w,
-    int grid_cells)  /* grid_w * grid_w */
+    int grid_cells,  /* grid_w * grid_w */
+    float push_strength,
+    float slope_strength)
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -81,12 +83,12 @@ __global__ void ca_step_kernel(
 
     float delta;
     if (is_max) {
-        delta = (1.0f - v) * 0.35f;
+        delta = (1.0f - v) * push_strength;
     } else if (is_min) {
-        delta = (-1.0f - v) * 0.35f;
+        delta = (-1.0f - v) * push_strength;
     } else {
         float max_n = fmaxf(fmaxf(n_up, n_dn), fmaxf(n_lf, n_rt));
-        delta = (max_n - v) * 0.20f;
+        delta = (max_n - v) * slope_strength;
     }
 
     float new_v = fminf(fmaxf(v + delta, -1.0f), 1.0f);
@@ -324,6 +326,8 @@ size_t ca_query_vram(int batch_size, int grid_w)
  * @param grid_w              Grid width (64, 128, 256, 512, 1000, etc.)
  * @param max_iters           Max iterations before CHAOTIC
  * @param stability_threshold Convergence threshold for mean |delta|
+ * @param push_strength       CA push strength for local max/min cells (e.g. 0.35)
+ * @param slope_strength      CA slope flow strength (e.g. 0.20)
  * @return 0 on success, -1 on HIP error
  */
 int ca_evolve_batch_v2(
@@ -334,7 +338,9 @@ int ca_evolve_batch_v2(
     int          batch_size,
     int          grid_w,
     int          max_iters,
-    float        stability_threshold)
+    float        stability_threshold,
+    float        push_strength,
+    float        slope_strength)
 {
     if (batch_size <= 0 || grid_w <= 0) return 0;
 
@@ -406,7 +412,8 @@ int ca_evolve_batch_v2(
         /* Kernel 1: CA step */
         hipLaunchKernelGGL(ca_step_kernel,
             grid_2d, block_2d, 0, 0,
-            src, dst, d_delta, d_status, grid_w, grid_cells);
+            src, dst, d_delta, d_status, grid_w, grid_cells,
+            push_strength, slope_strength);
 
         /* Kernel 2: Convergence check */
         hipLaunchKernelGGL(convergence_check_kernel,
@@ -497,11 +504,14 @@ int ca_evolve_single_v2(
     int*         state_out,
     int          grid_w,
     int          max_iters,
-    float        stability_threshold)
+    float        stability_threshold,
+    float        push_strength,
+    float        slope_strength)
 {
     return ca_evolve_batch_v2(
         frame_in, frame_out, ticks_out, state_out,
-        1, grid_w, max_iters, stability_threshold);
+        1, grid_w, max_iters, stability_threshold,
+        push_strength, slope_strength);
 }
 
 }  /* extern "C" */

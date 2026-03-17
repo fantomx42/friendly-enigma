@@ -14,6 +14,7 @@ import os
 import numpy as np
 
 from .dynamics import apply_ca_dynamics  # CPU fallback for get_cell_roles
+from .constants import MAX_PUSH_STRENGTH, SLOPE_FLOW_STRENGTH
 
 _LIB_DIR = os.path.join(os.path.dirname(__file__), "gpu")
 _LIB_V2_PATH = os.path.join(_LIB_DIR, "libwheeler_ca_v2.so")
@@ -34,7 +35,7 @@ def _load_lib():
         try:
             lib = ctypes.CDLL(_LIB_V2_PATH)
 
-            # int ca_evolve_batch_v2(float*, float*, int*, int*, int, int, int, float)
+            # int ca_evolve_batch_v2(float*, float*, int*, int*, int, int, int, float, float, float)
             lib.ca_evolve_batch_v2.argtypes = [
                 ctypes.POINTER(ctypes.c_float),   # frames_in
                 ctypes.POINTER(ctypes.c_float),   # frames_out
@@ -44,10 +45,12 @@ def _load_lib():
                 ctypes.c_int,                     # grid_w
                 ctypes.c_int,                     # max_iters
                 ctypes.c_float,                   # stability_threshold
+                ctypes.c_float,                   # push_strength
+                ctypes.c_float,                   # slope_strength
             ]
             lib.ca_evolve_batch_v2.restype = ctypes.c_int
 
-            # int ca_evolve_single_v2(float*, float*, int*, int*, int, int, float)
+            # int ca_evolve_single_v2(float*, float*, int*, int*, int, int, float, float, float)
             lib.ca_evolve_single_v2.argtypes = [
                 ctypes.POINTER(ctypes.c_float),
                 ctypes.POINTER(ctypes.c_float),
@@ -56,6 +59,8 @@ def _load_lib():
                 ctypes.c_int,                     # grid_w
                 ctypes.c_int,                     # max_iters
                 ctypes.c_float,                   # stability_threshold
+                ctypes.c_float,                   # push_strength
+                ctypes.c_float,                   # slope_strength
             ]
             lib.ca_evolve_single_v2.restype = ctypes.c_int
 
@@ -155,6 +160,8 @@ def gpu_evolve_single(
             grid_w,
             max_iters,
             ctypes.c_float(stability_threshold),
+            ctypes.c_float(MAX_PUSH_STRENGTH),
+            ctypes.c_float(SLOPE_FLOW_STRENGTH),
         )
     else:
         ret = lib.ca_evolve_single(
@@ -224,6 +231,8 @@ def gpu_evolve_batch(
             grid_w,
             max_iters,
             ctypes.c_float(stability_threshold),
+            ctypes.c_float(MAX_PUSH_STRENGTH),
+            ctypes.c_float(SLOPE_FLOW_STRENGTH),
         )
     else:
         ret = lib.ca_evolve_batch(
