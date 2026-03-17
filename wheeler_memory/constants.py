@@ -41,7 +41,7 @@ SALIENCE_MAX_ITERS_MED = 1000
 SALIENCE_MAX_ITERS_HIGH = 3000
 
 SALIENCE_THRESHOLD_LOW = 5e-4
-SALIENCE_THRESHOLD_MED = 5e-4
+SALIENCE_THRESHOLD_MED = 2e-4
 SALIENCE_THRESHOLD_HIGH = 1e-6
 
 # ---------------------------------------------------------------------------
