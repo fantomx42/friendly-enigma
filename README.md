@@ -267,7 +267,9 @@ python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 | `wheeler-ui` | Web dashboard at http://localhost:7437 |
 | `wheeler-scrub --text "text"` | Visualise how a memory formed (brick inspector) |
 | `wheeler-info` | System info (hardware, GPU, paths) |
+| `wheeler-bench` | Quality score benchmark for CA dynamics tuning |
 | `wheeler-bench-gpu` | Benchmark GPU vs CPU evolution speed |
+| `wheeler-generate` | Generative text engine (IT from BIT mode) |
 
 ### Benchmark
 
@@ -300,7 +302,7 @@ Every stored memory is a fixed-point in CA dynamics. The collection of all store
 
 Memories have temperature based on access frequency and time decay (7-day half-life). Hot memories are prioritised during recall. Cold memories can be archived via `wheeler-sleep`.
 
-Temperature tiers: `hot > warm > cool > cold > frozen`
+Temperature tiers: `hot (≥0.6) > warm (≥0.3) > cold (≥0.05) > fading (≥0.01) > dead (<0.01)`
 
 ### Reconstructive Recall (Darman)
 
@@ -338,7 +340,15 @@ wheeler_memory/          Core library
   gpu_dynamics.py          HIP/CUDA kernel dispatch
   attention.py             Salience-weighted recall
   warming.py               Association tracking
+  oscillation.py           Epistemic uncertainty via role-space oscillation detection
+  rotation.py              Rotation retry to escape bad attractor basins
+  polarity.py              Dual-polarity encoding (antipodal CA states)
+  consolidation.py         Sleep consolidation (prune redundant keyframes in bricks)
+  eviction.py              Three-phase graceful degradation (consolidation → fading → eviction)
+  generation.py            Generative engine (IT from BIT: attractors as generative model)
+  cache.py                 JSON file-based caching layer
   theories/                Theory experiments (basin analysis, resonance, synthesis)
+  gpu/                     HIP/CUDA kernel sources and compiled shared libraries
 
 scripts/                 CLI entry points + evaluation tools
   wheeler_primary.py       Wheeler-primary CLI
@@ -349,7 +359,7 @@ scripts/                 CLI entry points + evaluation tools
   topology_map.py          Co-activation mapping
   prepare_corpus.py        Corpus preparation from datasets
 
-tests/                   208 tests across 17 test files
+tests/                   Test suite across 20 test files
 ui/                      Web dashboard + interactive demo
 docs/                    Architecture, concepts, CLI, GPU, installation guides
 open_webui_setup/        OpenWebUI LLM integration
@@ -373,6 +383,7 @@ See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested readi
 | [CLI Reference](docs/cli.md) | Every flag documented |
 | [API Reference](docs/api.md) | Python library usage |
 | [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup |
+| [Roadmap](docs/future.md) | Planned features and research directions |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
 
