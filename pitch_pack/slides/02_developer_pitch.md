@@ -564,7 +564,7 @@ pytest tests/ -v
 
 ### For Practitioners
 - Follow the [Installation Guide](docs/install.md)
-- Try the [Interactive Demo](ui/demo.html)
+- Try the [Interactive Demo](docs/demos/demo.html)
 - Build something and share on Discussions
 
 ### For Contributors

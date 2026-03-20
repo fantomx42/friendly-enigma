@@ -219,7 +219,7 @@ The launch script mounts two paths into the Open WebUI Pipelines container:
 | `min_similarity` | 0.1 | Pearson threshold below which memories are suppressed |
 | `max_context_length` | 2000 | Soft cap on injected context characters |
 
-Source: `open_webui_setup/pipelines/wheeler_memory_pipeline.py`.
+Source: OpenWebUI pipeline (removed from repo, previously in `open_webui_setup/`).
 
 ---
 

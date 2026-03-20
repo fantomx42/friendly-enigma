@@ -5,7 +5,7 @@
 | Guide | Description |
 |-------|-------------|
 | [Installation](install.md) | Python venv setup, platform-specific GPU notes, Ollama |
-| [Interactive Demo](../ui/demo.html) | See the CA engine in your browser (no server needed) |
+| [Interactive Demo](demos/demo.html) | See the CA engine in your browser (no server needed) |
 
 ## Core Guides
 
@@ -27,6 +27,7 @@
 
 | Guide | Description |
 |-------|-------------|
+| [Vision](VISION.md) | Project Ralph — full architecture vision |
 | [Future / Roadmap](future.md) | Planned features and directions |
 | [Contributing](../CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](../CHANGELOG.md) | Release history |

@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.2.0 (2026-03-20)
+
+### Organization
+- Reorganized `scripts/` into `bench/`, `exploration/`, `tools/` subdirs
+- Moved reports to `docs/reports/`, HTML demos to `docs/demos/`
+- Removed `open_webui_setup/` (LLM infra, moved out of repo)
+- Removed `wheeler_3d_viewer/` (no longer maintained)
+- Added `docs/VISION.md` — Project Ralph architecture vision
+
+### Features
+- `wheeler-mmlu --mode learn` — full learn → consolidate → test cycle
+- `wheeler-generate` — IT-from-BIT generative text engine
+- `tests/test_hallucination.py` — hallucination classification tests
+- Crystallization pipeline refactor (pipelined embed→CA→store)
+- New planning docs committed (fractal cube addressing, ternary dynamics)
+
+### Tuning
+- Parameter experiments on SALIENCE_THRESHOLD_MED, constants updates
+
 ## v0.1.0 (Initial Release)
 
 ### Features

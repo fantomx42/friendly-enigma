@@ -284,10 +284,10 @@ python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 ### Evaluation Scripts
 
 ```bash
-python scripts/apple_test_semantic.py   # Semantic holdout test
-python scripts/eval_decoder.py          # Decoder quality by attractor depth
-python scripts/eval_decoder.py --decode # Also run small model (requires Ollama)
-python scripts/topology_map.py          # Co-activation adjacency map
+python scripts/bench/apple_test_semantic.py   # Semantic holdout test
+python scripts/bench/eval_decoder.py          # Decoder quality by attractor depth
+python scripts/bench/eval_decoder.py --decode # Also run small model (requires Ollama)
+python scripts/tools/topology_map.py          # Co-activation adjacency map
 ```
 
 ---
@@ -325,46 +325,45 @@ Corpus entries that discuss multiple concepts together create measurable attract
 ## Project Structure
 
 ```
-wheeler_memory/          Core library
-  dynamics.py              CA engine (3-state evolution, GPU dispatch)
-  embedding.py             Sentence transformer + JL random projection
-  hashing.py               SHA-256 deterministic encoding
-  storage.py               Store/recall with chunked Pearson search
-  reconstruction.py        Darman reconstructive recall
-  decoder.py               Wheeler-primary agent (small model as decoder)
-  crystallization.py       Corpus pre-training pipeline
-  temperature.py           Temperature/warmth tracking
-  chunking.py              Domain routing (keyword-based)
-  brick.py                 Memory brick format (.npz archives)
-  agent.py                 LLM agent with Wheeler context
-  gpu_dynamics.py          HIP/CUDA kernel dispatch
-  attention.py             Salience-weighted recall
-  warming.py               Association tracking
-  oscillation.py           Epistemic uncertainty via role-space oscillation detection
-  rotation.py              Rotation retry to escape bad attractor basins
-  polarity.py              Dual-polarity encoding (antipodal CA states)
-  consolidation.py         Sleep consolidation (prune redundant keyframes in bricks)
-  eviction.py              Three-phase graceful degradation (consolidation → fading → eviction)
-  generation.py            Generative engine (IT from BIT: attractors as generative model)
-  cache.py                 JSON file-based caching layer
-  theories/                Theory experiments (basin analysis, resonance, synthesis)
-  gpu/                     HIP/CUDA kernel sources and compiled shared libraries
+wheeler_memory/            Core library
+  dynamics.py                CA engine (3-state evolution, GPU dispatch)
+  embedding.py               Sentence transformer + JL random projection
+  hashing.py                 SHA-256 deterministic encoding
+  storage.py                 Store/recall with chunked Pearson search
+  reconstruction.py          Darman reconstructive recall
+  decoder.py                 Wheeler-primary agent (small model as decoder)
+  crystallization.py         Corpus pre-training pipeline
+  temperature.py             Temperature/warmth tracking
+  chunking.py                Domain routing (keyword-based)
+  brick.py                   Memory brick format (.npz archives)
+  agent.py                   LLM agent with Wheeler context
+  gpu_dynamics.py            HIP/CUDA kernel dispatch
+  attention.py               Salience-weighted recall
+  warming.py                 Association tracking
+  oscillation.py             Epistemic uncertainty via oscillation detection
+  rotation.py                Rotation retry to escape bad attractor basins
+  polarity.py                Dual-polarity encoding (antipodal CA states)
+  consolidation.py           Sleep consolidation (prune redundant keyframes)
+  eviction.py                Three-phase graceful degradation
+  generation.py              Generative engine (IT from BIT)
+  cache.py                   JSON file-based caching layer
+  theories/                  Theory experiments (basin, resonance, synthesis)
+  gpu/                       HIP/CUDA kernel sources
 
-scripts/                 CLI entry points + evaluation tools
-  wheeler_primary.py       Wheeler-primary CLI
-  wheeler_crystallize.py   Crystallization CLI
-  wheeler_mmlu.py          MMLU benchmark harness (semantic / decode / learn modes)
-  apple_test_semantic.py   Semantic holdout test
-  eval_decoder.py          Decoder quality evaluation
-  topology_map.py          Co-activation mapping
-  prepare_corpus.py        Corpus preparation from datasets
+scripts/                   CLI entry points
+  bench/                     Benchmarks & evaluation (apple test, decoder eval)
+  exploration/               Standalone exploration scripts
+  tools/                     Data prep, corpus cleanup, HIP build utilities
+  experiments/               Theory test harnesses
 
-tests/                   Test suite across 20 test files
-ui/                      Web dashboard + interactive demo
-docs/                    Architecture, concepts, CLI, GPU, installation guides
-open_webui_setup/        OpenWebUI LLM integration
-wheeler_3d_viewer/       3D attractor landscape viewer
-datasets/                Training corpora (SWE-bench, mbpp, LongBench, curated)
+tests/                     pytest suite (~233 tests)
+docs/                      Technical documentation
+  reports/                   Generated assessment reports
+  demos/                     Archived HTML demos (chat, dashboard)
+  VISION.md                  Project Ralph architecture vision
+plans/                     Research & implementation plans
+pitch_pack/                Investor/developer pitch materials
+datasets/                  Training corpora (gitignored, ~35GB)
 ```
 
 ---
@@ -376,7 +375,7 @@ See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested readi
 | Guide | Description |
 |-------|-------------|
 | [Installation](docs/install.md) | venv setup, platform-specific notes, GPU acceleration, Ollama |
-| [Interactive Demo](ui/demo.html) | See the CA engine in your browser (open as a file, no server) |
+| [Interactive Demo](docs/demos/demo.html) | See the CA engine in your browser (open as a file, no server) |
 | [Architecture](docs/architecture.md) | CA dynamics, temperature system, chunked storage, the math |
 | [Concepts](docs/concepts.md) | Theoretical foundation, reconstructive recall, semantic vs exact search |
 | [Design Principles](docs/design.md) | The Darman philosophy |
@@ -386,13 +385,6 @@ See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested readi
 | [Roadmap](docs/future.md) | Planned features and research directions |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
-
----
-
-## Related Tools
-
-- **OpenWebUI Integration** (`open_webui_setup/`) - inject Wheeler memories into any LLM conversation
-- **3D Viewer** (`wheeler_3d_viewer/`) - explore attractor landscapes in 3D
 
 ---
 

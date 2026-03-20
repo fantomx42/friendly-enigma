@@ -15,7 +15,7 @@ Python 3.11+ required. The system Python on Arch/CachyOS is externally-managed �
 ## Running Tests
 
 ```bash
-pytest                           # run all tests (208 tests)
+pytest                           # run all tests (~233 tests)
 pytest -m "not slow"             # skip slow tests
 pytest -m "not embed"            # skip tests requiring sentence-transformers
 pytest tests/test_dynamics.py    # run a specific test file
@@ -36,9 +36,15 @@ Test markers:
 
 - `wheeler_memory/` — core library (import as `from wheeler_memory import ...`)
 - `scripts/` — CLI entry points (registered in `pyproject.toml`)
+  - `bench/` — benchmarks & evaluation scripts
+  - `exploration/` — standalone exploration scripts
+  - `tools/` — data prep, corpus cleanup, HIP build utilities
+  - `experiments/` — theory test harnesses
 - `tests/` — pytest test suite
 - `docs/` — documentation (Markdown)
-- `ui/` — web dashboard (HTML/JS)
+  - `reports/` — generated assessment reports
+  - `demos/` — archived HTML demos
+- `plans/` — research & implementation plans
 
 ## Making Changes
 
