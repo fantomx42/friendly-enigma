@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -225,6 +226,46 @@ def score_semantic(
     return int(scores.index(max(scores))), scores
 
 
+def score_recall_text(
+    question: str,
+    recall_k: int = 10,
+    cache: "AttractorCache | None" = None,
+    debug: bool = False,
+) -> tuple[int, float]:
+    """Recall top-K facts for the question; extract answer letter by weighted vote.
+
+    Stored facts have the form "Q: {question} A: {letter}. {choice_text}".
+    Regex extracts the letter; similarity scores are summed per candidate.
+    Returns (predicted_index, total_vote_weight) or (-1, 0.0) on failure.
+    """
+    try:
+        from wheeler_memory.embedding import embed_to_frame
+        frame = embed_to_frame(question)
+    except Exception:
+        from wheeler_memory.hashing import hash_to_frame
+        frame = hash_to_frame(question)
+
+    hits = cache.search(frame, top_k=recall_k) if cache is not None else []
+
+    if debug:
+        print(f"      [debug] top-{len(hits)} recalls:")
+        for h in hits[:5]:
+            print(f"        sim={h['similarity']:.3f}  {h['text'][:80]}")
+
+    votes: dict[str, float] = {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0}
+    for hit in hits:
+        text = hit.get("text", "")
+        sim = hit.get("similarity", 0.0)
+        m = re.search(r"A:\s*([A-D])\.", text)
+        if m:
+            votes[m.group(1)] += sim
+
+    best = max(votes, key=votes.get)
+    if votes[best] == 0.0:
+        return -1, 0.0
+    return CHOICES.index(best), votes[best]
+
+
 def precompute_all_frames(questions_and_choices: list[tuple[str, list[str]]]) -> list[list]:
     """Batch-encode all question+choice pairs in one encoder call.
 
@@ -394,6 +435,7 @@ def run_benchmark(
     output: Path | None,
     split: str,
     use_embed: bool = True,
+    debug_recall: bool = False,
 ) -> dict:
     results = {}          # subject → {correct, total, accuracy}
     all_rows = []         # for TSV output
@@ -425,7 +467,7 @@ def run_benchmark(
     print()
 
     # Build attractor cache once for the entire benchmark run
-    cache = AttractorCache(data_dir) if mode == "semantic" else None
+    cache = AttractorCache(data_dir) if mode in ("semantic", "recall-text") else None
 
     for subj in subjects:
         correct = 0
@@ -450,6 +492,9 @@ def run_benchmark(
                 frames = precomputed[idx] if precomputed is not None else None
                 pred_idx, scores = score_semantic(question, choices, recall_k, cache, frames)
                 confidence = max(scores)
+            elif mode == "recall-text":
+                _dbg = debug_recall and idx < 3
+                pred_idx, confidence = score_recall_text(question, recall_k, cache, debug=_dbg)
             else:
                 try:
                     pred_idx, confidence = score_decode(
@@ -554,9 +599,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--mode",
-        choices=["semantic", "decode", "learn"],
+        choices=["semantic", "decode", "learn", "recall-text"],
         default="semantic",
-        help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), or 'learn' (store dev+val → consolidate → test). Default: semantic.",
+        help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), 'learn' (store dev+val → consolidate → test), or 'recall-text' (extract answer letter from recalled facts). Default: semantic.",
     )
     p.add_argument(
         "--split",
@@ -600,6 +645,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Use hash-based frames instead of sentence embeddings (much faster, lower accuracy).",
     )
+    p.add_argument(
+        "--debug-recall",
+        action="store_true",
+        help="Print top-5 recalled texts for first 3 questions per subject (recall-text mode).",
+    )
     return p.parse_args(argv)
 
 
@@ -641,6 +691,7 @@ def main(argv: list[str] | None = None) -> None:
         output=args.output,
         split=args.split,
         use_embed=not args.no_embed,
+        debug_recall=args.debug_recall,
     )
 
 

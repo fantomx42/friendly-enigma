@@ -79,3 +79,12 @@ WARMTH_HOP2 = 0.025               # Boost for neighbors-of-neighbors
 MAX_WARMTH = 0.15                 # Cap to prevent runaway accumulation
 WARMTH_FLOOR = 0.001              # Below this, warmth is garbage-collected
 CROSS_CHUNK_DECAY = 0.5           # Warmth decays by half when crossing a chunk boundary
+
+# ---------------------------------------------------------------------------
+# Hallucination discrimination
+# ---------------------------------------------------------------------------
+# classify_output() Pearson similarity threshold: similarity >= this = SYNTHESIS (grounded,
+# near a known basin), < this = NOVEL (stable but unknown territory).
+# Based on empirical attractor similarity data: near-paraphrase 0.51-0.56,
+# same-domain 0.13, cross-domain 0.002-0.05. Sweep [0.20 .. 0.50] during calibration.
+HALLUCINATION_THRESHOLD = 0.40

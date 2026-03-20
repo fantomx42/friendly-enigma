@@ -69,6 +69,65 @@ def _save_index(chunk_dir: Path, index: dict) -> None:
     invalidate(index_path)
 
 
+def batch_store_memories(
+    entries: list[tuple[str, dict, "MemoryBrick", str]],
+    data_dir: Path | None = None,
+) -> int:
+    """Store multiple memories with one index read+write per chunk.
+
+    Parameters
+    ----------
+    entries : list of (text, evolve_result, brick, chunk)
+    data_dir : Wheeler data directory
+
+    Returns number of successfully stored entries.
+    """
+    if not entries:
+        return 0
+
+    d = _get_data_dir(data_dir)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Group by chunk so we only lock+read+write each index once
+    by_chunk: dict[str, list[tuple[str, dict, MemoryBrick]]] = {}
+    for text, result, brick, chunk in entries:
+        by_chunk.setdefault(chunk, []).append((text, result, brick))
+
+    stored = 0
+    for chunk, items in by_chunk.items():
+        chunk_dir = get_chunk_dir(d, chunk)
+        lock_path = chunk_dir / "index.json.lock"
+        with open(lock_path, "w") as lock_fd:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            index = _load_index(chunk_dir)
+            for text, result, brick in items:
+                hex_key = text_to_hex(text)
+                # Write attractor + brick files (fast, outside lock in ideal world
+                # but done here for simplicity since they're independent files)
+                np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
+                brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
+                # Build index entry
+                meta = dict(result.get("metadata", {}))
+                meta["hit_count"] = 0
+                meta["last_accessed"] = now_iso
+                flat = result["attractor"].flatten()
+                meta["att_mean"] = float(flat.mean())
+                meta["att_std"] = float(flat.std())
+                index[hex_key] = {
+                    "text": text,
+                    "state": result["state"],
+                    "convergence_ticks": result["convergence_ticks"],
+                    "timestamp": now_iso,
+                    "metadata": meta,
+                    "chunk": chunk,
+                }
+                stored += 1
+            _save_index(chunk_dir, index)
+        touch_chunk_metadata(chunk_dir, stored=True)
+
+    return stored
+
+
 def store_memory(
     text: str,
     result: dict,

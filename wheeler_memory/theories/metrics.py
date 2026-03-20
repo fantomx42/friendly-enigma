@@ -7,7 +7,9 @@ and topology consistency — all computed from CA dynamics alone.
 import numpy as np
 from scipy.stats import pearsonr
 
+from ..constants import HALLUCINATION_THRESHOLD
 from ..dynamics import apply_ca_dynamics, evolve_and_interpret
+from ..hashing import hash_to_frame
 from .basin import measure_basin_width
 
 
@@ -56,6 +58,43 @@ def hallucination_score(
     # Clamp correlation to [0, 1] for score computation
     max_corr = max(0.0, min(1.0, max_corr))
     return e * (1.0 - max_corr)
+
+
+def classify_output(
+    text: str,
+    known_attractors: list[np.ndarray],
+    threshold: float = HALLUCINATION_THRESHOLD,
+) -> str:
+    """Classify text as SYNTHESIS, NOVEL, or HALLUCINATION.
+
+    SYNTHESIS     — CA converged AND Pearson similarity >= threshold (grounded, near a known basin)
+    NOVEL         — CA converged AND Pearson similarity < threshold (stable but unknown territory)
+    HALLUCINATION — CA did not converge (no basin = confident but groundless)
+
+    This makes SCM's core axiom executable: meaning is what survives symbolic pressure.
+    A hallucination has no basin; it doesn't survive CA evolution.
+
+    Note: uses Pearson similarity for SYNTHESIS/NOVEL (not hallucination_score, which
+    is energy-weighted and collapses to ~0 for any fully-converged attractor).
+    """
+    frame = hash_to_frame(text)
+    result = evolve_and_interpret(frame)
+    if result["state"] != "CONVERGED":
+        return "HALLUCINATION"
+    if not known_attractors:
+        return "NOVEL"
+    flat = result["attractor"].flatten()
+    flat_mean, flat_std = flat.mean(), flat.std()
+    if flat_std < 1e-10:
+        return "NOVEL"
+    max_sim = max(
+        float(
+            np.dot(flat - flat_mean, att.flatten() - att.flatten().mean())
+            / (len(flat) * flat_std * (att.flatten().std() + 1e-10))
+        )
+        for att in known_attractors
+    )
+    return "SYNTHESIS" if max_sim >= threshold else "NOVEL"
 
 
 def topology_consistency(

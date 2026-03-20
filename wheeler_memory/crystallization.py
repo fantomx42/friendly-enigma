@@ -25,19 +25,80 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
+from queue import Queue
+from threading import Thread
 from typing import Iterator
 
 import numpy as np
+
+# ---------------------------------------------------------------------------
+# CPU topology — detected once at import time
+# ---------------------------------------------------------------------------
+
+def _detect_core_groups() -> tuple[list[int], list[int]]:
+    """Return (p_cores, e_cores) by reading cpufreq max-freq from /sys.
+
+    P-cores have higher max frequency than E-cores on Intel hybrid chips.
+    Falls back to (all_cores, []) on non-hybrid or non-Linux systems.
+    """
+    try:
+        freq_map: dict[int, int] = {}
+        n = os.cpu_count() or 1
+        for i in range(n):
+            p = f"/sys/devices/system/cpu/cpu{i}/cpufreq/cpuinfo_max_freq"
+            try:
+                freq_map[i] = int(open(p).read().strip())
+            except OSError:
+                freq_map[i] = 0
+        if not freq_map:
+            return list(range(n)), []
+        freqs = sorted(set(freq_map.values()), reverse=True)
+        if len(freqs) < 2:
+            return list(freq_map), []
+        # Highest-frequency group = P-cores; rest = E-cores
+        top = freqs[0]
+        p_cores = [c for c, f in freq_map.items() if f == top or f >= freqs[1]]
+        e_cores = [c for c, f in freq_map.items() if f < freqs[1]]
+        # If split is extreme (>3:1 E:P), use E-cores for embedding (cluster L2)
+        return p_cores, e_cores
+    except Exception:
+        n = os.cpu_count() or 1
+        return list(range(n)), []
+
+
+_P_CORES, _E_CORES = _detect_core_groups()
+# Embedding benefits from E-core cluster L2 cache; use E-cores when available
+_EMBED_CORES: list[int] = _E_CORES if _E_CORES else _P_CORES
+_IO_CORES:    list[int] = _E_CORES if _E_CORES else _P_CORES
+
+
+def _pin(cpus: list[int]) -> None:
+    """Pin current thread to the given CPU list (Linux only, silently ignored elsewhere)."""
+    try:
+        os.sched_setaffinity(0, set(cpus))
+    except (AttributeError, OSError):
+        pass
+
+
+def _configure_torch_threads(n: int) -> None:
+    """Set PyTorch intra-op thread count (silently ignored if torch unavailable)."""
+    try:
+        import torch
+        torch.set_num_threads(n)
+    except Exception:
+        pass
 
 from .brick import MemoryBrick
 from .chunking import get_chunk_dir, list_existing_chunks, select_chunk
 from .dynamics import evolve_and_interpret
 from .hashing import hash_to_frame, text_to_hex
-from .storage import _get_data_dir, _load_index, store_memory
+from .storage import _get_data_dir, _load_index, batch_store_memories
 from .temperature import MAX_ATTRACTORS
 
 
@@ -227,34 +288,115 @@ def crystallize(
     # Gather existing keys for resume
     existing = _existing_keys(d) if resume else set()
 
-    # Lazy-load embedding if needed
+    # Lazy-load embedding
     if use_embedding:
         from .embedding import embed_to_frame_batch
 
-    # Collect texts into batches
-    batch: list[str] = []
+    if verbose:
+        n_embed = len(_EMBED_CORES)
+        label = "E-cores" if _E_CORES else "all-cores"
+        print(
+            f"  [crystallize] embed→{label}({n_embed}t)  CA→GPU  store→threads",
+            file=sys.stderr,
+        )
+
+    # ── Collect all batches upfront (corpus is a stream, needs buffering) ──
+    batches: list[list[str]] = []
+    current: list[str] = []
     total_processed = 0
 
     for text in load_corpus(corpus_path, fmt=fmt):
         if max_items is not None and total_processed >= max_items:
             break
-
         hex_key = text_to_hex(text)
         if resume and hex_key in existing:
             result.skipped += 1
             total_processed += 1
             continue
-
-        batch.append(text)
+        current.append(text)
         total_processed += 1
+        if len(current) >= batch_size:
+            batches.append(current)
+            current = []
+    if current:
+        batches.append(current)
 
-        if len(batch) >= batch_size:
-            _process_batch(batch, d, chunk, use_embedding, result, verbose)
-            batch.clear()
+    # ── Pipelined execution ────────────────────────────────────────────────
+    # Stage A (embed thread, E-cores):   texts → frames
+    # Stage B (main thread, GPU):        frames → ca_results
+    # Stage C (store thread, E-cores):   ca_results + texts → disk
+    #
+    # Queues carry (texts, frames) and (texts, ca_results) between stages.
+    # sentinel=None signals end-of-stream.
 
-    # Process remaining
-    if batch:
-        _process_batch(batch, d, chunk, use_embedding, result, verbose)
+    SENTINEL = None
+    embed_q: Queue = Queue(maxsize=2)   # A→B
+    store_q: Queue = Queue(maxsize=2)   # B→C
+
+    def _embed_worker() -> None:
+        _pin(_EMBED_CORES)
+        _configure_torch_threads(len(_EMBED_CORES))
+        try:
+            for batch in batches:
+                if use_embedding:
+                    frames = embed_to_frame_batch(batch)
+                else:
+                    frames = [hash_to_frame(t) for t in batch]
+                embed_q.put((batch, frames))
+        finally:
+            embed_q.put(SENTINEL)
+
+    def _store_worker() -> None:
+        _pin(_IO_CORES)
+        while True:
+            item = store_q.get()
+            if item is SENTINEL:
+                break
+            texts_b, ca_results_b = item
+            entries = []
+            for text, frame_result in zip(texts_b, ca_results_b):
+                try:
+                    text_chunk = chunk if chunk is not None else select_chunk(text)
+                    brick = MemoryBrick.from_evolution_result(frame_result)
+                    entries.append((text, frame_result, brick, text_chunk))
+                except Exception as exc:
+                    result.errors += 1
+                    if verbose:
+                        print(f"  error preparing '{text[:50]}...': {exc}", file=sys.stderr)
+            try:
+                n = batch_store_memories(entries, data_dir=data_dir)
+                result.stored += n
+                for _, _, _, text_chunk in entries[:n]:
+                    result.chunks_used[text_chunk] = result.chunks_used.get(text_chunk, 0) + 1
+                if verbose and result.stored % 100 < len(entries):
+                    milestone = (result.stored // 100) * 100
+                    print(f"  crystallized {milestone} memories...", file=sys.stderr)
+            except Exception as exc:
+                result.errors += len(entries)
+                if verbose:
+                    print(f"  error in batch store: {exc}", file=sys.stderr)
+
+    embed_thread = Thread(target=_embed_worker, daemon=True)
+    store_thread = Thread(target=_store_worker, daemon=True)
+    embed_thread.start()
+    store_thread.start()
+
+    # Main thread: CA evolution on GPU (stage B)
+    _pin(_P_CORES)  # P-cores for GPU dispatch / HIP overhead
+    while True:
+        item = embed_q.get()
+        if item is SENTINEL:
+            break
+        texts_b, frames = item
+        ca_results = [evolve_and_interpret(f) for f in frames]
+        store_q.put((texts_b, ca_results))
+    store_q.put(SENTINEL)
+
+    embed_thread.join()
+    store_thread.join()
+
+    # Restore full affinity
+    _pin(list(range(os.cpu_count() or 20)))
 
     # Final stats
     result.elapsed_seconds = time.monotonic() - t0
@@ -265,51 +407,3 @@ def crystallize(
         print(result, file=sys.stderr)
 
     return result
-
-
-def _process_batch(
-    texts: list[str],
-    data_dir: Path,
-    chunk: str | None,
-    use_embedding: bool,
-    result: CrystallizationResult,
-    verbose: bool,
-) -> None:
-    """Process a single batch of texts through the crystallization pipeline."""
-    # 1. Generate frames
-    if use_embedding:
-        from .embedding import embed_to_frame_batch
-
-        frames = embed_to_frame_batch(texts)
-    else:
-        frames = [hash_to_frame(t) for t in texts]
-
-    # 2. Evolve each frame through CA
-    # Use evolve_and_interpret which handles GPU dispatch + history synthesis
-    results = [evolve_and_interpret(f) for f in frames]
-
-    # 3. Store each memory
-    for text, frame_result in zip(texts, results):
-        try:
-            text_chunk = chunk if chunk is not None else select_chunk(text)
-            brick = MemoryBrick.from_evolution_result(frame_result)
-            store_memory(
-                text,
-                frame_result,
-                brick,
-                data_dir=data_dir,
-                chunk=text_chunk,
-                auto_evict=False,  # skip per-item eviction during bulk load
-            )
-            result.stored += 1
-            result.chunks_used[text_chunk] = result.chunks_used.get(text_chunk, 0) + 1
-
-            if verbose and result.stored % 100 == 0:
-                print(
-                    f"  crystallized {result.stored} memories...",
-                    file=sys.stderr,
-                )
-        except Exception as exc:
-            result.errors += 1
-            if verbose:
-                print(f"  error storing '{text[:50]}...': {exc}", file=sys.stderr)

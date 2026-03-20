@@ -31,10 +31,13 @@ def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
     neighbors = np.stack([n_up, n_down, n_left, n_right])
     max_neighbor = np.max(neighbors, axis=0)
 
+    is_flat = is_max & is_min   # all neighbours equal — no gradient, no movement
+
     delta = np.zeros_like(frame)
-    delta = np.where(is_max, (1 - frame) * MAX_PUSH_STRENGTH, delta)
-    delta = np.where(is_min, (-1 - frame) * MAX_PUSH_STRENGTH, delta)
+    delta = np.where(is_max & ~is_flat, (1 - frame) * MAX_PUSH_STRENGTH, delta)
+    delta = np.where(is_min & ~is_flat, (-1 - frame) * MAX_PUSH_STRENGTH, delta)
     delta = np.where(~is_max & ~is_min, (max_neighbor - frame) * SLOPE_FLOW_STRENGTH, delta)
+    # is_flat cells: delta stays 0 — uniform plateau is a stable fixed point
 
     return np.clip(frame + delta, -1, 1)
 

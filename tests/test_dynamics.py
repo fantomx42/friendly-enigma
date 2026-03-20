@@ -37,6 +37,24 @@ class TestApplyCADynamics:
         # Local min: delta = (-1 - cell) * 0.35, center stays near -1.0 (small negative delta)
         assert output[32, 32] <= frame[32, 32]
 
+    def test_flat_zero_plateau_is_stable(self):
+        """A uniform zero grid must not move — 0 is a stable fixed point."""
+        frame = np.zeros((64, 64), dtype=np.float32)
+        output = apply_ca_dynamics(frame)
+        np.testing.assert_array_equal(output, frame)
+
+    def test_flat_positive_plateau_is_stable(self):
+        """A uniform +1 grid must not move — +1 is a stable fixed point."""
+        frame = np.ones((64, 64), dtype=np.float32)
+        output = apply_ca_dynamics(frame)
+        np.testing.assert_array_equal(output, frame)
+
+    def test_flat_negative_plateau_is_stable(self):
+        """A uniform -1 grid must not move — -1 is a stable fixed point."""
+        frame = -np.ones((64, 64), dtype=np.float32)
+        output = apply_ca_dynamics(frame)
+        np.testing.assert_array_equal(output, frame)
+
 
 class TestEvolveAndInterpret:
     """Tests for evolve_and_interpret function."""
