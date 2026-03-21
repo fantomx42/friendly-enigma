@@ -40,8 +40,8 @@ SALIENCE_MAX_ITERS_LOW = 200
 SALIENCE_MAX_ITERS_MED = 1000
 SALIENCE_MAX_ITERS_HIGH = 3000
 
-SALIENCE_THRESHOLD_LOW = 5e-4
-SALIENCE_THRESHOLD_MED = 5e-2
+SALIENCE_THRESHOLD_LOW = 5e-2
+SALIENCE_THRESHOLD_MED = 1e-4
 SALIENCE_THRESHOLD_HIGH = 1e-6
 
 # ---------------------------------------------------------------------------
@@ -88,3 +88,25 @@ CROSS_CHUNK_DECAY = 0.5           # Warmth decays by half when crossing a chunk 
 # Based on empirical attractor similarity data: near-paraphrase 0.51-0.56,
 # same-domain 0.13, cross-domain 0.002-0.05. Sweep [0.20 .. 0.50] during calibration.
 HALLUCINATION_THRESHOLD = 0.40
+
+# ---------------------------------------------------------------------------
+# Encoder blending (hippocampus + language wheeler)
+# ---------------------------------------------------------------------------
+BLEND_ALPHA = 0.7  # Hippocampus weight in blended mode (1-alpha → language)
+
+# ---------------------------------------------------------------------------
+# Default encoder
+# ---------------------------------------------------------------------------
+DEFAULT_ENCODER = "blended"  # hippocampus(0.7) + language_wheeler(0.3)
+
+# ---------------------------------------------------------------------------
+# Cortex
+# ---------------------------------------------------------------------------
+CORTEX_K = 10                          # retrieved attractors for cortex input
+CORTEX_CLUSTER_THRESHOLD = 0.5         # Pearson r for same-cluster
+CORTEX_CONTRADICTION_THRESHOLD = 0.3   # negative r for contradiction flag
+CORTEX_SETTLE_MAX_STEPS = 100
+CORTEX_SETTLE_THRESHOLD = 1e-4
+CORTEX_SETTLE_INERTIA = 0.8
+CORTEX_CLASSIFIER_LR = 0.001
+CORTEX_CLASSIFIER_PATH = "cortex_classifier.npz"  # relative to data_dir

@@ -36,7 +36,11 @@ def main():
     )
     parser.add_argument(
         "--embed", action="store_true",
-        help="Use sentence embedding for query (enables fuzzy semantic recall)",
+        help="Use sentence embedding for query (deprecated: use --encoder)",
+    )
+    parser.add_argument(
+        "--encoder", choices=["hash", "hippocampus", "embedding", "language", "blended"],
+        default=None, help="Encoder to use for query frame (default: hash; hippocampus replaces MiniLM)",
     )
     parser.add_argument(
         "--reconstruct", action="store_true",
@@ -65,6 +69,7 @@ def main():
             chunk=args.chunk,
             temperature_boost=args.temperature_boost,
             use_embedding=args.embed,
+            encoder=args.encoder,
             reconstruct=args.reconstruct,
             reconstruct_alpha=args.alpha,
             salience=sal,

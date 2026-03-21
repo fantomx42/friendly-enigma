@@ -31,6 +31,7 @@ from .eviction import forget_by_text
 from .consolidation import sleep_consolidate as _sleep_consolidate
 from .hashing import text_to_hex
 from .rotation import store_with_rotation_retry
+from .theories.metrics import classify_output
 
 DEFAULT_MODEL = "qwen3"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
@@ -202,8 +203,8 @@ def _exec_store_memory(text: str, data_dir: Path | None, use_embedding: bool = F
     })
 
 
-def _exec_recall_memory(query: str, top_k: int, data_dir: Path | None, use_embedding: bool = False) -> str:
-    hits = recall_memory(query, top_k=top_k, data_dir=data_dir, use_embedding=use_embedding)
+def _exec_recall_memory(query: str, top_k: int, data_dir: Path | None, use_embedding: bool = False, encoder: str | None = None) -> str:
+    hits = recall_memory(query, top_k=top_k, data_dir=data_dir, use_embedding=use_embedding, encoder=encoder)
     if not hits:
         return json.dumps({"results": [], "message": "No memories found."})
     return json.dumps({
@@ -247,8 +248,8 @@ def _exec_forget_memory(text: str, data_dir: Path | None) -> str:
     return json.dumps({"forgotten": False, "reason": "Memory not found."})
 
 
-def _exec_polar_decay(text: str, top_k: int, data_dir: Path | None, use_embedding: bool = False) -> str:
-    hits = recall_memory(text, top_k=top_k, data_dir=data_dir, polar_decay=True, use_embedding=use_embedding)
+def _exec_polar_decay(text: str, top_k: int, data_dir: Path | None, use_embedding: bool = False, encoder: str | None = None) -> str:
+    hits = recall_memory(text, top_k=top_k, data_dir=data_dir, polar_decay=True, use_embedding=use_embedding, encoder=encoder)
     if not hits:
         return json.dumps({"results": [], "message": "No memories found."})
     return json.dumps({
@@ -341,13 +342,13 @@ def _exec_web_search(query: str, max_results: int = 5) -> str:
     return json.dumps({"query": query, "results": results})
 
 
-def _dispatch_tool(name: str, args: dict, data_dir: Path | None, use_embedding: bool = False) -> str:
+def _dispatch_tool(name: str, args: dict, data_dir: Path | None, use_embedding: bool = False, encoder: str | None = None) -> str:
     """Execute a tool call and return its JSON string result."""
     try:
         if name == "store_memory":
             return _exec_store_memory(args["text"], data_dir, use_embedding)
         if name == "recall_memory":
-            return _exec_recall_memory(args["query"], args.get("top_k", 5), data_dir, use_embedding)
+            return _exec_recall_memory(args["query"], args.get("top_k", 5), data_dir, use_embedding, encoder)
         if name == "list_memories":
             return _exec_list_memories(args.get("limit", 20), data_dir)
         if name == "forget_memory":
@@ -355,7 +356,7 @@ def _dispatch_tool(name: str, args: dict, data_dir: Path | None, use_embedding: 
         if name == "sleep_consolidate":
             return _exec_sleep_consolidate(data_dir)
         if name == "polar_decay":
-            return _exec_polar_decay(args["text"], args.get("top_k", 5), data_dir, use_embedding)
+            return _exec_polar_decay(args["text"], args.get("top_k", 5), data_dir, use_embedding, encoder)
         if name == "web_search":
             return _exec_web_search(args["query"], args.get("max_results", 5))
         return json.dumps({"error": f"Unknown tool: {name}"})
@@ -534,7 +535,8 @@ class WheelerAgent:
         reconstruct: bool = True,
         reconstruct_alpha: float = 0.3,
         verbose: bool = False,
-        use_embedding: bool = True,
+        use_embedding: bool = False,
+        encoder: str = "blended",
     ) -> None:
         self.model = model
         self.ollama_url = ollama_url
@@ -547,6 +549,7 @@ class WheelerAgent:
         self.reconstruct_alpha = reconstruct_alpha
         self.verbose = verbose
         self.use_embedding = use_embedding
+        self.encoder = encoder
         self._history: list[dict] = []
 
     def reset(self) -> None:
@@ -569,6 +572,7 @@ class WheelerAgent:
                 data_dir=self.data_dir,
                 reconstruct=self.reconstruct,
                 reconstruct_alpha=self.reconstruct_alpha,
+                encoder=self.encoder if not self.use_embedding else None,
                 use_embedding=self.use_embedding,
             )
         except Exception:
@@ -660,6 +664,9 @@ class WheelerAgent:
                 content = msg.get("content", "")
                 self._history.append({"role": "assistant", "content": content})
                 messages.append({"role": "assistant", "content": content})
+                classification = classify_output(content, [])
+                if self.verbose:
+                    print(f"[hallucination-discrimination] {classification}")
                 # ── Auto-store: persist the reply as a new memory ─────────────
                 if self.auto_store and content.strip():
                     self._auto_store_reply(content)
@@ -680,7 +687,7 @@ class WheelerAgent:
                 if self.verbose:
                     print(f"[tool] {name}({json.dumps(args)})")
 
-                result_str = _dispatch_tool(name, args, self.data_dir, self.use_embedding)
+                result_str = _dispatch_tool(name, args, self.data_dir, self.use_embedding, self.encoder)
 
                 if self.verbose:
                     print(f"[tool result] {result_str[:200]}")
@@ -703,6 +710,9 @@ class WheelerAgent:
         )
         content = resp.get("message", {}).get("content", "")
         self._history.append({"role": "assistant", "content": content})
+        classification = classify_output(content, [])
+        if self.verbose:
+            print(f"[hallucination-discrimination] {classification}")
         if self.auto_store and content.strip():
             self._auto_store_reply(content)
         return content
@@ -797,6 +807,8 @@ class WheelerAgent:
                 full_response = accumulated
                 self._history.append({"role": "assistant", "content": full_response})
                 messages.append({"role": "assistant", "content": full_response})
+                classification = classify_output(token_only, [])
+                yield {"type": "hallucination_discrimination", "classification": classification}
                 if self.auto_store and token_only.strip():
                     if self._auto_store_reply(token_only):
                         yield {"type": "auto_store"}
@@ -817,7 +829,7 @@ class WheelerAgent:
 
                 yield {"type": "tool_call", "name": name, "args": args}
 
-                result_str = _dispatch_tool(name, args, self.data_dir, self.use_embedding)
+                result_str = _dispatch_tool(name, args, self.data_dir, self.use_embedding, self.encoder)
                 try:
                     result_obj = json.loads(result_str)
                 except Exception:
@@ -845,6 +857,8 @@ class WheelerAgent:
             return
         content = resp.get("message", {}).get("content", "")
         self._history.append({"role": "assistant", "content": content})
+        classification = classify_output(content, [])
+        yield {"type": "hallucination_discrimination", "classification": classification}
         if self.auto_store and content.strip():
             if self._auto_store_reply(content):
                 yield {"type": "auto_store"}

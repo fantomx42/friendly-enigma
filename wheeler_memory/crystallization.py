@@ -248,6 +248,7 @@ def crystallize(
     batch_size: int = 32,
     chunk: str | None = None,
     use_embedding: bool = True,
+    encoder: str | None = None,
     max_items: int | None = None,
     resume: bool = True,
     fmt: str = "auto",
@@ -266,7 +267,11 @@ def crystallize(
     chunk : str, optional
         Force all texts into this chunk.  If None, auto-routes via select_chunk().
     use_embedding : bool
-        If True, use embed_to_frame (semantic).  If False, use hash_to_frame.
+        Legacy flag — if True, use embed_to_frame (semantic).  If False, use hash_to_frame.
+        Prefer the ``encoder`` parameter instead.
+    encoder : str, optional
+        Encoder name: "hash", "hippocampus", "embedding", "language", "blended".
+        Overrides ``use_embedding`` when set.
     max_items : int, optional
         Stop after processing this many texts (for validation runs).
     resume : bool
@@ -288,9 +293,21 @@ def crystallize(
     # Gather existing keys for resume
     existing = _existing_keys(d) if resume else set()
 
-    # Lazy-load embedding
-    if use_embedding:
+    # Resolve encoder
+    _resolved_encoder = encoder if encoder is not None else ("embedding" if use_embedding else "hash")
+
+    # Lazy-load batch functions
+    _batch_fn = None
+    if _resolved_encoder == "embedding":
         from .embedding import embed_to_frame_batch
+        _batch_fn = embed_to_frame_batch
+    elif _resolved_encoder == "hippocampus":
+        from .hippocampus import hippocampus_to_frame_batch
+        _batch_fn = hippocampus_to_frame_batch
+    elif _resolved_encoder in ("language", "blended"):
+        from .rotation import _get_frame_fn
+        _single_fn = _get_frame_fn(encoder=_resolved_encoder)
+        _batch_fn = lambda texts: [_single_fn(t) for t in texts]
 
     if verbose:
         n_embed = len(_EMBED_CORES)
@@ -338,8 +355,8 @@ def crystallize(
         _configure_torch_threads(len(_EMBED_CORES))
         try:
             for batch in batches:
-                if use_embedding:
-                    frames = embed_to_frame_batch(batch)
+                if _batch_fn is not None:
+                    frames = _batch_fn(batch)
                 else:
                     frames = [hash_to_frame(t) for t in batch]
                 embed_q.put((batch, frames))

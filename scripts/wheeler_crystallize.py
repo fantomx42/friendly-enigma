@@ -57,7 +57,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--no-embed",
         action="store_true",
-        help="Use SHA-256 hashing instead of sentence embeddings.",
+        help="Use SHA-256 hashing instead of sentence embeddings (deprecated: use --encoder).",
+    )
+    p.add_argument(
+        "--encoder",
+        choices=["hash", "hippocampus", "embedding", "language", "blended"],
+        default=None,
+        help="Encoder to use (default: embedding; hippocampus replaces MiniLM).",
     )
     p.add_argument(
         "--fmt",
@@ -93,6 +99,7 @@ def main(argv: list[str] | None = None) -> None:
             batch_size=args.batch_size,
             chunk=args.chunk,
             use_embedding=not args.no_embed,
+            encoder=args.encoder,
             max_items=args.max_items,
             resume=not args.no_resume,
             fmt=args.fmt,

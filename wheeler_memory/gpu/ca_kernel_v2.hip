@@ -80,9 +80,12 @@ __global__ void ca_step_kernel(
 
     bool is_max = (v >= n_up) & (v >= n_dn) & (v >= n_lf) & (v >= n_rt);
     bool is_min = (v <= n_up) & (v <= n_dn) & (v <= n_lf) & (v <= n_rt);
+    bool is_flat = is_max & is_min;  /* all neighbours equal — no gradient */
 
     float delta;
-    if (is_max) {
+    if (is_flat) {
+        delta = 0.0f;
+    } else if (is_max) {
         delta = (1.0f - v) * push_strength;
     } else if (is_min) {
         delta = (-1.0f - v) * push_strength;
@@ -160,8 +163,9 @@ __global__ void role_compute_kernel(
 
     bool is_max = (v >= n_up) & (v >= n_dn) & (v >= n_lf) & (v >= n_rt);
     bool is_min = (v <= n_up) & (v <= n_dn) & (v <= n_lf) & (v <= n_rt);
+    bool is_flat = is_max & is_min;
 
-    int8_t role = is_max ? (int8_t)1 : (is_min ? (int8_t)-1 : (int8_t)0);
+    int8_t role = is_flat ? (int8_t)0 : (is_max ? (int8_t)1 : (is_min ? (int8_t)-1 : (int8_t)0));
 
     /* Write to ring: [b][ring_slot][cell_idx] */
     role_ring[(size_t)b * OSC_WINDOW * gc + (size_t)ring_slot * gc + cell_idx] = role;

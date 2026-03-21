@@ -76,6 +76,7 @@ def store_dual(
     *,
     chunk: str | None = None,
     use_embedding: bool = False,
+    encoder: str | None = None,
     salience: float | None = None,
 ) -> dict:
     """Store a dual-polarity memory as two linked attractors.
@@ -106,7 +107,7 @@ def store_dual(
 
     # ── 1. Experience attractor ──────────────────────────────────────────────
     exp_result = store_with_rotation_retry(
-        text, data_dir=d, chunk=chunk, use_embedding=use_embedding, salience=salience,
+        text, data_dir=d, chunk=chunk, use_embedding=use_embedding, encoder=encoder, salience=salience,
     )
     experience_hex = text_to_hex(text)
 

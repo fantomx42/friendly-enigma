@@ -99,7 +99,7 @@ def semantic_apple_test(
     """
     from wheeler_memory.brick import MemoryBrick
     from wheeler_memory.dynamics import evolve_and_interpret
-    from wheeler_memory.embedding import embed_to_frame
+    from wheeler_memory.hippocampus import hippocampus_to_frame
     from wheeler_memory.storage import recall_memory, store_memory
     from wheeler_memory.hashing import text_to_hex
 
@@ -120,7 +120,7 @@ def semantic_apple_test(
     log.append(f"Storing {len(training_items)} items (holdout excluded)")
     stored_keys = {}
     for item in training_items:
-        frame = embed_to_frame(item)
+        frame = hippocampus_to_frame(item)
         result = evolve_and_interpret(frame)
         brick = MemoryBrick.from_evolution_result(result)
         hex_key = store_memory(
@@ -135,7 +135,7 @@ def semantic_apple_test(
         holdout,
         top_k=5,
         data_dir=data_dir,
-        use_embedding=True,
+        encoder="blended",
     )
 
     log.append(f"  Recalled {len(hits)} memories:")

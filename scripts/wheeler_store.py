@@ -18,7 +18,7 @@ def _embed_store(text, chunk, data_dir, salience=None):
     """Store using embedding-based frame generation."""
     import time
     from wheeler_memory.attention import compute_attention_budget
-    from wheeler_memory.embedding import embed_to_frame
+    from wheeler_memory.hippocampus import hippocampus_to_frame
     from wheeler_memory.dynamics import evolve_and_interpret
     from wheeler_memory.brick import MemoryBrick
     from wheeler_memory.storage import store_memory
@@ -29,7 +29,7 @@ def _embed_store(text, chunk, data_dir, salience=None):
     )
 
     start = time.time()
-    frame = embed_to_frame(text)
+    frame = hippocampus_to_frame(text)
     result = evolve_and_interpret(
         frame, max_iters=budget.max_iters,
         stability_threshold=budget.stability_threshold,
@@ -56,7 +56,11 @@ def main():
     parser.add_argument("text", help="Text to store (use '-' for stdin)")
     parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)")
     parser.add_argument("--chunk", default=None, help="Target chunk (default: auto-route)")
-    parser.add_argument("--embed", action="store_true", help="Use sentence embedding instead of SHA-256 hash")
+    parser.add_argument("--embed", action="store_true", help="Use sentence embedding instead of SHA-256 hash (deprecated: use --encoder)")
+    parser.add_argument(
+        "--encoder", choices=["hash", "hippocampus", "embedding", "language", "blended"],
+        default=None, help="Encoder to use (default: hash; hippocampus replaces MiniLM)",
+    )
     parser.add_argument(
         "--salience", choices=["low", "medium", "high"], default=None,
         help="Attention level: low (fast/loose), medium (default), high (deep/tight)",
@@ -82,7 +86,7 @@ def main():
             from wheeler_memory.polarity import store_dual
             dual_result = store_dual(
                 text, data_dir=args.data_dir, chunk=chunk,
-                use_embedding=args.embed, salience=sal,
+                use_embedding=args.embed, encoder=args.encoder, salience=sal,
             )
             exp = dual_result["experience"]
             state = exp["state"]
@@ -107,8 +111,11 @@ def main():
                 print("Warning: experience attractor failed to converge on all rotations.", file=sys.stderr)
             return
 
-        if args.embed:
-            result = _embed_store(text, chunk, args.data_dir, salience=sal)
+        if args.encoder or args.embed:
+            result = store_with_rotation_retry(
+                text, data_dir=args.data_dir, chunk=chunk,
+                use_embedding=args.embed, encoder=args.encoder, salience=sal,
+            )
         else:
             result = store_with_rotation_retry(
                 text, data_dir=args.data_dir, chunk=chunk, salience=sal,

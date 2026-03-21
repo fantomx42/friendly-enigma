@@ -46,6 +46,11 @@ def _get_embed_to_frame():
     from .embedding import embed_to_frame
     return embed_to_frame
 
+# Default encoder from constants
+def _get_default_encoder():
+    from .constants import DEFAULT_ENCODER
+    return DEFAULT_ENCODER
+
 DEFAULT_DATA_DIR = Path.home() / ".wheeler_memory"
 
 
@@ -195,6 +200,7 @@ def recall_memory(
     chunk: str | None = None,
     temperature_boost: float = 0.0,
     use_embedding: bool = False,
+    encoder: str | None = None,
     query_frame: "np.ndarray | None" = None,
     reconstruct: bool = False,
     reconstruct_alpha: float = 0.3,
@@ -235,11 +241,9 @@ def recall_memory(
                 chunks_to_search.append(c)
 
     if query_frame is None:
-        if use_embedding:
-            embed_fn = _get_embed_to_frame()
-            query_frame = embed_fn(text)
-        else:
-            query_frame = hash_to_frame(text)
+        from .rotation import _get_frame_fn
+        frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
+        query_frame = frame_fn(text)
     query_result = evolve_and_interpret(
         query_frame, max_iters=budget.max_iters,
         stability_threshold=budget.stability_threshold,

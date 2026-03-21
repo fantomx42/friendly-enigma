@@ -184,6 +184,7 @@ def trajectory_resonance(
     min_resonance: float = 0.15,
     dedup: str = "first",
     use_embedding: bool = False,
+    encoder: str | None = None,
     salience: float | None = None,
 ) -> GenerationResult:
     """Generate a sequence by resonating the query trajectory against stored attractors.
@@ -237,11 +238,9 @@ def trajectory_resonance(
             all_attractors.update(_load_chunk_attractors(chunk_dir))
 
     # Encode query → initial frame
-    if use_embedding:
-        from .embedding import embed_to_frame
-        query_frame = embed_to_frame(query_text)
-    else:
-        query_frame = hash_to_frame(query_text)
+    from .rotation import _get_frame_fn
+    frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
+    query_frame = frame_fn(query_text)
 
     # Evolve query frame through CA, collecting full history
     result = evolve_and_interpret(

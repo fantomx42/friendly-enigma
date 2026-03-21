@@ -103,9 +103,9 @@ def _select_chunks_by_embedding(query: str, max_chunks: int) -> list[str] | None
     Returns None if embedding is unavailable, triggering keyword fallback.
     """
     try:
-        from .embedding import embed_available, embed_text
-        if not embed_available():
-            return None
+        from .hippocampus import hippocampus_to_frame
+        query_frame = hippocampus_to_frame(query)
+        query_emb = query_frame.flatten()
     except ImportError:
         return None
 
@@ -115,7 +115,6 @@ def _select_chunks_by_embedding(query: str, max_chunks: int) -> list[str] | None
     if not chunks_root.exists():
         return None
 
-    query_emb = embed_text(query)
     query_norm = np.linalg.norm(query_emb)
     if query_norm == 0:
         return None
@@ -157,9 +156,7 @@ def update_chunk_centroid(chunk_dir: Path) -> None:
     Call this after bulk stores or periodically to keep routing fresh.
     """
     try:
-        from .embedding import embed_available, embed_text_batch
-        if not embed_available():
-            return
+        from .hippocampus import hippocampus_to_frame_batch
     except ImportError:
         return
 
@@ -174,7 +171,8 @@ def update_chunk_centroid(chunk_dir: Path) -> None:
     if not texts:
         return
 
-    embeddings = embed_text_batch(texts)  # (N, 384)
+    frames = hippocampus_to_frame_batch(texts)  # (N, 64, 64)
+    embeddings = np.array([f.flatten() for f in frames])
     centroid = embeddings.mean(axis=0)
 
     meta_path = chunk_dir / "metadata.json"

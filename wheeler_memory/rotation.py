@@ -18,11 +18,43 @@ from .hashing import hash_to_frame
 from .storage import DEFAULT_DATA_DIR, store_memory
 from .temperature import SALIENCE_DEFAULT
 
-def _get_frame_fn(use_embedding: bool):
-    if use_embedding:
+def _get_frame_fn(use_embedding: bool = False, *, encoder: str | None = None):
+    """Return the text→frame function for the requested encoder.
+
+    Parameters
+    ----------
+    use_embedding : bool
+        Legacy flag — equivalent to encoder="embedding".  Deprecated.
+    encoder : str or None
+        Encoder name: "hash", "hippocampus", "embedding", "language",
+        "blended".  When set, overrides use_embedding.
+    """
+    # Resolve legacy flag
+    if encoder is None:
+        encoder = "embedding" if use_embedding else "hash"
+
+    if encoder == "hash":
+        return hash_to_frame
+    elif encoder == "hippocampus":
+        from .hippocampus import hippocampus_to_frame
+        return hippocampus_to_frame
+    elif encoder == "embedding":
         from .embedding import embed_to_frame
         return embed_to_frame
-    return hash_to_frame
+    elif encoder == "language":
+        from .language_wheeler import language_to_frame
+        return language_to_frame
+    elif encoder == "blended":
+        from .hippocampus import hippocampus_to_frame
+        from .language_wheeler import language_to_frame
+        from .constants import BLEND_ALPHA
+        def _blended(text: str, size: int = 64) -> "np.ndarray":
+            h = hippocampus_to_frame(text, size)
+            l = language_to_frame(text, size)
+            return np.tanh(BLEND_ALPHA * h + (1 - BLEND_ALPHA) * l).astype(np.float32)
+        return _blended
+    else:
+        raise ValueError(f"Unknown encoder: {encoder!r}")
 
 
 def _load_rotation_stats(data_dir: Path) -> dict:
@@ -56,6 +88,7 @@ def store_with_rotation_retry(
     *,
     chunk: str | None = None,
     use_embedding: bool = False,
+    encoder: str | None = None,
     salience: float | None = None,
 ) -> dict:
     """Try 0/90/180/270 degree rotations, return first converged result.
@@ -67,7 +100,7 @@ def store_with_rotation_retry(
     """
     d = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
     budget = compute_attention_budget(salience if salience is not None else SALIENCE_DEFAULT)
-    frame_fn = _get_frame_fn(use_embedding)
+    frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
     base_frame = frame_fn(text)
     angles = [0, 90, 180, 270][:max_rotations]
     last_result = None

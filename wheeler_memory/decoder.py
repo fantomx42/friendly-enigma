@@ -32,6 +32,7 @@ from typing import Iterator
 
 from .storage import recall_memory
 from .warming import _load_associations
+from .theories.metrics import classify_output
 
 
 # ── System prompt: the small model is a renderer, not a thinker ───────────────
@@ -338,6 +339,7 @@ class WheelerPrimaryAgent:
             top_k=self.recall_k,
             data_dir=self.data_dir,
             use_embedding=True,
+            encoder="blended",
             reconstruct=self.reconstruct,
             reconstruct_alpha=self.reconstruct_alpha,
         )
@@ -364,7 +366,11 @@ class WheelerPrimaryAgent:
             {"role": "user", "content": prompt},
         ]
         resp = _ollama_generate(messages, self.model, self.ollama_url)
-        return resp.get("message", {}).get("content", "")
+        content = resp.get("message", {}).get("content", "")
+        classification = classify_output(content, [])
+        if self.verbose:
+            print(f"[hallucination-discrimination] {classification}", file=sys.stderr)
+        return content
 
     def run_stream(self, user_message: str) -> Iterator[dict]:
         """Streaming variant yielding typed events.
@@ -381,6 +387,7 @@ class WheelerPrimaryAgent:
             top_k=self.recall_k,
             data_dir=self.data_dir,
             use_embedding=True,
+            encoder="blended",
             reconstruct=self.reconstruct,
             reconstruct_alpha=self.reconstruct_alpha,
         )

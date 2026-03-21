@@ -50,12 +50,15 @@ class TestClassifyOutput:
         assert result in ("SYNTHESIS", "NOVEL", "HALLUCINATION")
 
     def test_identical_text_threshold_sensitivity(self):
-        """At threshold=0, even identical text is NOVEL (score is never exactly 0)."""
+        """At threshold=1, even identical text needs perfect Pearson r to be SYNTHESIS."""
         text = "newton's first law: an object in motion stays in motion"
         attractor = _make_attractor(text)
-        result = classify_output(text, [attractor], threshold=0.0)
-        # score >= 0.0 always, so threshold=0 means nothing is SYNTHESIS
-        assert result in ("NOVEL", "HALLUCINATION")
+        # threshold=0 → any non-negative similarity qualifies as SYNTHESIS
+        result_low = classify_output(text, [attractor], threshold=0.0)
+        assert result_low == "SYNTHESIS"
+        # threshold=1.0 → only perfect correlation qualifies
+        result_high = classify_output(text, [attractor], threshold=1.0)
+        assert result_high == "NOVEL"
 
 
 class TestHallucinationScore:

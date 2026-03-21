@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from datasets import load_dataset
 
 from wheeler_memory import evolve_and_interpret
-from wheeler_memory.embedding import embed_to_frame_batch
+from wheeler_memory.hippocampus import hippocampus_to_frame_batch
 
 # GPU import (optional)
 try:

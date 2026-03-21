@@ -32,8 +32,8 @@ import numpy as np
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _embed(texts: list[str]):
-    from wheeler_memory.embedding import embed_to_frame_batch
-    return embed_to_frame_batch(texts)
+    from wheeler_memory.hippocampus import hippocampus_to_frame_batch
+    return hippocampus_to_frame_batch(texts)
 
 def _evolve(frame):
     from wheeler_memory.dynamics import evolve_and_interpret

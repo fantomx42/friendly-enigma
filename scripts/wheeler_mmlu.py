@@ -3,8 +3,8 @@
 Evaluates Wheeler against the Massive Multitask Language Understanding benchmark
 and reports accuracy per subject, comparable to frontier model scores.
 
-Three evaluation modes
-----------------------
+Evaluation modes
+----------------
 semantic (default, Wheeler-native)
     For each choice A/B/C/D, query Wheeler with "question + choice" and measure
     the top attractor similarity. Pick the choice with the highest score.
@@ -21,11 +21,22 @@ learn
     3. Run sleep consolidation to reinforce and prune.
     4. Rebuild the attractor cache and test on the test split.
 
+recall-text
+    Recall top-K facts, extract answer by letter regex or text matching from context.
+
+cortex
+    Full cortex pipeline: L1 graph reasoning → L2 settlement → SCM evaluation
+    → optional L3 neural network classifier. Retrieves memories into attractor
+    graph, runs settlement CA for opinion diffusion, computes coherence layers,
+    and picks answer with highest settled opinion (or via L3 classifier if weights provided).
+
 Usage
 -----
     python scripts/wheeler_mmlu.py --subjects abstract_algebra --samples 50
     python scripts/wheeler_mmlu.py --mode decode --model qwen2.5:1.5b --samples 20
     python scripts/wheeler_mmlu.py --mode learn --subjects high_school_physics
+    python scripts/wheeler_mmlu.py --mode cortex --subjects abstract_algebra --recall-k 10
+    python scripts/wheeler_mmlu.py --mode cortex --classifier-weights path/to/weights.npz --all
     python scripts/wheeler_mmlu.py --all --samples 10
     python scripts/wheeler_mmlu.py --list-subjects
 """
@@ -228,19 +239,22 @@ def score_semantic(
 
 def score_recall_text(
     question: str,
+    choices: list[str],
     recall_k: int = 10,
     cache: "AttractorCache | None" = None,
     debug: bool = False,
 ) -> tuple[int, float]:
-    """Recall top-K facts for the question; extract answer letter by weighted vote.
+    """Recall top-K facts; extract answer by letter regex OR text matching.
 
-    Stored facts have the form "Q: {question} A: {letter}. {choice_text}".
-    Regex extracts the letter; similarity scores are summed per candidate.
-    Returns (predicted_index, total_vote_weight) or (-1, 0.0) on failure.
+    Two extraction strategies (both tried per hit):
+      1. Letter regex: "A: B." → vote for choice index 1
+      2. Text match:  answer substring appears in a choice → vote for that choice
+
+    Returns (predicted_index, confidence) or (-1, 0.0) on failure.
     """
     try:
-        from wheeler_memory.embedding import embed_to_frame
-        frame = embed_to_frame(question)
+        from wheeler_memory.hippocampus import hippocampus_to_frame
+        frame = hippocampus_to_frame(question).flatten()
     except Exception:
         from wheeler_memory.hashing import hash_to_frame
         frame = hash_to_frame(question)
@@ -252,18 +266,142 @@ def score_recall_text(
         for h in hits[:5]:
             print(f"        sim={h['similarity']:.3f}  {h['text'][:80]}")
 
-    votes: dict[str, float] = {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0}
+    votes = [0.0, 0.0, 0.0, 0.0]  # indexed by choice position
+    choices_lower = [c.lower().strip() for c in choices]
+
     for hit in hits:
         text = hit.get("text", "")
         sim = hit.get("similarity", 0.0)
+        matched = False
+
+        # Strategy 1: letter regex (MMLU learn-mode format "A: B. choice_text")
         m = re.search(r"A:\s*([A-D])\.", text)
         if m:
-            votes[m.group(1)] += sim
+            idx = CHOICES.index(m.group(1))
+            votes[idx] += sim
+            matched = True
 
-    best = max(votes, key=votes.get)
-    if votes[best] == 0.0:
+        # Strategy 2: text match (SciQ/ARC format "A: answer_text")
+        if not matched:
+            # Extract answer portion after "A:" or "A: "
+            ans_m = re.search(r"A:\s*(.+?)(?:\.|$)", text)
+            if ans_m:
+                answer = ans_m.group(1).lower().strip()
+                if len(answer) >= 2:  # skip trivially short
+                    for ci, cl in enumerate(choices_lower):
+                        if answer in cl or cl in answer:
+                            votes[ci] += sim
+                            matched = True
+                            break
+
+    best_idx = int(max(range(4), key=lambda i: votes[i]))
+    if votes[best_idx] == 0.0:
         return -1, 0.0
-    return CHOICES.index(best), votes[best]
+    return best_idx, votes[best_idx]
+
+
+def score_cortex(
+    question: str,
+    choices: list[str],
+    recall_k: int = 10,
+    cache: "AttractorCache | None" = None,
+    classifier_weights=None,  # ClassifierWeights | None
+) -> tuple[int, float]:
+    """Score using full cortex pipeline: L1 graph → L2 settlement → SCM → optional L3.
+
+    Returns (predicted_index, confidence).
+    """
+    from wheeler_memory.hippocampus import hippocampus_to_frame
+    from wheeler_memory.dynamics import evolve_and_interpret
+    from wheeler_memory.cortex import cortex_reason
+    from wheeler_memory.cortex_scm import compute_scm
+
+    # 1. Encode question → frame → attractor
+    q_frame = hippocampus_to_frame(question)
+    q_result = evolve_and_interpret(q_frame)
+    q_attractor = q_result["attractor"].flatten().astype(np.float32)
+
+    # 2. Encode each choice → attractor
+    choice_attractors = []
+    for c in choices:
+        c_frame = hippocampus_to_frame(f"{question} {c}")
+        c_result = evolve_and_interpret(c_frame)
+        choice_attractors.append(c_result["attractor"].flatten().astype(np.float32))
+    choice_attractors = np.array(choice_attractors)  # (4, 4096)
+
+    # 3. Retrieve top-K from cache (if available)
+    retrieved_attractors = []
+    retrieved_sims = []
+    if cache is not None:
+        hits = cache.search(q_frame, top_k=recall_k)
+        for h in hits:
+            # We need the actual attractor, not just text
+            # Re-encode from text (cache stores text + similarity)
+            r_frame = hippocampus_to_frame(h["text"])
+            r_result = evolve_and_interpret(r_frame)
+            retrieved_attractors.append(r_result["attractor"].flatten().astype(np.float32))
+            retrieved_sims.append(h["similarity"])
+
+    # 4. Build attractor ensemble: retrieved + choices
+    all_attractors = []
+    all_sims = []
+    if retrieved_attractors:
+        all_attractors.extend(retrieved_attractors)
+        all_sims.extend(retrieved_sims)
+    # Always include the 4 choice attractors
+    for i, ca in enumerate(choice_attractors):
+        all_attractors.append(ca)
+        # Choice similarity = Pearson between query and choice attractor
+        q_centered = q_attractor - q_attractor.mean()
+        c_centered = ca - ca.mean()
+        q_std = q_centered.std()
+        c_std = c_centered.std()
+        if q_std > 1e-10 and c_std > 1e-10:
+            sim = float(np.dot(q_centered, c_centered) / (len(q_centered) * q_std * c_std))
+        else:
+            sim = 0.0
+        all_sims.append(sim)
+
+    all_attractors = np.array(all_attractors)
+    all_sims = np.array(all_sims)
+
+    # 5. Run cortex
+    cortex_result = cortex_reason(all_attractors, all_sims)
+    graph = cortex_result["graph"]
+    settlement = cortex_result["settlement"]
+
+    # 6. Extract choice similarities from settled opinions
+    n_retrieved = len(retrieved_attractors)
+    choice_settled = settlement["settled"][-4:]  # last 4 entries are choices
+
+    # 7. If we have L3 classifier weights, use them
+    if classifier_weights is not None:
+        from wheeler_memory.cortex_classifier import classify
+        choice_sims = all_sims[-4:]  # Get the 4 choice similarities
+        scm_result = compute_scm(
+            np.array(all_sims[:n_retrieved]) if n_retrieved > 0 else np.array([]),
+            graph.adjacency,
+            graph.cluster_labels,
+            settlement["settled"],
+            settlement["settled"],  # prev = initial for first pass
+            float(choice_sims.max()) if len(choice_sims) > 0 else 0.0,
+        )
+        scm_layers = np.array([
+            scm_result.temperature,
+            scm_result.salience,
+            scm_result.energy,
+            scm_result.integration,
+            scm_result.polarity,
+            scm_result.net_warrant,
+            scm_result.explanation_readiness,
+        ])
+        pred_idx, confidence = classify(settlement["settled"], choice_sims, scm_layers, classifier_weights)
+        return pred_idx, confidence
+
+    # 8. Without L3: pick choice with highest settled opinion
+    pred_idx = int(np.argmax(choice_settled))
+    confidence = float(choice_settled[pred_idx])
+    return pred_idx, confidence
 
 
 def precompute_all_frames(questions_and_choices: list[tuple[str, list[str]]]) -> list[list]:
@@ -272,14 +410,15 @@ def precompute_all_frames(questions_and_choices: list[tuple[str, list[str]]]) ->
     Returns list of [frame_A, frame_B, frame_C, frame_D] per question.
     Much faster than encoding 4 texts per question individually.
     """
-    from wheeler_memory.embedding import embed_to_frame_batch
+    from wheeler_memory.hippocampus import hippocampus_to_frame_batch
 
     all_queries = []
     for question, choices in questions_and_choices:
         all_queries.extend(f"{question} {c}" for c in choices)
 
     print(f"  Pre-encoding {len(all_queries)} query+choice pairs in one batch...")
-    all_frames = embed_to_frame_batch(all_queries)
+    all_frames_2d = hippocampus_to_frame_batch(all_queries)
+    all_frames = [f.flatten() for f in all_frames_2d]
 
     result = []
     for i in range(0, len(all_frames), 4):
@@ -332,7 +471,7 @@ def score_decode(
         question,
         top_k=recall_k,
         data_dir=data_dir,
-        use_embedding=True,
+        encoder="blended",
     )
     state = extract_state(question, hits)
     memory_block = format_state(state)
@@ -379,7 +518,7 @@ def run_learning_pass(subjects: list[str], data_dir=None):
 
     Returns (n_stored, consolidation_result).
     """
-    from wheeler_memory.embedding import embed_to_frame_batch
+    from wheeler_memory.hippocampus import hippocampus_to_frame_batch
     from wheeler_memory.consolidation import sleep_consolidate
     from wheeler_memory.eviction import evict_for_capacity
 
@@ -398,7 +537,7 @@ def run_learning_pass(subjects: list[str], data_dir=None):
         return 0, None
 
     print(f"\n  [learn] Encoding {len(all_texts)} correct Q&A pairs...")
-    frames = embed_to_frame_batch(all_texts)
+    frames = hippocampus_to_frame_batch(all_texts)
 
     stored = 0
     for text, frame in zip(all_texts, frames):
@@ -436,6 +575,7 @@ def run_benchmark(
     split: str,
     use_embed: bool = True,
     debug_recall: bool = False,
+    classifier_weights_path: str | None = None,
 ) -> dict:
     results = {}          # subject → {correct, total, accuracy}
     all_rows = []         # for TSV output
@@ -466,8 +606,15 @@ def run_benchmark(
 
     print()
 
+    # Load classifier weights if provided (for cortex L3)
+    classifier_weights = None
+    if classifier_weights_path and mode == "cortex":
+        from wheeler_memory.cortex_classifier import load_weights
+        print(f"  Loading classifier weights from {classifier_weights_path}...")
+        classifier_weights = load_weights(classifier_weights_path)
+
     # Build attractor cache once for the entire benchmark run
-    cache = AttractorCache(data_dir) if mode in ("semantic", "recall-text") else None
+    cache = AttractorCache(data_dir) if mode in ("semantic", "recall-text", "cortex") else None
 
     for subj in subjects:
         correct = 0
@@ -494,7 +641,9 @@ def run_benchmark(
                 confidence = max(scores)
             elif mode == "recall-text":
                 _dbg = debug_recall and idx < 3
-                pred_idx, confidence = score_recall_text(question, recall_k, cache, debug=_dbg)
+                pred_idx, confidence = score_recall_text(question, choices, recall_k, cache, debug=_dbg)
+            elif mode == "cortex":
+                pred_idx, confidence = score_cortex(question, choices, recall_k, cache, classifier_weights)
             else:
                 try:
                     pred_idx, confidence = score_decode(
@@ -599,9 +748,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--mode",
-        choices=["semantic", "decode", "learn", "recall-text"],
+        choices=["semantic", "decode", "learn", "recall-text", "cortex"],
         default="semantic",
-        help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), 'learn' (store dev+val → consolidate → test), or 'recall-text' (extract answer letter from recalled facts). Default: semantic.",
+        help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), 'learn' (store dev+val → consolidate → test), 'recall-text' (extract answer letter from recalled facts), or 'cortex' (full cortex pipeline). Default: semantic.",
     )
     p.add_argument(
         "--split",
@@ -650,6 +799,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Print top-5 recalled texts for first 3 questions per subject (recall-text mode).",
     )
+    p.add_argument(
+        "--classifier-weights",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help="Path to trained cortex classifier weights (.npz) for cortex mode L3 classification.",
+    )
     return p.parse_args(argv)
 
 
@@ -692,6 +848,7 @@ def main(argv: list[str] | None = None) -> None:
         split=args.split,
         use_embed=not args.no_embed,
         debug_recall=args.debug_recall,
+        classifier_weights_path=args.classifier_weights,
     )
 
 
