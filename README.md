@@ -32,7 +32,7 @@ The system operates in two modes:
 | Mode | Description |
 |------|-------------|
 | **Wheeler-agent** | Wheeler provides context seasoning for a large LLM via Ollama |
-| **Wheeler-primary** | Wheeler IS the cognitive system — a small model (Qwen 1.5B) acts as a pure language renderer for Wheeler's attractor state, with no independent reasoning |
+| **Wheeler-primary** | Wheeler IS the cognitive system — a small model (Qwen 2.5-1.5B) acts as a pure language renderer for Wheeler's attractor state, with no independent reasoning |
 
 Memories have **temperature** — frequently recalled memories stay warm, stale ones cool and can be archived. Recall is **reconstructive**: stored attractors blend with query context and re-evolve, so the same memory reconstructs differently depending on what you're thinking about.
 
@@ -279,7 +279,7 @@ Corpus entries that discuss multiple concepts together create measurable attract
 | `wheeler-ui` | Web dashboard at http://localhost:7437 |
 | `wheeler-scrub --text "text"` | Visualise how a memory formed (brick inspector) |
 | `wheeler-info` | System info (hardware, GPU, paths) |
-| `wheeler-bench` | Quality score benchmark for CA dynamics tuning |
+| `wheeler-bench` | CA dynamics quality benchmark (logs to results.tsv) |
 | `wheeler-bench-gpu` | Benchmark GPU vs CPU evolution speed |
 | `wheeler-generate` | Generative text engine (IT from BIT mode) |
 
@@ -324,7 +324,7 @@ wheeler-crystallize corpus.jsonl --verbose  # only processes new items
 The included corpus preparation script extracts from SWE-bench, mbpp, LongBench, and curated domain entries:
 
 ```bash
-python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
+python scripts/tools/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 ```
 
 ---
@@ -354,22 +354,61 @@ wheeler_memory/          Core library
   eviction.py            Three-phase graceful degradation
   generation.py          Generative engine (IT from BIT)
   cache.py               JSON file-based caching layer
+  hardware.py            Hardware detection and capability flags
+  constants.py           Tunable CA dynamics parameters
+  theories/              Theory experiments (basin, resonance, synthesis)
+  gpu/                   HIP/CUDA kernel sources
 
-theories/                Theory experiments (basin, resonance, synthesis)
-gpu/                     HIP/CUDA kernel sources
 scripts/
-  bench/                 Benchmarks & evaluation (apple test, decoder eval)
+  bench/                 Benchmarks & evaluation
+    apple_test_semantic.py
+    eval_decoder.py
+    bench_associative.py
+    train_projection.py
   exploration/           Standalone exploration scripts
-  tools/                 Data prep, corpus cleanup, HIP build utilities
-experiments/             Theory test harnesses
+  experiments/           Theory test harnesses
+  tools/                 Data prep, corpus cleanup, GPU build utilities
+    prepare_corpus.py
+    topology_map.py
+    generate_evolution_gif.py
+    corpus_cleanup.py
+    build_hip.sh / install_hip_hook.sh
+  wheeler_store.py       CLI entry points (one per command)
+  wheeler_recall.py
+  wheeler_crystallize.py
+  wheeler_primary.py
+  wheeler_agent.py
+  wheeler_ui.py
+  wheeler_mmlu.py
+  wheeler_generate.py
+  wheeler_sleep.py
+  wheeler_temps.py
+  wheeler_forget.py
+  bench_quality.py
+  bench_gpu.py
+  scrub_brick.py
+  system_info.py
+
 tests/                   pytest suite (~233 tests)
-docs/                    Technical documentation
-reports/                 Generated assessment reports
-demos/                   Archived HTML demos (chat, dashboard)
-VISION.md                Project Ralph architecture vision
+docs/
+  INDEX.md               Guide index with suggested reading order
+  VISION.md              Project Ralph architecture vision
+  install.md             Installation guide
+  architecture.md        CA dynamics, temperature system, the math
+  concepts.md            Theoretical foundation, reconstructive recall
+  design.md              The Darman philosophy
+  cli.md                 Every flag documented
+  api.md                 Python library usage
+  gpu.md                 HIP/ROCm and CUDA setup
+  future.md              Planned features and research directions
+  assets/                Images and generated GIFs
+  demos/                 Archived HTML demos (chat, dashboard)
+  reports/               Generated assessment reports
+
 plans/                   Research & implementation plans
 pitch_pack/              Investor/developer pitch materials
 datasets/                Training corpora (gitignored, ~35GB)
+results.tsv              wheeler-bench CA dynamics tuning log
 ```
 
 ---
@@ -380,17 +419,17 @@ See [`docs/INDEX.md`](docs/INDEX.md) for a full guide listing with suggested rea
 
 | Guide | Description |
 |-------|-------------|
-| Installation | venv setup, platform-specific notes, GPU acceleration, Ollama |
-| Interactive Demo | See the CA engine in your browser (open as a file, no server) |
-| Architecture | CA dynamics, temperature system, chunked storage, the math |
-| Concepts | Theoretical foundation, reconstructive recall, semantic vs exact search |
-| Design Principles | The Darman philosophy |
-| CLI Reference | Every flag documented |
-| API Reference | Python library usage |
-| GPU Acceleration | HIP/ROCm and CUDA setup |
-| Roadmap | Planned features and research directions |
-| Contributing | Development setup, testing, code style |
-| Changelog | Release history |
+| [install.md](docs/install.md) | venv setup, platform-specific notes, GPU acceleration, Ollama |
+| [architecture.md](docs/architecture.md) | CA dynamics, temperature system, chunked storage, the math |
+| [concepts.md](docs/concepts.md) | Theoretical foundation, reconstructive recall, semantic vs exact search |
+| [design.md](docs/design.md) | The Darman philosophy |
+| [cli.md](docs/cli.md) | Every flag documented |
+| [api.md](docs/api.md) | Python library usage |
+| [gpu.md](docs/gpu.md) | HIP/ROCm and CUDA setup |
+| [future.md](docs/future.md) | Planned features and research directions |
+| [VISION.md](docs/VISION.md) | Project Ralph architecture vision |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, testing, code style |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
 
 ---
 
