@@ -118,7 +118,8 @@ def load_training_data(
                     frames_flat = [f.flatten().astype(np.float32) for f in frames]
 
                     # Compute similarity of each choice to question attractor
-                    question_frame = hippocampus_to_frame_batch([question])[0].flatten().astype(np.float32)
+                    question_frame_2d = hippocampus_to_frame_batch([question])[0]
+                    question_frame = question_frame_2d.flatten().astype(np.float32)
 
                     choice_sims = np.array(
                         [_pearson_correlation(question_frame, fc) for fc in frames_flat],
@@ -127,7 +128,7 @@ def load_training_data(
 
                     # Retrieve top-K attractors for this question
                     if cache is not None:
-                        hits = cache.search(question_frame, top_k=cortex_k)
+                        hits = cache.search(question_frame_2d, top_k=cortex_k)
                         retrieved_sims = np.array(
                             [h.get("similarity", 0.0) for h in hits], dtype=np.float32
                         )

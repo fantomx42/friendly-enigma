@@ -395,7 +395,13 @@ def score_cortex(
             scm_result.net_warrant,
             scm_result.explanation_readiness,
         ])
-        pred_idx, confidence = classify(settlement["settled"], choice_sims, scm_layers, classifier_weights)
+        # Pad/truncate settlement to CORTEX_K to match trained classifier input dim
+        from wheeler_memory.constants import CORTEX_K
+        settled_fixed = np.zeros(CORTEX_K, dtype=np.float32)
+        settled_raw = settlement["settled"]
+        n = min(len(settled_raw), CORTEX_K)
+        settled_fixed[:n] = settled_raw[:n]
+        pred_idx, confidence = classify(settled_fixed, choice_sims, scm_layers, classifier_weights)
         return pred_idx, confidence
 
     # 8. Without L3: pick choice with highest settled opinion
@@ -417,8 +423,7 @@ def precompute_all_frames(questions_and_choices: list[tuple[str, list[str]]]) ->
         all_queries.extend(f"{question} {c}" for c in choices)
 
     print(f"  Pre-encoding {len(all_queries)} query+choice pairs in one batch...")
-    all_frames_2d = hippocampus_to_frame_batch(all_queries)
-    all_frames = [f.flatten() for f in all_frames_2d]
+    all_frames = hippocampus_to_frame_batch(all_queries)
 
     result = []
     for i in range(0, len(all_frames), 4):
