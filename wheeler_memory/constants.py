@@ -128,8 +128,8 @@ TERNARY_THRESHOLD_NEG = -0.33
 # ---------------------------------------------------------------------------
 # Recall-text scoring (MMLU --mode recall-text)
 # ---------------------------------------------------------------------------
-RECALL_K = 30  # top-K recalled facts for letter extraction
-RECALL_MIN_SIM = 0.0  # minimum similarity to count a vote (0 = accept all)
+RECALL_K = 10  # top-K recalled facts for letter extraction
+RECALL_MIN_SIM = 0.05  # minimum similarity to count a vote (0 = accept all)
 RECALL_ENCODER = "hippocampus"  # encoder for recall queries
 
 # ---------------------------------------------------------------------------
