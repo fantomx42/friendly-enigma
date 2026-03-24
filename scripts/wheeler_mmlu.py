@@ -1023,6 +1023,21 @@ def run_learning_pass(subjects: list[str], data_dir=None, encoder: str = "hippoc
 
     d = Path(data_dir) if data_dir else Path.home() / ".wheeler_memory"
 
+    # Train word co-occurrence vectors from stored texts (SVD on PMI)
+    from wheeler_memory.word_encoder import train_word_vectors, save_word_vectors
+
+    print("  [learn] Training word co-occurrence vectors (SVD on PMI)...")
+    vectors, vocab = train_word_vectors(data_dir=str(d))
+    save_word_vectors(vectors, vocab, data_dir=str(d))
+    print(f"  [learn] Learned {len(vocab)} word vectors ({vectors.shape[1]}-dim)")
+
+    # Reset cached learned vectors so encoder picks up new ones
+    import wheeler_memory.word_encoder as _we
+
+    _we._learned_checked = False
+    _we._learned_vectors = None
+    _we._learned_word2idx = None
+
     print("  [learn] Running eviction to enforce capacity limits...")
     evict_for_capacity(d)
 

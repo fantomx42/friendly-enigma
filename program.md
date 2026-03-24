@@ -94,7 +94,7 @@ Tip: try increasing `MAX_PUSH_STRENGTH` to 0.40–0.45 first.  Often improves av
 ## Setup
 
 ```bash
-cd "/home/tristan/LocalLLM/wheeler memory"
+cd "/home/tristan/projects/wheeler-memory"
 source .venv/bin/activate
 pip install -e .
 
@@ -105,4 +105,61 @@ wheeler-bench
 git add wheeler_memory/constants.py
 git commit -m "Experiment 1: MAX_PUSH_STRENGTH 0.35 → 0.40"
 wheeler-bench --commit $(git rev-parse --short HEAD) --changed "MAX_PUSH_STRENGTH" --notes "testing sharper attractors"
+```
+
+---
+
+## Overnight Agenda — 2026-03-24
+
+### Current State
+- Best wheeler-bench score: 0.009 (CA dynamics solved)
+- MMLU semantic (hippocampus): 28.7% baseline
+- MMLU semantic (hippo-word, learned vectors from 17k-word corpus): 27.7%
+- Multi-choice mode added but encoder-limited (~27% regardless of params)
+- Word co-occurrence vector training activated in learn pass (SVD on PMI)
+- Previous overnight (2026-03-23): swept RECALL_K, RECALL_MIN_SIM, RECALL_ENCODER — all reverted
+
+### Tonight's Priority: Semantic mode with hippo-word blend tuning
+
+Word vectors are trained from the full main data dir (17,451 words). The hippo-word
+encoder blends hippocampus n-grams with learned word vectors weighted by `WORD_HIPPO_BLEND`.
+The optimal blend may not be 0.3 (default). Tonight sweeps the blend ratio and related params.
+
+**Pre-step (run ONCE before loop):**
+```bash
+cd /home/tristan/projects/wheeler-memory && source .venv/bin/activate
+python -c "
+from wheeler_memory.word_encoder import train_word_vectors, save_word_vectors
+vectors, vocab = train_word_vectors()
+save_word_vectors(vectors, vocab)
+print(f'Trained {len(vocab)} word vectors')
+"
+```
+
+**Benchmark command for each iteration:**
+```bash
+wheeler-mmlu --subjects high_school_physics conceptual_physics college_physics --mode semantic --encoder hippo-word --split test 2>&1 | tail -5
+```
+
+**Parameters to sweep (all in constants.py):**
+1. `WORD_HIPPO_BLEND` — try 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9 (current: 0.3)
+   Rationale: Find optimal hippocampus-to-word ratio; 0.3 may be suboptimal
+2. `RECALL_K` — try 3, 5, 10, 15, 20 (current: 10)
+   Rationale: Recall count affects semantic scoring through cache search
+3. `RECALL_MIN_SIM` — try 0.0, 0.05, 0.10, 0.15 (current: 0.15)
+   Rationale: Threshold affects which attractors contribute to scoring
+
+Score to track: MMLU accuracy (%) on physics subjects via semantic mode. Target: > 30%.
+
+### Model
+Local: qwen3.5:9b (code generation)
+Orchestration: Claude opus (loop management)
+
+### Budget
+- Max iterations: 20
+- Stop condition: MMLU semantic > 32% OR max iterations reached
+
+### Benchmark Command Override
+```bash
+wheeler-mmlu --subjects high_school_physics conceptual_physics college_physics --mode semantic --encoder hippo-word --split test
 ```
