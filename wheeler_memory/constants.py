@@ -137,5 +137,5 @@ RECALL_ENCODER = "hippocampus"  # encoder for recall queries
 # ---------------------------------------------------------------------------
 WORD_PROJECTION_SEED = 0xBEEF_CAFE  # seeds word → 384-dim matrix
 WORD_HASH_SPACE = 2**16  # 65536 buckets (same size as hippocampus)
-WORD_HIPPO_BLEND = 0.2  # word weight in hippo+word hybrid (1-this → hippocampus)
+WORD_HIPPO_BLEND = 0.5  # word weight in hippo+word hybrid (1-this → hippocampus)
 ENSEMBLE_MARGIN_THRESHOLD = 16  # hippo margin below this → defer to secondary encoder
