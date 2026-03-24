@@ -10,13 +10,13 @@
 
 ## Overview
 
-Wheeler Memory is a **learning architecture**, not a language model. It encodes text through a Hippocampus encoder into a 64x64 cellular automaton (CA) grid, evolves it through 3-state dynamics until convergence (~40-50 ticks), and stores the resulting pattern. A Cortex system with three tiers (L1 Graph topology, L2 Settlement CA, L3 Native Classifier) handles semantic scoring and reconstruction.
+Wheeler Memory is a **learning architecture**, not a language model. It encodes text through a native Hippocampus encoder into a 64x64 cellular automaton (CA) grid, evolves it through 3-state dynamics until convergence (~40-50 ticks), and stores the resulting pattern. A Cortex system with three tiers (L1 Graph topology, L2 Settlement CA, L3 Native Classifier) handles semantic scoring and reconstruction.
 
 Similar concepts produce similar attractors. Query evolution followed by Pearson correlation against stored attractors enables recall. The Language Wheeler component renders CA states as natural language without independent reasoning.
 
 | Component | Role |
 |-----------|------|
-| **Hippocampus Encoder** | Native semantic embedding (no pretrained models) |
+| **Hippocampus Encoder** | Native semantic embedding via character n-gram random indexing (no pretrained models) |
 | **CA Dynamics** | 3-state evolution to stable attractors |
 | **Cortex** | L1 semantic topology, L2 settlement stability, L3 classifier scoring |
 | **Language Wheeler** | Renders attractor state as text (decoder, not LLM) |
@@ -40,9 +40,11 @@ pip install -e ".[embed]"
 ### Store and recall memories
 
 ```bash
-wheeler-store --embed "self-attention computes relationships between all positions"
-wheeler-recall --embed "how does attention work in transformers"
+wheeler-store "self-attention computes relationships between all positions"
+wheeler-recall "how does attention work in transformers"
 ```
+
+Add `--embed` to use the MiniLM sentence-transformer encoder instead of the native Hippocampus encoder.
 
 ### Pre-train from a corpus
 
@@ -59,20 +61,23 @@ wheeler-primary --interactive --show-state --verbose
 ### Run the MMLU benchmark
 
 ```bash
-# Pure semantic evaluation (no LLM)
-wheeler-mmlu --subjects high_school_physics conceptual_physics --mode semantic
+# Zero-shot cortex evaluation (no stored knowledge)
+wheeler-mmlu --all --mode cortex
 
 # Full learn → consolidate → test cycle
 wheeler-mmlu --subjects high_school_physics conceptual_physics --mode learn
 
+# With trained L3 classifier
+wheeler-mmlu --all --mode cortex --classifier-weights cortex_classifier.npz
+
 # All 57 subjects, save results
-wheeler-mmlu --all --mode semantic --output results.tsv
+wheeler-mmlu --all --mode cortex --output results.tsv
 ```
 
 ### Launch the web dashboard
 
 ```bash
-wheeler-ui # opens http://localhost:7437
+wheeler-ui  # opens http://localhost:7437
 ```
 
 ---
@@ -88,69 +93,65 @@ wheeler-ui # opens http://localhost:7437
 ## Architecture
 
 ```
- ENCODING PIPELINE
- -----------------
-Text ---> Hippocampus Encoder (native semantic)
-          |
-          v
-        JL Random Projection (to 4096 dims)
-          |
-          v
-        Reshape to 64x64 grid, quantize to {-1, 0, +1}
-          |
-          v
-        CA Evolution (~40-50 ticks to convergence)
-          |
-          v
-        Attractor (64x64 stable pattern)
+ENCODING PIPELINE
+-----------------
+Text ---> Hippocampus Encoder (native: character n-gram random indexing)
+                    |
+                    v
+          [Optional: MiniLM via --embed flag]
+                    |
+                    v
+          JL Random Projection (to 4096 dims)
+                    |
+                    v
+          Reshape to 64x64 grid, quantize to {-1, 0, +1}
+                    |
+                    v
+          CA Evolution (~40-50 ticks to convergence)
+                    |
+                    v
+          Attractor (64x64 stable pattern)
 
+CORTEX SYSTEM (Semantic Scoring & Topology)
+-------------------------------------------
+Stored Attractors ---> L1 Graph: Semantic topology (Hippocampus native encoder)
+                              |
+                              v
+                    L2 Settlement CA: Stability-driven settlement & consolidation
+                              |
+                              v
+                    SCM: Soft Constraint Satisfaction for coherence
+                              |
+                              v
+                    L3 Classifier: Native semantic scorer (trainable, 11K params)
 
- CORTEX SYSTEM (Semantic Scoring & Topology)
- -------------------------------------------
-Stored Attractors ---> L1 Graph: Semantic topology
-                         (Hippocampus native encoder)
-                       |
-                       v
-                     L2 Settlement CA: Stability-driven
-                        settlement & consolidation
-                       |
-                       v
-                     SCM: Soft Constraint Satisfaction
-                        for coherence
-                       |
-                       v
-                     L3 Classifier: Native semantic scorer
-
-
- QUERY & RECALL
- --------------
+QUERY & RECALL
+--------------
 Query ---> Same encoding pipeline ---> Query attractor
-          |
-          v
-        Cortex L1 scoring via Pearson correlation
-          |
-          v
-        Top-K hits ranked by native classifier
-          |
-          v
-        [Optional] Reconstructive recall:
-          blend stored attractor with query context,
-          re-evolve through CA -> reconstructed memory
-          |
-          v
-        Language Wheeler renders CA state as text
+                    |
+                    v
+          Cortex L1 scoring via Pearson correlation
+                    |
+                    v
+          Top-K hits ranked by native classifier
+                    |
+                    v
+          [Optional] Reconstructive recall: blend stored attractor with query
+          context, re-evolve through CA -> reconstructed memory
+                    |
+                    v
+          Language Wheeler renders CA state as text
 
-
- MMLU BENCHMARK MODES
- --------------------
---mode semantic     : Pure CA attractor correlation (no LLM)
---mode cortex       : Cortex L3 classifier scoring
+MMLU BENCHMARK MODES
+--------------------
+--mode cortex       : Cortex L3 classifier scoring (default, no LLM)
+--mode semantic     : Pure CA attractor Pearson correlation
 --mode recall-text  : Reconstruction + text decode
 --mode decode       : Small model decoder for rendering
 --mode learn        : Full cycle (learn → consolidate → test)
 ```
 
-The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slopes flow uphill. Convergence takes ~3ms on CPU. Cortex eliminates pretrained model dependencies (MiniLM removed); all semantic understanding is native to the architecture.
+The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slopes flow uphill. Convergence takes ~3ms on CPU. The Hippocampus encoder uses character 3-grams and 4-grams with random indexing — lexical similarity produces similar frames; true semantic similarity emerges from attractor dynamics and Cortex layers. Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
 
 ---
 
@@ -160,25 +161,21 @@ Validated on a corpus of **2,711 memories** (26.9% grid saturation):
 
 ### MMLU Benchmark (learn → consolidate → test)
 
-Wheeler now has a full learning loop: store correct Q&A facts from dev+validation splits,
-run sleep consolidation, then test on the held-out test split.
+Wheeler has a full learning loop: store correct Q&A facts from dev+validation splits, run sleep consolidation, then test on the held-out test split. Results use the native Cortex encoder (no external models). Full logs in `results/`.
 
-**Physics subjects — 488 questions (test split):**
+**All 57 subjects — 14,042 questions (test split):**
 
-| Subject | Correct / Total | Accuracy |
-|---------|----------------|----------|
-| conceptual_physics | 65/235 | 27.7% |
-| college_physics | 36/102 | 35.3% |
-| high_school_physics | 33/151 | 21.9% |
-| **OVERALL** | **134/488** | **27.5%** |
+| Run | Mode | Score | Notes |
+|-----|------|-------|-------|
+| Zero-shot Cortex | `--mode cortex` (0 stored memories) | 24.3% (3,418/14,042) | At chance — no knowledge to retrieve |
+| Cortex + Learned Facts | `--mode cortex` (1,812 science attractors stored) | 25.3% (3,557/14,042) | +1.0% over zero-shot |
+| Cortex + L3 Classifier | `--mode cortex --classifier-weights cortex_classifier.npz` | 25.9% (3,643/14,042) | +1.6% over zero-shot |
 
-Random chance for 4-choice MCQ is **25.0%**. Current scoring uses Pearson correlation
-between CA attractors — it measures attractor *shape* similarity, not *propositional content*.
-The stored Q&A facts are in the index; the scoring mechanism can't yet read them.
+Random chance for 4-choice MCQ is **25.0%**. Encoder: blended (hippocampus 0.7 + language wheeler 0.3). The L3 classifier is trained with numpy SGD (11K params) — loss barely moved from chance, needs more training data or richer features.
 
-**Next step:** Reconstruction scoring. Evolve the query → let the CA settle → read back
-what the attractor is saying → compare that to the choices as text. This is the path where
-"it from bit" becomes the scoring mechanism, not just the storage philosophy.
+**Previous MiniLM semantic baseline (removed):** 27.5% — used external pretrained model (`all-MiniLM-L6-v2`), no longer the default encoder.
+
+**Next step:** Reconstruction scoring. Evolve the query → let the CA settle → read back what the attractor is saying → compare that to the choices as text. This is the path where "it from bit" becomes the scoring mechanism, not just the storage philosophy.
 
 ### Semantic Apple Test
 
@@ -228,7 +225,7 @@ echo '{"text": "concept description here"}' > corpus.jsonl
 wheeler-crystallize corpus.jsonl --verbose --batch-size 64
 
 # Resume support - re-running skips already-stored entries
-wheeler-crystallize corpus.jsonl --verbose # only processes new items
+wheeler-crystallize corpus.jsonl --verbose  # only processes new items
 ```
 
 **Supported input formats:** JSONL (`{"text": "..."}` per line), CSV (column named `text`), TXT (one entry per line), Parquet (auto-detects text column).
@@ -236,7 +233,8 @@ wheeler-crystallize corpus.jsonl --verbose # only processes new items
 The included corpus preparation script extracts from SWE-bench, mbpp, LongBench, and curated domain entries:
 
 ```bash
-python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
+python scripts/tools/prepare_corpus.py
+# -> datasets/corpus.jsonl (2711 entries)
 ```
 
 ---
@@ -247,8 +245,8 @@ python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 
 | Command | Description |
 |---------|-------------|
-| `wheeler-store "text"` | Store a memory (add `--embed` for semantic) |
-| `wheeler-recall "text"` | Find similar memories (add `--embed` for semantic) |
+| `wheeler-store "text"` | Store a memory (add `--embed` for MiniLM semantic encoder) |
+| `wheeler-recall "text"` | Find similar memories (add `--embed` for MiniLM semantic encoder) |
 | `wheeler-forget --text "text"` | Delete a specific memory |
 | `wheeler-temps` | View all memories with temperature/freshness |
 | `wheeler-sleep` | Archive cold memories to save space |
@@ -287,9 +285,17 @@ python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 |---------|-------------|
 | `wheeler-mmlu --subjects SUBJECT` | Run MMLU on specific subjects |
 | `wheeler-mmlu --all` | Run all 57 MMLU subjects |
+| `wheeler-mmlu --mode cortex` | Cortex L3 classifier scoring (default) |
 | `wheeler-mmlu --mode learn` | Learn dev+val → consolidate → test on test split |
 | `wheeler-mmlu --mode decode --model qwen2.5:1.5b` | Decoder mode (requires Ollama) |
+| `wheeler-mmlu --classifier-weights cortex_classifier.npz` | Use trained L3 classifier |
 | `wheeler-mmlu --list-subjects` | Print all 57 available subjects |
+
+### Training
+
+| Command | Description |
+|---------|-------------|
+| `python scripts/train_cortex_classifier.py` | Train the L3 cortex classifier (numpy SGD) |
 
 ### Evaluation Scripts
 
@@ -297,7 +303,9 @@ python scripts/prepare_corpus.py  # -> datasets/corpus.jsonl (2711 entries)
 python scripts/bench/apple_test_semantic.py   # Semantic holdout test
 python scripts/bench/eval_decoder.py          # Decoder quality by attractor depth
 python scripts/bench/eval_decoder.py --decode # Also run small model (requires Ollama)
+python scripts/bench/bench_associative.py     # Associative recall benchmarks
 python scripts/tools/topology_map.py          # Co-activation adjacency map
+python scripts/tools/generate_evolution_gif.py # Regenerate the CA evolution GIF
 ```
 
 ---
@@ -335,61 +343,88 @@ Corpus entries that discuss multiple concepts together create measurable attract
 ## Project Structure
 
 ```
-wheeler_memory/            Core library
+wheeler_memory/          Core library
   ENCODING
-    dynamics.py              CA engine (3-state evolution, GPU dispatch)
-    embedding.py             Hippocampus encoder + JL random projection
-    hashing.py               SHA-256 deterministic encoding
-    brick.py                 Memory brick format (.npz archives)
-
+    dynamics.py          CA engine (3-state evolution, GPU dispatch)
+    embedding.py         MiniLM sentence embedding + JL random projection (optional)
+    hippocampus.py       Native encoder: character n-gram random indexing (default)
+    hashing.py           SHA-256 deterministic encoding
+    brick.py             Memory brick format (.npz archives)
   CORTEX SYSTEM
-    cortex.py                Cortex orchestration & L1 graph topology
-    cortex_scm.py            L2 Settlement CA + Soft Constraint Satisfaction
-    cortex_classifier.py     L3 Native semantic classifier
-
+    cortex.py            Cortex orchestration & L1 graph topology
+    cortex_scm.py        L2 Settlement CA + Soft Constraint Satisfaction
+    cortex_classifier.py L3 Native semantic classifier (trainable, numpy SGD)
   STORAGE & RECALL
-    storage.py               Store/recall with chunked Pearson search
-    reconstruction.py        Reconstructive recall (Darman philosophy)
-    cache.py                 JSON file-based caching layer
-
+    storage.py           Store/recall with chunked Pearson search
+    reconstruction.py    Reconstructive recall (Darman philosophy)
+    cache.py             JSON file-based caching layer
   AGENTS & RENDERING
-    decoder.py               Language Wheeler decoder (text rendering)
-    agent.py                 LLM agent wrapper (Wheeler context seasoning)
-    generation.py            Generative engine (IT from BIT)
-
+    decoder.py           Language Wheeler decoder (text rendering)
+    language_wheeler.py  Language Wheeler component (CA state → text)
+    agent.py             LLM agent wrapper (Wheeler context seasoning)
+    generation.py        Generative engine (IT from BIT)
   UTILITIES
-    crystallization.py       Corpus pre-training pipeline
-    temperature.py           Temperature/warmth tracking
-    chunking.py              Domain routing (keyword-based)
-    gpu_dynamics.py          HIP/CUDA kernel dispatch
-    attention.py             Salience-weighted recall
-    warming.py               Association tracking
-    oscillation.py           Epistemic uncertainty via oscillation detection
-    rotation.py              Rotation retry to escape bad attractor basins
-    polarity.py              Dual-polarity encoding (antipodal CA states)
-    consolidation.py         Sleep consolidation (prune redundant keyframes)
-    eviction.py              Three-phase graceful degradation
-    theories/                Theory experiments (basin, resonance, synthesis)
-    gpu/                     HIP/CUDA kernel sources
+    crystallization.py   Corpus pre-training pipeline
+    temperature.py       Temperature/warmth tracking
+    chunking.py          Domain routing (keyword-based)
+    gpu_dynamics.py      HIP/CUDA kernel dispatch
+    hardware.py          Hardware detection & optimal device selection
+    attention.py         Salience-weighted recall warming
+    warming.py           Association tracking
+    oscillation.py       Epistemic uncertainty via oscillation detection
+    rotation.py          Rotation retry to escape bad attractor basins
+    polarity.py          Dual-polarity encoding (antipodal CA states)
+    consolidation.py     Sleep consolidation (prune redundant keyframes)
+    eviction.py          Three-phase graceful degradation
+    constants.py         Tunable system constants
+  theories/              Theory experiments (basin, resonance, synthesis)
+  gpu/                   HIP/CUDA kernel sources
 
-scripts/                   CLI entry points
-  bench/                     Benchmarks & evaluation (apple test, decoder eval)
-  exploration/               Standalone exploration scripts
-  tools/                     Data prep, corpus cleanup, HIP build utilities
-  experiments/               Theory test harnesses
-  train_cortex_classifier.py Training script for L3 cortex classifier
+scripts/                 CLI entry points
+  bench/                 Benchmarks & evaluation
+    apple_test_semantic.py   Semantic holdout test
+    eval_decoder.py          Decoder quality by attractor depth
+    bench_associative.py     Associative recall benchmarks
+    train_projection.py      Learn an optimised JL projection matrix
+  exploration/           Standalone exploration scripts
+  tools/                 Data prep, corpus cleanup, HIP build utilities
+    prepare_corpus.py    Corpus preparation (SWE-bench, mbpp, LongBench)
+    topology_map.py      Co-activation adjacency map
+    generate_evolution_gif.py   Regenerate docs/assets/diagrams/evolution.gif
+    build_hip.sh / install_hip_hook.sh   HIP kernel build scripts
+  train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
+  wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
 
-tests/                     pytest suite (~233+ tests)
-  test_cortex.py             Cortex system unit tests
+tests/                   pytest suite (21 test modules, 230+ tests)
+  test_cortex.py         Cortex system unit tests
+  test_hallucination.py  Hallucination classification tests
+  test_generation.py     Trajectory resonance tests
+  ... (dynamics, storage, brick, chunking, consolidation, eviction, etc.)
 
-docs/                      Technical documentation
-  reports/                   Generated assessment reports
-  demos/                     Archived HTML demos (chat, dashboard)
-  VISION.md                  Project vision
+results/                 Benchmark logs & baselines
+  BASELINES.md           Recorded MMLU baseline runs with notes
+  mmlu_cortex_*.log      Per-run MMLU logs
 
-plans/                     Research & implementation plans
-pitch_pack/                Investor/developer pitch materials
-datasets/                  Training corpora (gitignored, ~35GB)
+docs/                    Technical documentation
+  VISION.md              Project Ralph — full architecture vision
+  INDEX.md               Guide listing with suggested reading order
+  architecture.md        CA dynamics, temperature system, chunked storage, the math
+  concepts.md            Theoretical foundation, reconstructive recall
+  design.md              The Darman philosophy
+  cli.md                 Every flag documented
+  api.md                 Python library usage
+  gpu.md                 HIP/ROCm and CUDA setup
+  install.md             venv setup, platform-specific notes
+  future.md              Planned features and research directions
+  assets/                Diagrams and media
+  demos/                 Archived HTML demos (chat, dashboard, CA demo)
+  reports/               Generated assessment reports
+
+plans/                   Research & implementation plans
+pitch_pack/              Investor/developer pitch materials
+datasets/                Training corpora (gitignored, ~35GB)
+program.md               Autoresearch tuning program and constants guide
+results.tsv              Latest benchmark summary (TSV)
 ```
 
 ---
@@ -408,6 +443,7 @@ See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested readi
 | [CLI Reference](docs/cli.md) | Every flag documented |
 | [API Reference](docs/api.md) | Python library usage |
 | [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup |
+| [Vision](docs/VISION.md) | Project Ralph — full architecture vision |
 | [Roadmap](docs/future.md) | Planned features and research directions |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
