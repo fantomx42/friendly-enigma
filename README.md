@@ -82,14 +82,6 @@ wheeler-ui  # opens http://localhost:7437
 
 ---
 
-## How It Looks
-
-<img src="docs/assets/diagrams/evolution.gif" alt="CA evolution - a random grid converging to a stable attractor" width="320">
-
-*A random 64x64 grid converging to a stable attractor through 3-state CA dynamics.*
-
----
-
 ## Architecture
 
 ```
