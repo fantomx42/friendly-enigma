@@ -69,6 +69,8 @@ class DecoderState:
     confidence: float = 0.0
     co_activated: list[tuple[str, str]] = field(default_factory=list)
     uncertain: bool = True
+    interference_state: str = ""  # GROUNDED/ABSORBED/UNCONSOLIDATED/CONTESTED
+    scm_openness: float = 1.0  # fraction of SCM cells below gap threshold
 
 
 def extract_state(
@@ -142,8 +144,15 @@ def format_state(state: DecoderState) -> str:
     lines = [
         f"QUERY: {state.query}",
         f"CONFIDENCE: {_confidence_label(state.confidence)}",
-        "",
     ]
+
+    if state.interference_state:
+        lines.append(
+            f"INTERFERENCE: {state.interference_state} "
+            f"(SCM openness: {state.scm_openness:.0%})"
+        )
+
+    lines.append("")
 
     if state.attractors:
         lines.append("ACTIVE MEMORIES (ranked by relevance):")

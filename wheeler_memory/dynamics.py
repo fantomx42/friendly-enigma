@@ -53,6 +53,44 @@ def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
     return np.clip(frame + delta, -1, 1)
 
 
+def apply_ca_dynamics_parameterized(
+    frame: np.ndarray,
+    push_strength: float,
+    slope_strength: float,
+) -> np.ndarray:
+    """Apply a single CA iteration with caller-supplied push/slope strengths.
+
+    Identical logic to apply_ca_dynamics() but accepts per-grid constants,
+    enabling corpus (tight) and experiential (loose) evolution regimes
+    from the same engine.
+    """
+    n_up = np.roll(frame, 1, axis=0)
+    n_down = np.roll(frame, -1, axis=0)
+    n_left = np.roll(frame, 1, axis=1)
+    n_right = np.roll(frame, -1, axis=1)
+
+    is_max = (
+        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
+    )
+    is_min = (
+        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
+    )
+
+    neighbors = np.stack([n_up, n_down, n_left, n_right])
+    max_neighbor = np.max(neighbors, axis=0)
+
+    is_flat = is_max & is_min
+
+    delta = np.zeros_like(frame)
+    delta = np.where(is_max & ~is_flat, (1 - frame) * push_strength, delta)
+    delta = np.where(is_min & ~is_flat, (-1 - frame) * push_strength, delta)
+    delta = np.where(
+        ~is_max & ~is_min, (max_neighbor - frame) * slope_strength, delta
+    )
+
+    return np.clip(frame + delta, -1, 1)
+
+
 # GPU dispatch — imported after apply_ca_dynamics is defined to avoid circular
 # import (gpu_dynamics imports apply_ca_dynamics from this module).
 try:
@@ -98,6 +136,78 @@ def evolve_and_interpret(
     for i in range(max_iters):
         frame_old = frame
         frame = apply_ca_dynamics(frame)
+        delta = np.abs(frame - frame_old).mean()
+
+        history.append(frame.copy())
+
+        if delta < stability_threshold:
+            return {
+                "state": "CONVERGED",
+                "attractor": frame,
+                "convergence_ticks": i + 1,
+                "history": history,
+                "metadata": {},
+            }
+
+        if i > 50 and i % 10 == 0:
+            osc_result = detect_oscillation(history)
+            if osc_result["oscillating"]:
+                return {
+                    "state": "OSCILLATING",
+                    "attractor": frame,
+                    "convergence_ticks": i + 1,
+                    "history": history,
+                    "metadata": {
+                        "cycle_period": osc_result["period"],
+                        "oscillating_cells": osc_result["oscillating_cells"],
+                        "cycle_states": osc_result["cycle_states"],
+                    },
+                }
+
+    return {
+        "state": "CHAOTIC",
+        "attractor": frame,
+        "convergence_ticks": max_iters,
+        "history": history,
+        "metadata": {},
+    }
+
+
+def evolve_with_params(
+    frame: np.ndarray,
+    push_strength: float,
+    slope_strength: float,
+    max_iters: int = SALIENCE_MAX_ITERS_MED,
+    stability_threshold: float = SALIENCE_THRESHOLD_MED,
+) -> dict:
+    """Evolve a frame using custom push/slope strengths.
+
+    Same convergence/oscillation/chaos detection as evolve_and_interpret(),
+    but uses apply_ca_dynamics_parameterized() with the given strengths.
+    Enables corpus vs experiential evolution from a single code path.
+
+    For GPU: ca_evolve_single_v2 already accepts push/slope as runtime params.
+    """
+    if _GPU_READY and _gpu_evolve is not None:
+        try:
+            result = _gpu_evolve(
+                frame,
+                max_iters=max_iters,
+                stability_threshold=stability_threshold,
+                push_strength=push_strength,
+                slope_strength=slope_strength,
+            )
+            if not result["history"]:
+                result["history"] = [frame.copy(), result["attractor"].copy()]
+            return result
+        except Exception as e:
+            logging.warning("GPU evolution failed, falling back to CPU: %s", e)
+
+    history = [frame.copy()]
+
+    for i in range(max_iters):
+        frame_old = frame
+        frame = apply_ca_dynamics_parameterized(frame, push_strength, slope_strength)
         delta = np.abs(frame - frame_old).mean()
 
         history.append(frame.copy())

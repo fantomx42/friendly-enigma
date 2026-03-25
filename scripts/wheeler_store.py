@@ -91,6 +91,11 @@ def main():
         action="store_true",
         help="Store as a dual-polarity memory (creates experience + polar attractors linked by polarity_link edge)",
     )
+    parser.add_argument(
+        "--experiential",
+        action="store_true",
+        help="Store as an experiential (episodic) memory with temporal context",
+    )
     args = parser.parse_args()
 
     text = sys.stdin.read().strip() if args.text == "-" else args.text
@@ -104,6 +109,52 @@ def main():
     sal = salience_from_label(args.salience) if args.salience else None
 
     try:
+        if args.experiential:
+            import time
+            from wheeler_memory.attention import compute_attention_budget
+            from wheeler_memory.dynamics import evolve_with_params
+            from wheeler_memory.brick import MemoryBrick
+            from wheeler_memory.storage import store_memory
+            from wheeler_memory.experiential import ExperientialMeta
+            from wheeler_memory.constants import (
+                EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW,
+            )
+            from wheeler_memory.rotation import _get_frame_fn
+            from wheeler_memory.temperature import SALIENCE_DEFAULT
+
+            budget = compute_attention_budget(
+                sal if sal is not None else SALIENCE_DEFAULT
+            )
+            frame_fn = _get_frame_fn(args.embed, encoder=args.encoder)
+            start = time.time()
+            frame = frame_fn(text)
+            result = evolve_with_params(
+                frame,
+                EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW,
+                max_iters=budget.max_iters,
+                stability_threshold=budget.stability_threshold,
+            )
+            wall = time.time() - start
+
+            if result["state"] == "CONVERGED":
+                brick = MemoryBrick.from_evolution_result(result)
+                meta = ExperientialMeta()
+                key = store_memory(
+                    text, result, brick, args.data_dir, chunk=chunk,
+                    grid="experiential", experiential_meta=meta,
+                )
+                chunk_label = f"{chunk} (auto)" if auto else chunk
+                print(f"Chunk:    {chunk_label}")
+                print(f"Grid:     experiential")
+                print(f"State:    {result['state']}")
+                print(f"Ticks:    {result['convergence_ticks']}")
+                print(f"Time:     {wall:.3f}s")
+                print(f"Key:      {key[:16]}...")
+                print("Experiential memory stored successfully.")
+            else:
+                print(f"Warning: failed to converge ({result['state']})", file=sys.stderr)
+            return
+
         if args.dual:
             from wheeler_memory.polarity import store_dual
 

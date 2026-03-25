@@ -151,12 +151,19 @@ def store_memory(
     chunk: str | None = None,
     auto_evict: bool = True,
     memory_type: str | None = None,
+    grid: str = "corpus",
+    experiential_meta: "ExperientialMeta | None" = None,
 ) -> str:
     """Save attractor, brick, and index entry for a memory.
 
     Returns the hex hash key used for storage.
-    When memory_type is set (e.g. "polar"), it is written into the
-    index entry's metadata so recall can filter or classify the entry.
+
+    Parameters
+    ----------
+    grid : "corpus" or "experiential".  Corpus writes to attractors/ (default).
+        Experiential writes to experiential/ subdirectory with temporal context.
+    experiential_meta : temporal context for experiential memories.
+    memory_type : written into metadata (e.g. "polar").
     """
     d = _get_data_dir(data_dir)
     if chunk is None:
@@ -165,8 +172,21 @@ def store_memory(
     chunk_dir = get_chunk_dir(d, chunk)
     hex_key = text_to_hex(text)
 
-    np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
-    brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
+    if grid == "experiential":
+        from .experiential import (
+            ExperientialMeta,
+            experiential_bricks_dir,
+            experiential_dir,
+        )
+
+        exp_dir = experiential_dir(chunk_dir)
+        np.save(exp_dir / f"{hex_key}.npy", result["attractor"])
+        brick.save(experiential_bricks_dir(chunk_dir) / f"{hex_key}.npz")
+        meta = experiential_meta or ExperientialMeta()
+        meta.save(exp_dir / f"{hex_key}.meta.json")
+    else:
+        np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
+        brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
 
     lock_path = chunk_dir / "index.json.lock"
     with open(lock_path, "w") as lock_fd:
@@ -182,7 +202,7 @@ def store_memory(
         base_metadata["att_std"] = float(flat.std())
         if memory_type is not None:
             base_metadata["memory_type"] = memory_type
-        index[hex_key] = {
+        entry = {
             "text": text,
             "state": result["state"],
             "convergence_ticks": result["convergence_ticks"],
@@ -190,6 +210,9 @@ def store_memory(
             "metadata": base_metadata,
             "chunk": chunk,
         }
+        if grid == "experiential":
+            entry["grid"] = "experiential"
+        index[hex_key] = entry
         _save_index(chunk_dir, index)
     touch_chunk_metadata(chunk_dir, stored=True)
     build_store_associations(chunk_dir, hex_key)
@@ -277,6 +300,9 @@ def recall_memory(
 
         for hex_key, meta in index.items():
             if meta.get("metadata", {}).get("memory_type") in ("avoidance", "polar"):
+                continue
+            # Default recall skips experiential entries (use interference=True for those)
+            if meta.get("grid") == "experiential":
                 continue
             attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
             if not attractor_path.exists():

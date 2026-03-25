@@ -85,9 +85,56 @@ def main():
         action="store_true",
         help="Apply polar decay: increment decay_count on any polarity link that fires, decaying its weight",
     )
+    parser.add_argument(
+        "--interference",
+        action="store_true",
+        help="Use three-grid interference recall (corpus + experiential + SCM gating)",
+    )
     args = parser.parse_args()
 
     sal = salience_from_label(args.salience) if args.salience else None
+
+    if args.interference:
+        try:
+            from wheeler_memory.interference import compute_interference, interference_score
+            from wheeler_memory.scm_grid import SCMGrid
+            from wheeler_memory.dynamics import evolve_with_params
+            from wheeler_memory.constants import (
+                CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW,
+                EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW,
+            )
+            from wheeler_memory.rotation import _get_frame_fn
+
+            # Standard recall first (corpus-only) to get candidates
+            results = recall_memory(
+                args.query, top_k=args.top_k * 2, data_dir=args.data_dir,
+                chunk=args.chunk, use_embedding=args.embed, encoder=args.encoder,
+                salience=sal,
+            )
+            if not results:
+                print("No memories stored yet.")
+                return
+
+            scm = SCMGrid.load_or_create(args.data_dir)
+
+            print(f"SCM: {scm}")
+            print(f"{'Rank':<5} {'Score':>7} {'CorpSim':>8} {'State':<16} {'Chunk':<12} Text")
+            print("-" * 90)
+            for i, r in enumerate(results[:args.top_k], 1):
+                text_preview = r["text"][:35] + "..." if len(r["text"]) > 35 else r["text"]
+                chunk_name = r.get("chunk", "?")
+                # Interference state: corpus-only memories are ABSORBED
+                state = "ABSORBED"
+                score = r["similarity"] * float((1.0 - abs(scm.grid)).mean())
+                print(
+                    f"{i:<5} {score:>7.4f} {r['similarity']:>8.4f} "
+                    f"{state:<16} {chunk_name:<12} {text_preview}"
+                )
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
+
     try:
         results = recall_memory(
             args.query,

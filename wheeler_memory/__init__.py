@@ -15,7 +15,12 @@ from .chunking import (
     select_chunk,
     select_recall_chunks,
 )
-from .dynamics import apply_ca_dynamics, evolve_and_interpret
+from .dynamics import (
+    apply_ca_dynamics,
+    apply_ca_dynamics_parameterized,
+    evolve_and_interpret,
+    evolve_with_params,
+)
 from .hashing import hash_to_frame, text_to_hex
 from .oscillation import detect_oscillation, get_cell_roles
 from .rotation import store_with_rotation_retry
@@ -47,6 +52,7 @@ from .eviction import (
 from .consolidation import (
     ConsolidationResult,
     consolidate_brick,
+    consolidate_experiential_to_corpus,
     consolidation_stats,
     select_keyframes,
     sleep_consolidate,
@@ -77,6 +83,26 @@ except ImportError:
     embed_to_frame = None
     embed_to_frame_batch = None
 
+# SCM grid (spatial trust topology)
+from .scm_grid import SCMGrid
+
+# Experiential grid (episodic memory with temporal context)
+from .experiential import ExperientialMeta
+
+# Three-grid interference engine
+from .interference import (
+    ABSORBED,
+    CONTESTED,
+    GROUNDED,
+    SILENT,
+    UNCONSOLIDATED,
+    ConsistencyResult,
+    InterferenceResult,
+    compute_interference,
+    interference_score,
+    self_consistency_check,
+)
+
 # Reconstructive recall
 from .reconstruction import reconstruct, reconstruct_batch
 
@@ -96,7 +122,9 @@ __all__ = [
     "hash_to_frame",
     "text_to_hex",
     "apply_ca_dynamics",
+    "apply_ca_dynamics_parameterized",
     "evolve_and_interpret",
+    "evolve_with_params",
     "get_cell_roles",
     "detect_oscillation",
     "MemoryBrick",
@@ -149,6 +177,8 @@ __all__ = [
     "embed_available",
     "embed_to_frame",
     "embed_to_frame_batch",
+    # SCM grid
+    "SCMGrid",
     # Reconstructive recall
     "reconstruct",
     "reconstruct_batch",

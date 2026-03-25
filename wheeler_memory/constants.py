@@ -144,3 +144,26 @@ ENSEMBLE_MARGIN_THRESHOLD = 16  # hippo margin below this → defer to secondary
 # Spatial similarity (topology-aware retrieval)
 # ---------------------------------------------------------------------------
 SPATIAL_PEARSON_WEIGHT = 0.5  # Pearson vs spatial blend (1.0 = pure Pearson, 0.0 = pure spatial)
+
+# ---------------------------------------------------------------------------
+# Three-grid interference architecture
+# ---------------------------------------------------------------------------
+
+# Corpus grid — crystallized knowledge (aliases to existing CA dynamics)
+CORPUS_MAX_PUSH = MAX_PUSH_STRENGTH       # 0.57 — tight attractors
+CORPUS_SLOPE_FLOW = SLOPE_FLOW_STRENGTH   # 0.55 — moderate mixing
+
+# Experiential grid — episodic memory (loose attractors, fast mixing)
+EXPERIENTIAL_MAX_PUSH = 0.35              # weaker push → looser basins
+EXPERIENTIAL_SLOPE_FLOW = 0.70            # stronger flow → faster convergence
+EXPERIENTIAL_HALF_LIFE_DAYS = 2.0         # aggressive decay
+EXPERIENTIAL_HIT_SATURATION = 5           # fewer hits to saturate
+
+# SCM grid — learned trust topology (permission, not content)
+SCM_LEARNING_RATE = 0.05                  # base update step per feedback event
+SCM_HARDENING_FLOOR = 0.001              # minimum update magnitude (never fully frozen)
+SCM_GAP_THRESHOLD = 0.3                   # |SCM| below this = open gap (permissive)
+SCM_ANNEAL_RATE = 0.10                    # hardening count decay per sleep cycle (10%)
+
+# Interference
+INTERFERENCE_PEAK_THRESHOLD = 0.5         # |value| above this = "peak" in content grid

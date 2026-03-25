@@ -245,6 +245,7 @@ def sleep_consolidate(
     else:
         chunks = list(list_existing_chunks(data_dir))
 
+    # Phase 1: Brick pruning (existing behavior)
     for chunk_name in chunks:
         chunk_dir = data_dir / "chunks" / chunk_name
         if not chunk_dir.exists():
@@ -350,7 +351,186 @@ def sleep_consolidate(
             if not dry_run:
                 consolidated.save(brick_path)
 
+    # Phase 2: Experiential → corpus projection
+    if not dry_run:
+        projections = consolidate_experiential_to_corpus(
+            data_dir, chunk=chunk
+        )
+        result.experiential_projections = projections
+
+    # Phase 3: SCM annealing — soften hardened trust regions
+    if not dry_run:
+        try:
+            from .scm_grid import SCMGrid
+
+            scm = SCMGrid.load_or_create(data_dir)
+            annealed = scm.anneal()
+            if annealed > 0:
+                scm.save()
+            result.scm_annealed = annealed
+        except Exception:
+            result.scm_annealed = 0
+
     return result
+
+
+def consolidate_experiential_to_corpus(
+    data_dir: str | Path,
+    chunk: str | None = None,
+    min_temperature: float = TIER_WARM,
+    similarity_threshold: float = 0.5,
+    dry_run: bool = False,
+) -> list[dict]:
+    """Sleep phase 2: project experiential attractors into corpus space.
+
+    For each experiential memory with temperature <= min_temperature:
+    1. Load experiential attractor
+    2. Re-evolve under corpus rules (tighter push, less flow)
+    3. If Pearson >= similarity_threshold to existing corpus attractor → reinforce
+    4. If no match → create new corpus entry
+    5. Mark experiential entry as consolidated
+
+    Returns list of projection results.
+    """
+    from scipy.stats import pearsonr
+
+    from .constants import CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW
+    from .dynamics import evolve_with_params
+    from .experiential import ExperientialMeta, experiential_dir
+
+    data_dir = Path(data_dir)
+    now = datetime.now(timezone.utc)
+    projections = []
+
+    chunks_to_process = [chunk] if chunk else list(list_existing_chunks(data_dir))
+
+    for chunk_name in chunks_to_process:
+        chunk_dir = data_dir / "chunks" / chunk_name
+        if not chunk_dir.exists():
+            continue
+
+        exp_dir = chunk_dir / "experiential"
+        if not exp_dir.exists():
+            continue
+
+        index = _load_index(chunk_dir)
+        warmth_data = load_warmth(chunk_dir)
+
+        for hex_key, entry in index.items():
+            if entry.get("grid") != "experiential":
+                continue
+
+            # Check if already consolidated
+            meta_path = exp_dir / f"{hex_key}.meta.json"
+            if meta_path.exists():
+                meta = ExperientialMeta.load(meta_path)
+                if meta.consolidated:
+                    continue
+
+            ensure_access_fields(entry, entry["timestamp"])
+            w = warmth_data.get(hex_key, {})
+            temp = effective_temperature(
+                entry["metadata"]["hit_count"],
+                entry["metadata"]["last_accessed"],
+                warmth_boost=w.get("boost", 0.0),
+                warmth_applied_at=w.get("applied_at"),
+                now=now,
+            )
+
+            # Only consolidate cooled-down experiential memories
+            if temp > min_temperature:
+                continue
+
+            exp_att_path = exp_dir / f"{hex_key}.npy"
+            if not exp_att_path.exists():
+                continue
+
+            exp_att = np.load(exp_att_path)
+
+            # Re-evolve under corpus rules
+            corpus_result = evolve_with_params(
+                exp_att.copy(), CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW
+            )
+
+            if corpus_result["state"] != "CONVERGED":
+                projections.append({
+                    "hex_key": hex_key,
+                    "chunk": chunk_name,
+                    "action": "skipped",
+                    "reason": "did_not_converge_under_corpus_rules",
+                })
+                continue
+
+            corpus_att = corpus_result["attractor"]
+
+            # Check if it matches an existing corpus attractor
+            best_sim = 0.0
+            best_key = None
+            att_dir = chunk_dir / "attractors"
+            if att_dir.exists():
+                for att_path in att_dir.glob("*.npy"):
+                    existing = np.load(att_path, mmap_mode="r")
+                    if existing.shape != (64, 64):
+                        continue
+                    corr, _ = pearsonr(corpus_att.flatten(), existing.flatten())
+                    sim = float(corr) if not np.isnan(corr) else 0.0
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_key = att_path.stem
+
+            if best_sim >= similarity_threshold and best_key:
+                # Reinforce existing corpus memory
+                action = "reinforced"
+                if not dry_run and best_key in index:
+                    corpus_entry = index[best_key]
+                    ensure_access_fields(corpus_entry, corpus_entry["timestamp"])
+                    corpus_entry["metadata"]["hit_count"] += 1
+                    corpus_entry["metadata"]["last_accessed"] = now.isoformat()
+            else:
+                # Create new corpus entry from crystallized experience
+                action = "crystallized"
+                if not dry_run:
+                    from .brick import MemoryBrick
+
+                    np.save(att_dir / f"{hex_key}.npy", corpus_att)
+                    brick = MemoryBrick.from_evolution_result(corpus_result)
+                    brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
+                    # Update index entry to also be corpus
+                    entry["grid"] = "consolidated"
+
+            # Mark experiential meta as consolidated
+            if not dry_run and meta_path.exists():
+                meta = ExperientialMeta.load(meta_path)
+                meta.consolidated = True
+                meta.save(meta_path)
+
+            projections.append({
+                "hex_key": hex_key,
+                "chunk": chunk_name,
+                "action": action,
+                "best_similarity": best_sim,
+                "best_match": best_key,
+                "temperature": temp,
+            })
+
+    # Save updated indices
+    if not dry_run:
+        for chunk_name in chunks_to_process:
+            chunk_dir = data_dir / "chunks" / chunk_name
+            if chunk_dir.exists():
+                index = _load_index(chunk_dir)
+                if index:
+                    _save_index(chunk_dir, index)
+
+    return projections
+
+
+def _save_index(chunk_dir: Path, index: dict) -> None:
+    """Save index atomically (same pattern as storage.py)."""
+    index_path = chunk_dir / "index.json"
+    tmp_path = index_path.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(index, indent=2))
+    tmp_path.replace(index_path)
 
 
 def consolidation_stats(

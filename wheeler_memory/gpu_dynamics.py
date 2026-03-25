@@ -125,6 +125,8 @@ def gpu_evolve_single(
     max_iters: int = 1000,
     stability_threshold: float = 1e-4,
     grid_w: int = 64,
+    push_strength: float | None = None,
+    slope_strength: float | None = None,
 ) -> dict:
     """Evolve a single frame on GPU.
 
@@ -137,6 +139,8 @@ def gpu_evolve_single(
         max_iters: max CA iterations
         stability_threshold: convergence threshold (v2 only; v1 uses compiled-in value)
         grid_w: grid width — any value for v2, must be 64 for v1
+        push_strength: override MAX_PUSH_STRENGTH (v2 only; enables corpus/experiential regimes)
+        slope_strength: override SLOPE_FLOW_STRENGTH (v2 only)
     """
     lib = _load_lib()
     if lib is None:
@@ -155,6 +159,9 @@ def gpu_evolve_single(
     ticks = ctypes.c_int(0)
     state = ctypes.c_int(0)
 
+    _push = push_strength if push_strength is not None else MAX_PUSH_STRENGTH
+    _slope = slope_strength if slope_strength is not None else SLOPE_FLOW_STRENGTH
+
     if _lib_version == 2:
         ret = lib.ca_evolve_single_v2(
             frame_in.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
@@ -164,8 +171,8 @@ def gpu_evolve_single(
             grid_w,
             max_iters,
             ctypes.c_float(stability_threshold),
-            ctypes.c_float(MAX_PUSH_STRENGTH),
-            ctypes.c_float(SLOPE_FLOW_STRENGTH),
+            ctypes.c_float(_push),
+            ctypes.c_float(_slope),
         )
     else:
         ret = lib.ca_evolve_single(
