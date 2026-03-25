@@ -32,6 +32,7 @@ def embed_available() -> bool:
     """Check if sentence-transformers is importable."""
     try:
         import sentence_transformers  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -43,7 +44,7 @@ def get_model():
     if _model is None:
         from sentence_transformers import SentenceTransformer
         from .hardware import get_optimal_device
-        
+
         device = get_optimal_device()
         print(f"Loading embedding model on {device}...")
         _model = SentenceTransformer(MODEL_NAME, device=device)
@@ -66,9 +67,9 @@ def _get_projection_matrix() -> np.ndarray:
             _projection_matrix = np.load(_LEARNED_PROJECTION_PATH)
         else:
             rng = np.random.Generator(np.random.PCG64(PROJECTION_SEED))
-            _projection_matrix = rng.standard_normal(
-                (EMBED_DIM, FRAME_CELLS)
-            ).astype(np.float32) / np.sqrt(FRAME_CELLS)
+            _projection_matrix = rng.standard_normal((EMBED_DIM, FRAME_CELLS)).astype(
+                np.float32
+            ) / np.sqrt(FRAME_CELLS)
     return _projection_matrix
 
 
@@ -113,14 +114,13 @@ def embed_text_batch(texts: list[str]) -> np.ndarray:
 def embed_to_frame_batch(texts: list[str], size: int = FRAME_SIZE) -> list[np.ndarray]:
     """Batch-convert texts to CA frames via embedding + projection."""
     embeddings = embed_text_batch(texts)  # (N, 384)
-    proj = _get_projection_matrix()        # (384, 4096)
+    proj = _get_projection_matrix()  # (384, 4096)
 
-    frames_flat = embeddings @ proj        # (N, 4096)
+    frames_flat = embeddings @ proj  # (N, 4096)
     frames_flat = np.tanh(frames_flat * 3.0)
 
     return [
-        frames_flat[i].reshape(size, size).astype(np.float32)
-        for i in range(len(texts))
+        frames_flat[i].reshape(size, size).astype(np.float32) for i in range(len(texts))
     ]
 
 

@@ -18,9 +18,9 @@ from wheeler_memory import (
 
 def verify_correctness(n=100):
     """Run n inputs through both CPU and GPU, assert matching results."""
-    print(f"\n{'='*55}")
+    print(f"\n{'=' * 55}")
     print(f"  CORRECTNESS VERIFICATION  (n={n})")
-    print(f"{'='*55}")
+    print(f"{'=' * 55}")
 
     if not gpu_available():
         print("  GPU not available! Build with: cd wheeler_memory/gpu && make")
@@ -48,13 +48,17 @@ def verify_correctness(n=100):
         if cpu_result["convergence_ticks"] != gpu_result["convergence_ticks"]:
             tick_errors += 1
             if tick_errors <= 3:
-                print(f"  TICK MISMATCH #{i}: CPU={cpu_result['convergence_ticks']} GPU={gpu_result['convergence_ticks']}")
+                print(
+                    f"  TICK MISMATCH #{i}: CPU={cpu_result['convergence_ticks']} GPU={gpu_result['convergence_ticks']}"
+                )
 
     if mismatches == 0 and tick_errors == 0:
         print(f"  ✓ All {n} inputs match exactly (atol=1e-4)")
         return True
     else:
-        print(f"  ✗ {mismatches} attractor mismatches, {tick_errors} tick mismatches out of {n}")
+        print(
+            f"  ✗ {mismatches} attractor mismatches, {tick_errors} tick mismatches out of {n}"
+        )
         return False
 
 
@@ -63,11 +67,13 @@ def benchmark(batch_sizes=None):
     if batch_sizes is None:
         batch_sizes = [1, 10, 50, 100, 500, 1000, 5000]
 
-    print(f"\n{'='*55}")
+    print(f"\n{'=' * 55}")
     print(f"  PERFORMANCE BENCHMARK")
-    print(f"{'='*55}")
-    print(f"  {'Batch':>6}  {'CPU (s)':>9}  {'GPU (s)':>9}  {'Speedup':>8}  {'GPU samp/s':>10}")
-    print(f"  {'─'*6}  {'─'*9}  {'─'*9}  {'─'*8}  {'─'*10}")
+    print(f"{'=' * 55}")
+    print(
+        f"  {'Batch':>6}  {'CPU (s)':>9}  {'GPU (s)':>9}  {'Speedup':>8}  {'GPU samp/s':>10}"
+    )
+    print(f"  {'─' * 6}  {'─' * 9}  {'─' * 9}  {'─' * 8}  {'─' * 10}")
 
     for n in batch_sizes:
         texts = [f"benchmark input {i} batch {n}" for i in range(n)]
@@ -84,20 +90,30 @@ def benchmark(batch_sizes=None):
         gpu_evolve_batch([f.copy() for f in frames])
         gpu_time = time.time() - gpu_start
 
-        speedup = cpu_time / gpu_time if gpu_time > 0 else float('inf')
-        gpu_rate = n / gpu_time if gpu_time > 0 else float('inf')
+        speedup = cpu_time / gpu_time if gpu_time > 0 else float("inf")
+        gpu_rate = n / gpu_time if gpu_time > 0 else float("inf")
 
-        print(f"  {n:>6}  {cpu_time:>9.4f}  {gpu_time:>9.4f}  {speedup:>7.1f}×  {gpu_rate:>10.0f}")
+        print(
+            f"  {n:>6}  {cpu_time:>9.4f}  {gpu_time:>9.4f}  {speedup:>7.1f}×  {gpu_rate:>10.0f}"
+        )
 
     print()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Wheeler Memory GPU benchmark")
-    parser.add_argument("--verify-only", action="store_true", help="Only run correctness check")
-    parser.add_argument("--skip-verify", action="store_true", help="Skip correctness check")
-    parser.add_argument("--batch-sizes", type=str, default=None,
-                        help="Comma-separated batch sizes (default: 1,10,50,100,500,1000,5000)")
+    parser.add_argument(
+        "--verify-only", action="store_true", help="Only run correctness check"
+    )
+    parser.add_argument(
+        "--skip-verify", action="store_true", help="Skip correctness check"
+    )
+    parser.add_argument(
+        "--batch-sizes",
+        type=str,
+        default=None,
+        help="Comma-separated batch sizes (default: 1,10,50,100,500,1000,5000)",
+    )
     args = parser.parse_args()
 
     print(f"GPU available: {gpu_available()}")

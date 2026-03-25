@@ -35,7 +35,9 @@ def _result_to_dict(result) -> dict:
 def _print_result(result, verbose: bool = False) -> None:
     """Human-readable output."""
     if not result.sequence:
-        print("(no resonances above threshold — try --min-resonance lower or store more memories)")
+        print(
+            "(no resonances above threshold — try --min-resonance lower or store more memories)"
+        )
         return
 
     print(f"Query : {result.query}")
@@ -60,7 +62,9 @@ def _print_result(result, verbose: bool = False) -> None:
         print("  " + "-" * 60)
         for t in result.ticks:
             flag = "*" if t.emitted else " "
-            text_preview = t.peak_text[:45] + "…" if len(t.peak_text) > 45 else t.peak_text
+            text_preview = (
+                t.peak_text[:45] + "…" if len(t.peak_text) > 45 else t.peak_text
+            )
             print(f"  {t.tick:>4}  {t.peak_sim:>7.4f}  {flag:>7}  {text_preview}")
 
 
@@ -108,43 +112,59 @@ def main():
         description="Generate from CA trajectory resonance (IT from BIT)"
     )
     parser.add_argument(
-        "query", nargs="?", default=None,
+        "query",
+        nargs="?",
+        default=None,
         help="Query text to generate from",
     )
     parser.add_argument(
-        "--chunk", default=None,
+        "--chunk",
+        default=None,
         help="Restrict to this chunk (default: auto-select all chunks)",
     )
     parser.add_argument(
-        "--min-resonance", type=float, default=0.15,
+        "--min-resonance",
+        type=float,
+        default=0.15,
         help="Minimum Pearson similarity to emit at a tick (default: 0.15)",
     )
     parser.add_argument(
-        "--dedup", choices=["first", "last", "peak", "none"], default="first",
+        "--dedup",
+        choices=["first", "last", "peak", "none"],
+        default="first",
         help="Deduplication strategy (default: first)",
     )
     parser.add_argument(
-        "--embed", action="store_true",
+        "--embed",
+        action="store_true",
         help="Use sentence embedding for query frame (semantic mode)",
     )
     parser.add_argument(
-        "--salience", choices=["low", "medium", "high"], default=None,
+        "--salience",
+        choices=["low", "medium", "high"],
+        default=None,
         help="Attention level: low (fast), medium (default), high (deep)",
     )
     parser.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="Output full GenerationResult as JSON",
     )
     parser.add_argument(
-        "--interactive", "-i", action="store_true",
+        "--interactive",
+        "-i",
+        action="store_true",
         help="REPL mode: enter queries interactively",
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
+        "--verbose",
+        "-v",
+        action="store_true",
         help="Show full per-tick log",
     )
     parser.add_argument(
-        "--data-dir", default=None,
+        "--data-dir",
+        default=None,
         help="Data directory (default: ~/.wheeler_memory)",
     )
 
@@ -152,8 +172,11 @@ def main():
 
     if args.interactive:
         import readline  # noqa: F401 — enables line editing on supported platforms
+
         print("Wheeler Generate — IT from BIT  (Ctrl-D or Ctrl-C to exit)")
-        print(f"Settings: chunk={args.chunk!r}  min_resonance={args.min_resonance}  dedup={args.dedup!r}")
+        print(
+            f"Settings: chunk={args.chunk!r}  min_resonance={args.min_resonance}  dedup={args.dedup!r}"
+        )
         print()
         while True:
             try:

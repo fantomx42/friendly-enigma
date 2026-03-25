@@ -1,4 +1,5 @@
 """Integration tests for MemoryBrick serialization and access."""
+
 import numpy as np
 import pytest
 from pathlib import Path

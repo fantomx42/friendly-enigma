@@ -45,7 +45,7 @@ Use these verbatim across all materials for consistency:
 
 ## Visual Asset Inventory
 
-All paths relative to project root (`/home/tristan/wheeler memory/`).
+All paths relative to project root (`/home/tristan/projects/wheeler-memory/`).
 
 | Asset | Path | Use In |
 |---|---|---|

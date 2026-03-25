@@ -85,8 +85,11 @@ def reconstruct_batch(
     """Reconstruct multiple stored memories against the same query context."""
     return [
         reconstruct(
-            stored, query_attractor, alpha,
-            max_iters=max_iters, stability_threshold=stability_threshold,
+            stored,
+            query_attractor,
+            alpha,
+            max_iters=max_iters,
+            stability_threshold=stability_threshold,
         )
         for stored in stored_attractors
     ]

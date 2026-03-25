@@ -15,11 +15,17 @@ from wheeler_memory import list_memories
 
 def main():
     parser = argparse.ArgumentParser(description="Inspect Wheeler memory temperatures")
-    parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)")
-    parser.add_argument("--chunk", default=None, help="Show only this chunk")
-    parser.add_argument("--tier", default=None, choices=["hot", "warm", "cold"], help="Filter by tier")
     parser.add_argument(
-        "--sort", default="temp", choices=["temp", "hits", "chunk"],
+        "--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)"
+    )
+    parser.add_argument("--chunk", default=None, help="Show only this chunk")
+    parser.add_argument(
+        "--tier", default=None, choices=["hot", "warm", "cold"], help="Filter by tier"
+    )
+    parser.add_argument(
+        "--sort",
+        default="temp",
+        choices=["temp", "hits", "chunk"],
         help="Sort order (default: temp)",
     )
     args = parser.parse_args()
@@ -27,7 +33,9 @@ def main():
     try:
         memories = list_memories(data_dir=args.data_dir, chunk=args.chunk)
     except FileNotFoundError:
-        print('No memories found. Store something first with: wheeler-store "your text"')
+        print(
+            'No memories found. Store something first with: wheeler-store "your text"'
+        )
         return
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -58,7 +66,9 @@ def main():
     for m in memories:
         hits = m["metadata"]["hit_count"]
         text_preview = m["text"][:40] + "..." if len(m["text"]) > 40 else m["text"]
-        print(f"{m['temperature']:>6.3f} {m['temperature_tier']:<5} {hits:>5} {m['chunk']:<15} {text_preview}")
+        print(
+            f"{m['temperature']:>6.3f} {m['temperature_tier']:<5} {hits:>5} {m['chunk']:<15} {text_preview}"
+        )
 
 
 if __name__ == "__main__":

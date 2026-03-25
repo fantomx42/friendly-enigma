@@ -31,29 +31,45 @@ import numpy as np
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _embed(texts: list[str]):
     from wheeler_memory.hippocampus import hippocampus_to_frame_batch
+
     return hippocampus_to_frame_batch(texts)
+
 
 def _evolve(frame):
     from wheeler_memory.dynamics import evolve_and_interpret
+
     return evolve_and_interpret(frame)
+
 
 def _store(text: str, frame, data_dir: Path):
     from wheeler_memory.dynamics import evolve_and_interpret
     from wheeler_memory.brick import MemoryBrick
     from wheeler_memory.storage import store_memory
+
     result = evolve_and_interpret(frame)
     brick = MemoryBrick.from_evolution_result(result)
-    store_memory(text, result, brick, data_dir=data_dir, chunk="science", auto_evict=False)
+    store_memory(
+        text, result, brick, data_dir=data_dir, chunk="science", auto_evict=False
+    )
     return result["attractor"].flatten().astype(np.float32)
+
 
 def _build_cache(data_dir: Path):
     from wheeler_memory.storage import list_memories
+
     memories = list_memories(data_dir=data_dir)
     texts, atts = [], []
     for m in memories:
-        p = data_dir / "chunks" / m.get("chunk", "general") / "attractors" / f"{m['hex_key']}.npy"
+        p = (
+            data_dir
+            / "chunks"
+            / m.get("chunk", "general")
+            / "attractors"
+            / f"{m['hex_key']}.npy"
+        )
         if not p.exists():
             continue
         att = np.load(p)
@@ -64,13 +80,23 @@ def _build_cache(data_dir: Path):
     if not atts:
         return None
     matrix = np.stack(atts)
-    return {"matrix": matrix, "means": matrix.mean(axis=1), "stds": matrix.std(axis=1), "texts": texts}
+    return {
+        "matrix": matrix,
+        "means": matrix.mean(axis=1),
+        "stds": matrix.std(axis=1),
+        "texts": texts,
+    }
+
 
 def _search(cache, frame, top_k: int = 1) -> list[dict]:
     from wheeler_memory.dynamics import evolve_and_interpret
     from wheeler_memory.constants import SALIENCE_MAX_ITERS_MED, SALIENCE_THRESHOLD_MED
-    result = evolve_and_interpret(frame, max_iters=SALIENCE_MAX_ITERS_MED,
-                                  stability_threshold=SALIENCE_THRESHOLD_MED)
+
+    result = evolve_and_interpret(
+        frame,
+        max_iters=SALIENCE_MAX_ITERS_MED,
+        stability_threshold=SALIENCE_THRESHOLD_MED,
+    )
     q = result["attractor"].flatten().astype(np.float32)
     qm, qs = q.mean(), q.std()
     if qs < 1e-10:
@@ -84,15 +110,18 @@ def _search(cache, frame, top_k: int = 1) -> list[dict]:
     idx = idx[np.argsort(sims[idx])[::-1]]
     return [{"text": cache["texts"][i], "similarity": float(sims[i])} for i in idx]
 
+
 def _corrupt_text(text: str, corruption: float, rng: random.Random) -> str:
     """Randomly drop words from text to simulate cue degradation."""
     words = text.split()
     keep = [w for w in words if rng.random() > corruption]
     return " ".join(keep) if keep else words[0]
 
+
 def _load_facts(n: int) -> list[dict]:
     """Load physics facts from MMLU dev+validation for use as test patterns."""
     from datasets import load_dataset
+
     CHOICES = ["A", "B", "C", "D"]
     facts = []
     for subject in ["high_school_physics", "conceptual_physics", "college_physics"]:
@@ -102,18 +131,22 @@ def _load_facts(n: int) -> list[dict]:
                 for item in ds:
                     letter = CHOICES[int(item["answer"])]
                     choice_text = item["choices"][int(item["answer"])]
-                    facts.append({
-                        "text": f"Q: {item['question']} A: {letter}. {choice_text}",
-                        "question": item["question"],
-                        "letter": letter,
-                    })
+                    facts.append(
+                        {
+                            "text": f"Q: {item['question']} A: {letter}. {choice_text}",
+                            "question": item["question"],
+                            "letter": letter,
+                        }
+                    )
             except Exception:
                 continue
         if len(facts) >= n:
             break
     return facts[:n]
 
+
 # ── Test 1: Capacity curve ────────────────────────────────────────────────────
+
 
 def test_capacity_curve(facts: list[dict], ns: list[int], n_trials: int = 3) -> dict:
     """Recall accuracy vs. N stored patterns.
@@ -128,7 +161,7 @@ def test_capacity_curve(facts: list[dict], ns: list[int], n_trials: int = 3) -> 
     print(f"  Grid: 64×64 = 4096 cells  |  Classical Hopfield limit: ~565 patterns")
     print()
     print(f"  {'N':>6}  {'α=N/4096':>10}  {'Accuracy':>10}  {'vs Classical':>14}")
-    print(f"  {'─'*6}  {'─'*10}  {'─'*10}  {'─'*14}")
+    print(f"  {'─' * 6}  {'─' * 10}  {'─' * 10}  {'─' * 14}")
 
     results = {}
     rng = random.Random(42)
@@ -173,10 +206,13 @@ def test_capacity_curve(facts: list[dict], ns: list[int], n_trials: int = 3) -> 
 
     return results
 
+
 # ── Test 2: Cue degradation ───────────────────────────────────────────────────
 
-def test_cue_degradation(facts: list[dict], n_store: int = 22,
-                          corruptions: list[float] = None) -> dict:
+
+def test_cue_degradation(
+    facts: list[dict], n_store: int = 22, corruptions: list[float] = None
+) -> dict:
     """Recall accuracy vs. fraction of query text removed.
 
     Classical baseline: ~30% noise tolerance
@@ -192,7 +228,7 @@ def test_cue_degradation(facts: list[dict], n_store: int = 22,
     print(f"  Modern Hopfield:    >90% accuracy at 40% masking")
     print()
     print(f"  {'Corruption':>12}  {'Accuracy':>10}  {'vs Modern Hopfield':>20}")
-    print(f"  {'─'*12}  {'─'*10}  {'─'*20}")
+    print(f"  {'─' * 12}  {'─' * 10}  {'─' * 20}")
 
     subset = facts[:n_store]
     results = {}
@@ -226,7 +262,9 @@ def test_cue_degradation(facts: list[dict], n_store: int = 22,
 
     return results
 
+
 # ── Test 3: Interference ──────────────────────────────────────────────────────
+
 
 def test_interference(facts: list[dict], n_store: int = 20) -> dict:
     """Recall accuracy when stored patterns have varying semantic similarity.
@@ -236,10 +274,13 @@ def test_interference(facts: list[dict], n_store: int = 20) -> dict:
     """
     print("\n── Test 3: Interference ────────────────────────────────────────")
     print(f"  Store size per group: {n_store}")
-    print(f"  Prediction: cross-subject facts should have higher recall than same-subject")
+    print(
+        f"  Prediction: cross-subject facts should have higher recall than same-subject"
+    )
     print()
 
     from datasets import load_dataset
+
     CHOICES = ["A", "B", "C", "D"]
 
     def load_subject(subject, n):
@@ -249,11 +290,13 @@ def test_interference(facts: list[dict], n_store: int = 20) -> dict:
                 ds = load_dataset("cais/mmlu", subject, split=split)
                 for item in ds:
                     letter = CHOICES[int(item["answer"])]
-                    out.append({
-                        "text": f"Q: {item['question']} A: {letter}. {item['choices'][int(item['answer'])]}",
-                        "question": item["question"],
-                        "letter": letter,
-                    })
+                    out.append(
+                        {
+                            "text": f"Q: {item['question']} A: {letter}. {item['choices'][int(item['answer'])]}",
+                            "question": item["question"],
+                            "letter": letter,
+                        }
+                    )
                     if len(out) >= n:
                         return out
             except Exception:
@@ -291,19 +334,31 @@ def test_interference(facts: list[dict], n_store: int = 20) -> dict:
             print(f"  {label}: {acc:.1%}  ({hits}/{len(query_facts)})")
             results[label] = float(acc)
 
-    interference = results.get("Same-subject (physics only)", 0) - \
-                   results.get("Cross-subject (physics+history)", 0)
-    print(f"\n  Interference effect: {interference:+.1%}  (negative = same-subject hurts recall)")
+    interference = results.get("Same-subject (physics only)", 0) - results.get(
+        "Cross-subject (physics+history)", 0
+    )
+    print(
+        f"\n  Interference effect: {interference:+.1%}  (negative = same-subject hurts recall)"
+    )
     return results
+
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
 def _parse_args():
-    p = argparse.ArgumentParser(description="Wheeler associative memory characterization")
-    p.add_argument("--max-n", type=int, default=400,
-                   help="Max N for capacity curve (default 400)")
-    p.add_argument("--n-trials", type=int, default=3,
-                   help="Trials per N in capacity curve (default 3)")
+    p = argparse.ArgumentParser(
+        description="Wheeler associative memory characterization"
+    )
+    p.add_argument(
+        "--max-n", type=int, default=400, help="Max N for capacity curve (default 400)"
+    )
+    p.add_argument(
+        "--n-trials",
+        type=int,
+        default=3,
+        help="Trials per N in capacity curve (default 3)",
+    )
     p.add_argument("--skip-capacity", action="store_true")
     p.add_argument("--skip-degradation", action="store_true")
     p.add_argument("--skip-interference", action="store_true")
@@ -350,9 +405,9 @@ def main():
         int_results = test_interference(facts)
 
     elapsed = time.time() - t0
-    print(f"\n{'='*66}")
+    print(f"\n{'=' * 66}")
     print(f"  Total elapsed: {elapsed:.1f}s")
-    print(f"{'='*66}")
+    print(f"{'=' * 66}")
 
     print("""
 Literature baselines:

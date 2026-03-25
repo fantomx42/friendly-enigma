@@ -39,8 +39,9 @@ def test_static_topology():
 
         # Without query
         output_path = Path(tmp_dir) / "topology_basic.png"
-        fig = plot_topology(attractors, basin_widths, hit_counts,
-                            output_path=output_path)
+        fig = plot_topology(
+            attractors, basin_widths, hit_counts, output_path=output_path
+        )
         assert output_path.exists(), f"Output file not created: {output_path}"
         print(f"  Basic plot: {output_path} ({output_path.stat().st_size} bytes)")
 
@@ -52,7 +53,9 @@ def test_static_topology():
 
         output_path2 = Path(tmp_dir) / "topology_full.png"
         fig2 = plot_topology(
-            attractors, basin_widths, hit_counts,
+            attractors,
+            basin_widths,
+            hit_counts,
             query_attractor=query_result["attractor"],
             candidates=[candidate_result["attractor"]],
             output_path=output_path2,

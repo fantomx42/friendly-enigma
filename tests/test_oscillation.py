@@ -1,4 +1,5 @@
 """Unit tests for oscillation detection."""
+
 import numpy as np
 import pytest
 from wheeler_memory.oscillation import detect_oscillation, get_cell_roles

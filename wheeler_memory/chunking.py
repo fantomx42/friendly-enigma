@@ -13,35 +13,130 @@ import numpy as np
 
 CHUNK_KEYWORDS: dict[str, list[str]] = {
     "code": [
-        "python", "rust", "code", "bug", "debug", "compile", "function",
-        "class", "import", "git", "commit", "api", "server", "deploy",
-        "docker", "test", "refactor", "script", "variable", "error",
-        "exception", "lint", "cargo", "npm", "pip", "branch", "merge",
-        "syntax", "frontend", "backend", "database", "sql", "html", "css",
-        "javascript", "typescript",
+        "python",
+        "rust",
+        "code",
+        "bug",
+        "debug",
+        "compile",
+        "function",
+        "class",
+        "import",
+        "git",
+        "commit",
+        "api",
+        "server",
+        "deploy",
+        "docker",
+        "test",
+        "refactor",
+        "script",
+        "variable",
+        "error",
+        "exception",
+        "lint",
+        "cargo",
+        "npm",
+        "pip",
+        "branch",
+        "merge",
+        "syntax",
+        "frontend",
+        "backend",
+        "database",
+        "sql",
+        "html",
+        "css",
+        "javascript",
+        "typescript",
     ],
     "hardware": [
-        "printer", "3d print", "solder", "circuit", "arduino", "raspberry",
-        "gpio", "wire", "pcb", "resistor", "capacitor", "motor", "sensor",
-        "voltage", "ampere", "oscilloscope", "multimeter", "firmware",
-        "hardware", "cnc", "laser", "filament", "nozzle", "extruder",
-        "bambu", "ender", "stepper",
+        "printer",
+        "3d print",
+        "solder",
+        "circuit",
+        "arduino",
+        "raspberry",
+        "gpio",
+        "wire",
+        "pcb",
+        "resistor",
+        "capacitor",
+        "motor",
+        "sensor",
+        "voltage",
+        "ampere",
+        "oscilloscope",
+        "multimeter",
+        "firmware",
+        "hardware",
+        "cnc",
+        "laser",
+        "filament",
+        "nozzle",
+        "extruder",
+        "bambu",
+        "ender",
+        "stepper",
     ],
     "daily_tasks": [
-        "grocery", "groceries", "dentist", "doctor", "appointment",
-        "schedule", "meeting", "call", "email", "buy", "pick up",
-        "todo", "errand", "laundry", "clean", "cook", "dinner",
-        "lunch", "breakfast", "workout", "exercise", "gym",
+        "grocery",
+        "groceries",
+        "dentist",
+        "doctor",
+        "appointment",
+        "schedule",
+        "meeting",
+        "call",
+        "email",
+        "buy",
+        "pick up",
+        "todo",
+        "errand",
+        "laundry",
+        "clean",
+        "cook",
+        "dinner",
+        "lunch",
+        "breakfast",
+        "workout",
+        "exercise",
+        "gym",
     ],
     "science": [
-        "physics", "chemistry", "biology", "math", "equation", "theorem",
-        "hypothesis", "experiment", "quantum", "relativity", "entropy",
-        "molecule", "atom", "cell", "genome", "evolution", "neuron",
-        "calculus", "algebra", "statistics", "probability",
+        "physics",
+        "chemistry",
+        "biology",
+        "math",
+        "equation",
+        "theorem",
+        "hypothesis",
+        "experiment",
+        "quantum",
+        "relativity",
+        "entropy",
+        "molecule",
+        "atom",
+        "cell",
+        "genome",
+        "evolution",
+        "neuron",
+        "calculus",
+        "algebra",
+        "statistics",
+        "probability",
     ],
     "meta": [
-        "wheeler", "memory system", "attractor", "brick", "cellular automata",
-        "ca dynamics", "rotation", "convergence", "oscillation", "chunk",
+        "wheeler",
+        "memory system",
+        "attractor",
+        "brick",
+        "cellular automata",
+        "ca dynamics",
+        "rotation",
+        "convergence",
+        "oscillation",
+        "chunk",
     ],
 }
 
@@ -104,12 +199,14 @@ def _select_chunks_by_embedding(query: str, max_chunks: int) -> list[str] | None
     """
     try:
         from .hippocampus import hippocampus_to_frame
+
         query_frame = hippocampus_to_frame(query)
         query_emb = query_frame.flatten()
     except ImportError:
         return None
 
     from .cache import cached_load_json
+
     data_dir = Path.home() / ".wheeler_memory"
     chunks_root = data_dir / "chunks"
     if not chunks_root.exists():
@@ -202,7 +299,8 @@ def list_existing_chunks(data_dir: Path) -> list[str]:
     if not chunks_root.exists():
         return []
     return sorted(
-        d.name for d in chunks_root.iterdir()
+        d.name
+        for d in chunks_root.iterdir()
         if d.is_dir() and (d / "index.json").exists()
     )
 

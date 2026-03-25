@@ -53,8 +53,15 @@ def plot_topology(
     keys = list(attractors.keys())
     if not keys:
         fig, ax = plt.subplots(figsize=(10, 8))
-        ax.text(0.5, 0.5, "No attractors to plot", ha="center", va="center",
-                transform=ax.transAxes, fontsize=14)
+        ax.text(
+            0.5,
+            0.5,
+            "No attractors to plot",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+            fontsize=14,
+        )
         if output_path:
             fig.savefig(output_path, dpi=150, bbox_inches="tight")
         return fig
@@ -79,7 +86,7 @@ def plot_topology(
         all_vectors = flat_vectors
 
     coords_2d = _pca_2d(all_vectors)
-    attractor_coords = coords_2d[:len(keys)]
+    attractor_coords = coords_2d[: len(keys)]
 
     # Normalize sizes and colors
     widths = np.array([basin_widths.get(k, 0.1) for k in keys])
@@ -97,15 +104,23 @@ def plot_topology(
     # Attractor nodes
     for i, k in enumerate(keys):
         ax.scatter(
-            attractor_coords[i, 0], attractor_coords[i, 1],
-            s=sizes[i], c=[[0.4, 0.7, 1.0, alphas[i]]],
-            edgecolors="white", linewidths=0.5, zorder=3,
+            attractor_coords[i, 0],
+            attractor_coords[i, 1],
+            s=sizes[i],
+            c=[[0.4, 0.7, 1.0, alphas[i]]],
+            edgecolors="white",
+            linewidths=0.5,
+            zorder=3,
         )
         label = k[:8]
         ax.annotate(
-            label, (attractor_coords[i, 0], attractor_coords[i, 1]),
-            textcoords="offset points", xytext=(5, 5),
-            fontsize=7, color="white", alpha=0.6,
+            label,
+            (attractor_coords[i, 0], attractor_coords[i, 1]),
+            textcoords="offset points",
+            xytext=(5, 5),
+            fontsize=7,
+            color="white",
+            alpha=0.6,
         )
 
     # Query ground point
@@ -116,8 +131,12 @@ def plot_topology(
         # Draw lines from query to attractors
         for i in range(len(keys)):
             ax.plot(
-                [qx, attractor_coords[i, 0]], [qy, attractor_coords[i, 1]],
-                color="yellow", alpha=0.15, linewidth=0.5, zorder=1,
+                [qx, attractor_coords[i, 0]],
+                [qy, attractor_coords[i, 1]],
+                color="yellow",
+                alpha=0.15,
+                linewidth=0.5,
+                zorder=1,
             )
         idx += 1
 
@@ -126,8 +145,15 @@ def plot_topology(
         for i in range(len(candidates)):
             cx, cy = coords_2d[idx + i, 0], coords_2d[idx + i, 1]
             ax.scatter(
-                cx, cy, s=150, facecolors="none", edgecolors="lime",
-                linewidths=1.5, linestyles="dashed", zorder=4, label="Candidate" if i == 0 else None,
+                cx,
+                cy,
+                s=150,
+                facecolors="none",
+                edgecolors="lime",
+                linewidths=1.5,
+                linestyles="dashed",
+                zorder=4,
+                label="Candidate" if i == 0 else None,
             )
 
     ax.set_title("Wheeler Attractor Topology (Lichtenberg)", color="white", fontsize=14)
@@ -135,12 +161,16 @@ def plot_topology(
     for spine in ax.spines.values():
         spine.set_color("#333333")
     if query_attractor is not None or candidates:
-        ax.legend(facecolor="#1a1a1a", edgecolor="#333333", labelcolor="white", fontsize=9)
+        ax.legend(
+            facecolor="#1a1a1a", edgecolor="#333333", labelcolor="white", fontsize=9
+        )
 
     if output_path:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
+        fig.savefig(
+            output_path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor()
+        )
     plt.close(fig)
 
     return fig
@@ -191,7 +221,7 @@ def animate_apple_test(
     if trajectory:
         ax_traj.set_ylim(min(trajectory) - 0.05, max(trajectory) + 0.05)
 
-    line, = ax_traj.plot([], [], color="cyan", linewidth=1.5)
+    (line,) = ax_traj.plot([], [], color="cyan", linewidth=1.5)
 
     # Main panel: simple state indicator
     ax_main.set_xlim(-1, 1)
@@ -202,11 +232,23 @@ def animate_apple_test(
     ax_main.tick_params(colors="white", labelsize=8)
 
     status_text = ax_main.text(
-        0, 0.8, "", ha="center", va="center", color="white", fontsize=14,
+        0,
+        0.8,
+        "",
+        ha="center",
+        va="center",
+        color="white",
+        fontsize=14,
         transform=ax_main.transAxes,
     )
     verdict_text = ax_main.text(
-        0.5, 0.2, "", ha="center", va="center", fontsize=18, fontweight="bold",
+        0.5,
+        0.2,
+        "",
+        ha="center",
+        va="center",
+        fontsize=18,
+        fontweight="bold",
         transform=ax_main.transAxes,
     )
 
@@ -239,12 +281,18 @@ def animate_apple_test(
                 line.set_data(range(end), trajectory[:end])
 
             if frame_idx >= n_frames - 1:
-                colors = {"convergence": "lime", "dissolution": "orange", "hallucination": "red"}
+                colors = {
+                    "convergence": "lime",
+                    "dissolution": "orange",
+                    "hallucination": "red",
+                }
                 verdict_text.set_text(f"Verdict: {verdict.upper()}")
                 verdict_text.set_color(colors.get(verdict, "white"))
 
         return line, status_text, verdict_text
 
-    anim = FuncAnimation(fig, animate, init_func=init, frames=n_frames, interval=500, blit=True)
+    anim = FuncAnimation(
+        fig, animate, init_func=init, frames=n_frames, interval=500, blit=True
+    )
     anim.save(str(output_path), writer=PillowWriter(fps=2))
     plt.close(fig)

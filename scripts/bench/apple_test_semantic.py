@@ -124,10 +124,16 @@ def semantic_apple_test(
         result = evolve_and_interpret(frame)
         brick = MemoryBrick.from_evolution_result(result)
         hex_key = store_memory(
-            item, result, brick, data_dir=data_dir, auto_evict=False,
+            item,
+            result,
+            brick,
+            data_dir=data_dir,
+            auto_evict=False,
         )
         stored_keys[hex_key] = item
-        log.append(f"  Stored: '{item[:60]}...' → {result['state']} ({result['convergence_ticks']} ticks)")
+        log.append(
+            f"  Stored: '{item[:60]}...' → {result['state']} ({result['convergence_ticks']} ticks)"
+        )
 
     # Step 2: Query for the holdout using semantic recall
     log.append(f"\nQuerying for holdout: '{holdout[:80]}...'")
@@ -152,14 +158,20 @@ def semantic_apple_test(
     # Verdict logic
     if not hits or top_sim < 0.1:
         verdict = "silent"
-        log.append(f"\nVERDICT: SILENT — no meaningful activation (top_sim={top_sim:.3f})")
+        log.append(
+            f"\nVERDICT: SILENT — no meaningful activation (top_sim={top_sim:.3f})"
+        )
     elif top_sim > 0.25:
         verdict = "topology"
-        log.append(f"\nVERDICT: TOPOLOGY — semantic neighbors activated (top_sim={top_sim:.3f})")
+        log.append(
+            f"\nVERDICT: TOPOLOGY — semantic neighbors activated (top_sim={top_sim:.3f})"
+        )
         log.append(f"  Top hit: '{top_text[:80]}...'")
     else:
         verdict = "weak_topology"
-        log.append(f"\nVERDICT: WEAK TOPOLOGY — some activation but low similarity (top_sim={top_sim:.3f})")
+        log.append(
+            f"\nVERDICT: WEAK TOPOLOGY — some activation but low similarity (top_sim={top_sim:.3f})"
+        )
 
     # Step 4: Control — what happens with hash_to_frame? (no semantic similarity)
     from wheeler_memory.hashing import hash_to_frame
@@ -174,7 +186,9 @@ def semantic_apple_test(
     hash_correlations = []
     for h in hits:
         hex_key = h["hex_key"]
-        stored_att = np.load(data_dir / "chunks" / h["chunk"] / "attractors" / f"{hex_key}.npy")
+        stored_att = np.load(
+            data_dir / "chunks" / h["chunk"] / "attractors" / f"{hex_key}.npy"
+        )
         corr, _ = pearsonr(hash_att, stored_att.flatten())
         hash_correlations.append(float(corr))
 
@@ -191,10 +205,7 @@ def semantic_apple_test(
         "holdout": holdout,
         "top_similarity": top_sim,
         "top_hit_text": top_text,
-        "all_hits": [
-            {"text": h["text"], "similarity": h["similarity"]}
-            for h in hits
-        ],
+        "all_hits": [{"text": h["text"], "similarity": h["similarity"]} for h in hits],
         "hash_max_correlation": max_hash_corr,
         "embedding_advantage": top_sim - max_hash_corr,
         "log": log,
@@ -211,7 +222,10 @@ def run_all_domains(data_dir: Path | None = None):
     for name, config in DOMAINS.items():
         print(f"\n{'─' * 70}")
         result = semantic_apple_test(
-            config["items"], config["holdout"], name, data_dir=data_dir,
+            config["items"],
+            config["holdout"],
+            name,
+            data_dir=data_dir,
         )
         results[name] = result
         for line in result["log"]:
@@ -221,8 +235,10 @@ def run_all_domains(data_dir: Path | None = None):
     print(f"\n{'=' * 70}")
     print("SUMMARY")
     print(f"{'=' * 70}")
-    print(f"{'Domain':<18} {'Verdict':<16} {'Top Sim':>8} {'Hash Ctrl':>10} {'Advantage':>10}")
-    print(f"{'─'*18} {'─'*16} {'─'*8} {'─'*10} {'─'*10}")
+    print(
+        f"{'Domain':<18} {'Verdict':<16} {'Top Sim':>8} {'Hash Ctrl':>10} {'Advantage':>10}"
+    )
+    print(f"{'─' * 18} {'─' * 16} {'─' * 8} {'─' * 10} {'─' * 10}")
     for name, r in results.items():
         print(
             f"{name:<18} {r['verdict']:<16} {r['top_similarity']:>8.3f} "
@@ -233,16 +249,26 @@ def run_all_domains(data_dir: Path | None = None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Semantic Apple Test for Wheeler Memory")
-    parser.add_argument("--domain", choices=list(DOMAINS.keys()), default=None,
-                        help="Run specific domain only")
-    parser.add_argument("--data-dir", default=None, help="Data directory (default: temp)")
+    parser = argparse.ArgumentParser(
+        description="Semantic Apple Test for Wheeler Memory"
+    )
+    parser.add_argument(
+        "--domain",
+        choices=list(DOMAINS.keys()),
+        default=None,
+        help="Run specific domain only",
+    )
+    parser.add_argument(
+        "--data-dir", default=None, help="Data directory (default: temp)"
+    )
     args = parser.parse_args()
 
     if args.domain:
         config = DOMAINS[args.domain]
         result = semantic_apple_test(
-            config["items"], config["holdout"], args.domain,
+            config["items"],
+            config["holdout"],
+            args.domain,
             data_dir=args.data_dir,
         )
         for line in result["log"]:

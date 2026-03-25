@@ -193,31 +193,52 @@ _TOOLS: list[dict] = [
 
 # ── Tool execution ────────────────────────────────────────────────────────────
 
-def _exec_store_memory(text: str, data_dir: Path | None, use_embedding: bool = False) -> str:
-    result = store_with_rotation_retry(text, use_embedding=use_embedding, data_dir=data_dir)
-    return json.dumps({
-        "stored": True,
-        "key": text_to_hex(text),
-        "state": result["state"],
-        "ticks": result["convergence_ticks"],
-    })
+
+def _exec_store_memory(
+    text: str, data_dir: Path | None, use_embedding: bool = False
+) -> str:
+    result = store_with_rotation_retry(
+        text, use_embedding=use_embedding, data_dir=data_dir
+    )
+    return json.dumps(
+        {
+            "stored": True,
+            "key": text_to_hex(text),
+            "state": result["state"],
+            "ticks": result["convergence_ticks"],
+        }
+    )
 
 
-def _exec_recall_memory(query: str, top_k: int, data_dir: Path | None, use_embedding: bool = False, encoder: str | None = None) -> str:
-    hits = recall_memory(query, top_k=top_k, data_dir=data_dir, use_embedding=use_embedding, encoder=encoder)
+def _exec_recall_memory(
+    query: str,
+    top_k: int,
+    data_dir: Path | None,
+    use_embedding: bool = False,
+    encoder: str | None = None,
+) -> str:
+    hits = recall_memory(
+        query,
+        top_k=top_k,
+        data_dir=data_dir,
+        use_embedding=use_embedding,
+        encoder=encoder,
+    )
     if not hits:
         return json.dumps({"results": [], "message": "No memories found."})
-    return json.dumps({
-        "results": [
-            {
-                "text": h["text"],
-                "similarity": round(h["similarity"], 4),
-                "state": h.get("state", "?"),
-                "temperature": round(h.get("temperature", 0.0), 3),
-            }
-            for h in hits
-        ]
-    })
+    return json.dumps(
+        {
+            "results": [
+                {
+                    "text": h["text"],
+                    "similarity": round(h["similarity"], 4),
+                    "state": h.get("state", "?"),
+                    "temperature": round(h.get("temperature", 0.0), 3),
+                }
+                for h in hits
+            ]
+        }
+    )
 
 
 def _exec_list_memories(limit: int, data_dir: Path | None) -> str:
@@ -225,22 +246,25 @@ def _exec_list_memories(limit: int, data_dir: Path | None) -> str:
     mems = mems[:limit]
     if not mems:
         return json.dumps({"memories": [], "message": "No memories stored."})
-    return json.dumps({
-        "count": len(mems),
-        "memories": [
-            {
-                "text": m["text"],
-                "state": m.get("state", "?"),
-                "temperature": round(m.get("temperature", 0.0), 3),
-                "timestamp": m.get("timestamp", ""),
-            }
-            for m in mems
-        ],
-    })
+    return json.dumps(
+        {
+            "count": len(mems),
+            "memories": [
+                {
+                    "text": m["text"],
+                    "state": m.get("state", "?"),
+                    "temperature": round(m.get("temperature", 0.0), 3),
+                    "timestamp": m.get("timestamp", ""),
+                }
+                for m in mems
+            ],
+        }
+    )
 
 
 def _exec_forget_memory(text: str, data_dir: Path | None) -> str:
     from .hashing import text_to_hex as _text_to_hex
+
     hex_key = _text_to_hex(text)
     found = forget_by_text(text, data_dir=data_dir)
     if found:
@@ -248,30 +272,47 @@ def _exec_forget_memory(text: str, data_dir: Path | None) -> str:
     return json.dumps({"forgotten": False, "reason": "Memory not found."})
 
 
-def _exec_polar_decay(text: str, top_k: int, data_dir: Path | None, use_embedding: bool = False, encoder: str | None = None) -> str:
-    hits = recall_memory(text, top_k=top_k, data_dir=data_dir, polar_decay=True, use_embedding=use_embedding, encoder=encoder)
+def _exec_polar_decay(
+    text: str,
+    top_k: int,
+    data_dir: Path | None,
+    use_embedding: bool = False,
+    encoder: str | None = None,
+) -> str:
+    hits = recall_memory(
+        text,
+        top_k=top_k,
+        data_dir=data_dir,
+        polar_decay=True,
+        use_embedding=use_embedding,
+        encoder=encoder,
+    )
     if not hits:
         return json.dumps({"results": [], "message": "No memories found."})
-    return json.dumps({
-        "results": [
-            {
-                "text": h["text"],
-                "similarity": round(h["similarity"], 4),
-                "polar_firing": h.get("polar_firing"),
-            }
-            for h in hits
-        ]
-    })
+    return json.dumps(
+        {
+            "results": [
+                {
+                    "text": h["text"],
+                    "similarity": round(h["similarity"], 4),
+                    "polar_firing": h.get("polar_firing"),
+                }
+                for h in hits
+            ]
+        }
+    )
 
 
 def _exec_sleep_consolidate(data_dir: Path | None) -> str:
     result = _sleep_consolidate(data_dir=data_dir)
-    return json.dumps({
-        "consolidated": len(result.memories_consolidated),
-        "skipped": len(result.memories_skipped),
-        "frames_before": result.total_frames_before,
-        "frames_after": result.total_frames_after,
-    })
+    return json.dumps(
+        {
+            "consolidated": len(result.memories_consolidated),
+            "skipped": len(result.memories_skipped),
+            "frames_before": result.total_frames_before,
+            "frames_after": result.total_frames_after,
+        }
+    )
 
 
 def _exec_web_search(query: str, max_results: int = 5) -> str:
@@ -292,6 +333,7 @@ def _exec_web_search(query: str, max_results: int = 5) -> str:
 
     class _DDGParser(HTMLParser):
         """Parse DDG Lite result rows: each result is a <tr> with link + snippet cells."""
+
         def __init__(self):
             super().__init__()
             self.results: list[dict] = []
@@ -342,13 +384,21 @@ def _exec_web_search(query: str, max_results: int = 5) -> str:
     return json.dumps({"query": query, "results": results})
 
 
-def _dispatch_tool(name: str, args: dict, data_dir: Path | None, use_embedding: bool = False, encoder: str | None = None) -> str:
+def _dispatch_tool(
+    name: str,
+    args: dict,
+    data_dir: Path | None,
+    use_embedding: bool = False,
+    encoder: str | None = None,
+) -> str:
     """Execute a tool call and return its JSON string result."""
     try:
         if name == "store_memory":
             return _exec_store_memory(args["text"], data_dir, use_embedding)
         if name == "recall_memory":
-            return _exec_recall_memory(args["query"], args.get("top_k", 5), data_dir, use_embedding, encoder)
+            return _exec_recall_memory(
+                args["query"], args.get("top_k", 5), data_dir, use_embedding, encoder
+            )
         if name == "list_memories":
             return _exec_list_memories(args.get("limit", 20), data_dir)
         if name == "forget_memory":
@@ -356,7 +406,9 @@ def _dispatch_tool(name: str, args: dict, data_dir: Path | None, use_embedding: 
         if name == "sleep_consolidate":
             return _exec_sleep_consolidate(data_dir)
         if name == "polar_decay":
-            return _exec_polar_decay(args["text"], args.get("top_k", 5), data_dir, use_embedding, encoder)
+            return _exec_polar_decay(
+                args["text"], args.get("top_k", 5), data_dir, use_embedding, encoder
+            )
         if name == "web_search":
             return _exec_web_search(args["query"], args.get("max_results", 5))
         return json.dumps({"error": f"Unknown tool: {name}"})
@@ -365,6 +417,7 @@ def _dispatch_tool(name: str, args: dict, data_dir: Path | None, use_embedding: 
 
 
 # ── Ollama HTTP client ────────────────────────────────────────────────────────
+
 
 def _ollama_chat(
     messages: list[dict],
@@ -392,8 +445,7 @@ def _ollama_chat(
             return json.loads(resp.read())
     except urllib.error.URLError as exc:
         raise RuntimeError(
-            f"Could not reach Ollama at {base_url}. "
-            "Is it running? Try: ollama serve"
+            f"Could not reach Ollama at {base_url}. Is it running? Try: ollama serve"
         ) from exc
 
 
@@ -434,8 +486,7 @@ def _ollama_chat_stream(
                     break
     except urllib.error.URLError as exc:
         raise RuntimeError(
-            f"Could not reach Ollama at {base_url}. "
-            "Is it running? Try: ollama serve"
+            f"Could not reach Ollama at {base_url}. Is it running? Try: ollama serve"
         ) from exc
 
 
@@ -462,7 +513,7 @@ class _ThinkingFilter:
                 idx = self._buf.find(self._CLOSE)
                 if idx >= 0:
                     events.append(("thinking", self._buf[:idx]))
-                    self._buf = self._buf[idx + len(self._CLOSE):]
+                    self._buf = self._buf[idx + len(self._CLOSE) :]
                     self._in_think = False
                 else:
                     # Keep last (len(CLOSE)-1) chars in case tag spans chunks
@@ -476,7 +527,7 @@ class _ThinkingFilter:
                 if idx >= 0:
                     if idx > 0:
                         events.append(("token", self._buf[:idx]))
-                    self._buf = self._buf[idx + len(self._OPEN):]
+                    self._buf = self._buf[idx + len(self._OPEN) :]
                     self._in_think = True
                 else:
                     keep = len(self._OPEN) - 1
@@ -496,6 +547,7 @@ class _ThinkingFilter:
 
 
 # ── Agent class ───────────────────────────────────────────────────────────────
+
 
 class WheelerAgent:
     """LLM agent loop with access to Wheeler Memory tools.
@@ -587,7 +639,7 @@ class WheelerAgent:
             tiers.setdefault(tier, []).append(h)
 
         tier_config = [
-            ("hot",  "Strong memories (high confidence)"),
+            ("hot", "Strong memories (high confidence)"),
             ("warm", "Moderate memories (medium confidence)"),
             ("cold", "Faint memories (low confidence, may have drifted)"),
         ]
@@ -602,7 +654,9 @@ class WheelerAgent:
             for h in group:
                 sim = round(h["similarity"], 2)
                 temp = round(h.get("temperature", 0.0), 2)
-                lines.append(f'  {counter}. "{h["text"]}"  (similarity={sim}, temp={temp})')
+                lines.append(
+                    f'  {counter}. "{h["text"]}"  (similarity={sim}, temp={temp})'
+                )
                 counter += 1
             lines.append("")
 
@@ -673,11 +727,13 @@ class WheelerAgent:
                 return content
 
             # Execute each tool call
-            messages.append({
-                "role": "assistant",
-                "content": msg.get("content", ""),
-                "tool_calls": tool_calls,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": msg.get("content", ""),
+                    "tool_calls": tool_calls,
+                }
+            )
             for tc in tool_calls:
                 fn = tc.get("function", {})
                 name = fn.get("name", "")
@@ -687,21 +743,27 @@ class WheelerAgent:
                 if self.verbose:
                     print(f"[tool] {name}({json.dumps(args)})")
 
-                result_str = _dispatch_tool(name, args, self.data_dir, self.use_embedding, self.encoder)
+                result_str = _dispatch_tool(
+                    name, args, self.data_dir, self.use_embedding, self.encoder
+                )
 
                 if self.verbose:
                     print(f"[tool result] {result_str[:200]}")
 
-                messages.append({
-                    "role": "tool",
-                    "content": result_str,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "content": result_str,
+                    }
+                )
 
         # Fallback: ask for a final answer without tools
-        messages.append({
-            "role": "user",
-            "content": "(Please give your final answer now — no more tool calls needed.)",
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": "(Please give your final answer now — no more tool calls needed.)",
+            }
+        )
         resp = _ollama_chat(
             messages=messages,
             model=self.model,
@@ -808,7 +870,10 @@ class WheelerAgent:
                 self._history.append({"role": "assistant", "content": full_response})
                 messages.append({"role": "assistant", "content": full_response})
                 classification = classify_output(token_only, [])
-                yield {"type": "hallucination_discrimination", "classification": classification}
+                yield {
+                    "type": "hallucination_discrimination",
+                    "classification": classification,
+                }
                 if self.auto_store and token_only.strip():
                     if self._auto_store_reply(token_only):
                         yield {"type": "auto_store"}
@@ -816,11 +881,13 @@ class WheelerAgent:
                 return
 
             # ── Tool calls ─────────────────────────────────────────────────────
-            messages.append({
-                "role": "assistant",
-                "content": accumulated,
-                "tool_calls": tool_calls,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": accumulated,
+                    "tool_calls": tool_calls,
+                }
+            )
             for tc in tool_calls:
                 fn = tc.get("function", {})
                 name = fn.get("name", "")
@@ -829,22 +896,31 @@ class WheelerAgent:
 
                 yield {"type": "tool_call", "name": name, "args": args}
 
-                result_str = _dispatch_tool(name, args, self.data_dir, self.use_embedding, self.encoder)
+                result_str = _dispatch_tool(
+                    name, args, self.data_dir, self.use_embedding, self.encoder
+                )
                 try:
                     result_obj = json.loads(result_str)
                 except Exception:
                     result_obj = {"raw": result_str}
                 ok = "error" not in result_obj
 
-                yield {"type": "tool_result", "name": name, "result": result_obj, "ok": ok}
+                yield {
+                    "type": "tool_result",
+                    "name": name,
+                    "result": result_obj,
+                    "ok": ok,
+                }
 
                 messages.append({"role": "tool", "content": result_str})
 
         # Fallback: ask for final answer without tools (non-streaming is fine here)
-        messages.append({
-            "role": "user",
-            "content": "(Please give your final answer now — no more tool calls needed.)",
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": "(Please give your final answer now — no more tool calls needed.)",
+            }
+        )
         try:
             resp = _ollama_chat(
                 messages=messages,

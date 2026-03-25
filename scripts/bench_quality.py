@@ -123,7 +123,7 @@ def run_benchmark(verbose: bool = True) -> dict:
 
         if verbose:
             print(
-                f"  [{i+1:2d}/{n}] {result['state']:<11} "
+                f"  [{i + 1:2d}/{n}] {result['state']:<11} "
                 f"{result['convergence_ticks']:>4} ticks  {text[:45]}"
             )
 
@@ -145,7 +145,11 @@ def run_benchmark(verbose: bool = True) -> dict:
 
     # --- Ticks (normalized) ---
     converged_ticks = [t for s, t in zip(states, ticks_list) if s == "CONVERGED"]
-    median_ticks = float(np.median(converged_ticks)) if converged_ticks else float(SALIENCE_MAX_ITERS_MED)
+    median_ticks = (
+        float(np.median(converged_ticks))
+        if converged_ticks
+        else float(SALIENCE_MAX_ITERS_MED)
+    )
     ticks_norm = median_ticks / SALIENCE_MAX_ITERS_MED
 
     # --- Alive fraction ---
@@ -173,7 +177,9 @@ def run_benchmark(verbose: bool = True) -> dict:
     }
 
 
-def append_result(result: dict, improved: bool | None, commit: str, changed: str, notes: str) -> None:
+def append_result(
+    result: dict, improved: bool | None, commit: str, changed: str, notes: str
+) -> None:
     """Append one row to results.tsv (creates the file with header if absent)."""
     if not _RESULTS_TSV.exists():
         _RESULTS_TSV.write_text(_TSV_HEADER)
@@ -181,20 +187,25 @@ def append_result(result: dict, improved: bool | None, commit: str, changed: str
     iteration = _next_iteration(_RESULTS_TSV)
     improved_str = "" if improved is None else ("1" if improved else "0")
 
-    row = "\t".join([
-        str(iteration),
-        result["timestamp"],
-        str(result["score"]),
-        str(result["avg_correlation"]),
-        str(result["convergence_ratio"]),
-        str(result["median_ticks"]),
-        str(result["avg_alive_fraction"]),
-        str(result["elapsed_seconds"]),
-        improved_str,
-        commit,
-        changed,
-        notes,
-    ]) + "\n"
+    row = (
+        "\t".join(
+            [
+                str(iteration),
+                result["timestamp"],
+                str(result["score"]),
+                str(result["avg_correlation"]),
+                str(result["convergence_ratio"]),
+                str(result["median_ticks"]),
+                str(result["avg_alive_fraction"]),
+                str(result["elapsed_seconds"]),
+                improved_str,
+                commit,
+                changed,
+                notes,
+            ]
+        )
+        + "\n"
+    )
 
     with open(_RESULTS_TSV, "a") as f:
         f.write(row)
@@ -203,9 +214,13 @@ def append_result(result: dict, improved: bool | None, commit: str, changed: str
 def main() -> None:
     parser = argparse.ArgumentParser(description="Wheeler Memory quality benchmark")
     parser.add_argument("--json", action="store_true", help="Print JSON result only")
-    parser.add_argument("--no-save", action="store_true", help="Do not append to results.tsv")
+    parser.add_argument(
+        "--no-save", action="store_true", help="Do not append to results.tsv"
+    )
     parser.add_argument("--commit", default="", help="Git commit hash for results.tsv")
-    parser.add_argument("--changed", default="", help="Parameter(s) changed for results.tsv")
+    parser.add_argument(
+        "--changed", default="", help="Parameter(s) changed for results.tsv"
+    )
     parser.add_argument("--notes", default="", help="Free-text notes for results.tsv")
     args = parser.parse_args()
 
@@ -220,10 +235,16 @@ def main() -> None:
         return
 
     prev_score = _last_score(_RESULTS_TSV)
-    improved = None if prev_score is None else (
-        True if result["score"] < prev_score else
-        None if result["score"] == prev_score else
-        False
+    improved = (
+        None
+        if prev_score is None
+        else (
+            True
+            if result["score"] < prev_score
+            else None
+            if result["score"] == prev_score
+            else False
+        )
     )
 
     # Human-readable summary
@@ -237,7 +258,9 @@ def main() -> None:
         print(f"  vs. previous   : {prev_score:.6f}  {arrow} {abs(delta):.6f}")
     print(f"  Avg |r|        : {result['avg_correlation']:.4f}  (target < 0.50)")
     print(f"  Max |r|        : {result['max_correlation']:.4f}  (target < 0.85)")
-    print(f"  Convergence    : {result['n_converged']}/{result['n_total']}  ({result['convergence_ratio']:.0%})")
+    print(
+        f"  Convergence    : {result['n_converged']}/{result['n_total']}  ({result['convergence_ratio']:.0%})"
+    )
     print(f"  Median ticks   : {result['median_ticks']:.0f}")
     print(f"  Alive fraction : {result['avg_alive_fraction']:.4f}")
     print(f"  Elapsed        : {result['elapsed_seconds']:.1f}s")

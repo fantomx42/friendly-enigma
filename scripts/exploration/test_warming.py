@@ -102,14 +102,27 @@ def main():
         print("\n[2] effective_temperature")
 
         base = compute_temperature(5, now.isoformat(), now=now)
-        eff = effective_temperature(5, now.isoformat(), warmth_boost=0.05,
-                                    warmth_applied_at=now.isoformat(), now=now)
-        check("effective = base + warmth", abs(eff - (base + 0.05)) < 1e-4,
-              f"base={base}, eff={eff}")
+        eff = effective_temperature(
+            5,
+            now.isoformat(),
+            warmth_boost=0.05,
+            warmth_applied_at=now.isoformat(),
+            now=now,
+        )
+        check(
+            "effective = base + warmth",
+            abs(eff - (base + 0.05)) < 1e-4,
+            f"base={base}, eff={eff}",
+        )
 
         # Cap at 1.0
-        eff_cap = effective_temperature(10, now.isoformat(), warmth_boost=0.15,
-                                        warmth_applied_at=now.isoformat(), now=now)
+        eff_cap = effective_temperature(
+            10,
+            now.isoformat(),
+            warmth_boost=0.15,
+            warmth_applied_at=now.isoformat(),
+            now=now,
+        )
         check("effective capped at 1.0", eff_cap <= 1.0, f"got {eff_cap}")
 
         # No warmth returns base
@@ -141,8 +154,11 @@ def main():
         print(f"  Stored {len(texts)} memories, {total_edges} edges formed")
         # SHA-256 attractors have near-zero correlation (~0.015 avg), so
         # store-time edges only form in embedding mode.  0 edges is correct here.
-        check("store-time edges: 0 expected for SHA-256 mode", total_edges == 0,
-              f"got {total_edges}")
+        check(
+            "store-time edges: 0 expected for SHA-256 mode",
+            total_edges == 0,
+            f"got {total_edges}",
+        )
 
         # Check that each edge is bidirectional
         bidirectional = True
@@ -158,13 +174,24 @@ def main():
         # ==================================================================
         print("\n[4] Co-recall associations")
 
-        edges_before = sum(len(v) for v in load_associations(chunk_dir).get("edges", {}).values()) // 2
+        edges_before = (
+            sum(len(v) for v in load_associations(chunk_dir).get("edges", {}).values())
+            // 2
+        )
         # Recall should return multiple results and form co-recall edges
-        results = recall_memory("python debug error", top_k=3, data_dir=tmp, chunk="general")
-        edges_after = sum(len(v) for v in load_associations(chunk_dir).get("edges", {}).values()) // 2
+        results = recall_memory(
+            "python debug error", top_k=3, data_dir=tmp, chunk="general"
+        )
+        edges_after = (
+            sum(len(v) for v in load_associations(chunk_dir).get("edges", {}).values())
+            // 2
+        )
         check("recall returned results", len(results) > 0, f"got {len(results)}")
-        check("co-recall may add edges", edges_after >= edges_before,
-              f"before={edges_before}, after={edges_after}")
+        check(
+            "co-recall may add edges",
+            edges_after >= edges_before,
+            f"before={edges_before}, after={edges_after}",
+        )
 
         # ==================================================================
         # Test 5: Warmth propagation
@@ -186,13 +213,19 @@ def main():
             (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
 
             warmed = propagate_warmth(chunk_dir, [key_with_neighbors])
-            check("warmth propagated to neighbors", len(warmed) > 0, f"warmed {len(warmed)} memories")
+            check(
+                "warmth propagated to neighbors",
+                len(warmed) > 0,
+                f"warmed {len(warmed)} memories",
+            )
 
             # Check hop 1 neighbor got WARMTH_HOP1
             if neighbors[0] in warmed:
-                check(f"hop-1 neighbor boost is {WARMTH_HOP1}",
-                      abs(warmed[neighbors[0]] - WARMTH_HOP1) < 1e-4,
-                      f"got {warmed[neighbors[0]]}")
+                check(
+                    f"hop-1 neighbor boost is {WARMTH_HOP1}",
+                    abs(warmed[neighbors[0]] - WARMTH_HOP1) < 1e-4,
+                    f"got {warmed[neighbors[0]]}",
+                )
 
             # Check warmth is persisted
             warmth_on_disk = load_warmth(chunk_dir)
@@ -205,9 +238,11 @@ def main():
                 for n2 in n1_neighbors:
                     if n2 != key_with_neighbors and n2 not in set(neighbors):
                         if n2 in warmed:
-                            check(f"hop-2 neighbor boost is {WARMTH_HOP2}",
-                                  abs(warmed[n2] - WARMTH_HOP2) < 1e-4,
-                                  f"got {warmed[n2]}")
+                            check(
+                                f"hop-2 neighbor boost is {WARMTH_HOP2}",
+                                abs(warmed[n2] - WARMTH_HOP2) < 1e-4,
+                                f"got {warmed[n2]}",
+                            )
                             hop2_found = True
                             break
                 if hop2_found:
@@ -232,9 +267,11 @@ def main():
                     m["metadata"]["hit_count"],
                     m["metadata"]["last_accessed"],
                 )
-                check("warmed memory temp > base temp",
-                      m["temperature"] > base,
-                      f"effective={m['temperature']}, base={base}")
+                check(
+                    "warmed memory temp > base temp",
+                    m["temperature"] > base,
+                    f"effective={m['temperature']}, base={base}",
+                )
             else:
                 print("  - (warmed memories not found in list)")
         else:
@@ -252,9 +289,11 @@ def main():
                 propagate_warmth(chunk_dir, [key_with_neighbors])
             warmth_data = load_warmth(chunk_dir)
             for hk, entry in warmth_data.items():
-                check(f"warmth capped at {MAX_WARMTH}",
-                      entry["boost"] <= MAX_WARMTH + 1e-4,
-                      f"got {entry['boost']}")
+                check(
+                    f"warmth capped at {MAX_WARMTH}",
+                    entry["boost"] <= MAX_WARMTH + 1e-4,
+                    f"got {entry['boost']}",
+                )
                 break  # Just check one
 
         # ==================================================================
@@ -286,13 +325,13 @@ def main():
         # ==================================================================
         # Summary
         # ==================================================================
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  ASSOCIATIVE WARMING TEST RESULTS")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"  Passed: {passes}")
         print(f"  Failed: {fails}")
         print(f"  Overall: {'PASS' if fails == 0 else 'FAIL'}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

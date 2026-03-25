@@ -52,9 +52,7 @@ def hallucination_score(
         return e
 
     frame_flat = frame.flatten()
-    max_corr = max(
-        pearsonr(frame_flat, att.flatten())[0] for att in known_attractors
-    )
+    max_corr = max(pearsonr(frame_flat, att.flatten())[0] for att in known_attractors)
     # Clamp correlation to [0, 1] for score computation
     max_corr = max(0.0, min(1.0, max_corr))
     return e * (1.0 - max_corr)

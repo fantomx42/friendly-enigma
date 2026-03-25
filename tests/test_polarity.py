@@ -1,7 +1,11 @@
 """Unit tests for dual-polarity encoding helpers."""
+
 import pytest
 from wheeler_memory.polarity import (
-    POLAR_WEIGHT_DECAY, POLAR_DECAY_THRESHOLD, is_neutralized, polar_weight,
+    POLAR_WEIGHT_DECAY,
+    POLAR_DECAY_THRESHOLD,
+    is_neutralized,
+    polar_weight,
 )
 
 
@@ -21,13 +25,13 @@ class TestPolarWeight:
     def test_polar_weight_three_decays(self):
         """{'decay_count': 3} → 0.7^3 ≈ 0.343."""
         weight = polar_weight({"decay_count": 3})
-        expected = POLAR_WEIGHT_DECAY ** 3
+        expected = POLAR_WEIGHT_DECAY**3
         assert abs(weight - expected) < 1e-10
 
     def test_polar_weight_legacy_field(self):
         """{'safe_recall_count': 2} → 0.7^2 (backward compat)."""
         weight = polar_weight({"safe_recall_count": 2})
-        expected = POLAR_WEIGHT_DECAY ** 2
+        expected = POLAR_WEIGHT_DECAY**2
         assert abs(weight - expected) < 1e-10
 
     def test_polar_weight_no_count(self):

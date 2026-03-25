@@ -111,8 +111,10 @@ def test_resonance_basic():
         print("\n  Resonant files:")
         for rf in result.resonant_files:
             path = Path(rf["path"]).name
-            print(f"    {path}: score={rf['resonance_score']:.4f} "
-                  f"text={rf['chunk_text'][:60]}...")
+            print(
+                f"    {path}: score={rf['resonance_score']:.4f} "
+                f"text={rf['chunk_text'][:60]}..."
+            )
 
         print("  PASS: Resonance test completed")
     finally:
@@ -128,7 +130,7 @@ def test_cost_ratio():
         # Create many code files and one cooking file
         for i in range(5):
             (corpus / f"code_{i}.txt").write_text(
-                f"def function_{i}(x):\n    return x ** {i+2}\n" * 20
+                f"def function_{i}(x):\n    return x ** {i + 2}\n" * 20
             )
         (corpus / "cooking.txt").write_text(COOKING_TEXT)
 
@@ -144,8 +146,9 @@ def test_cost_ratio():
 
         # Note: with hash-based encoding, resonance is stochastic.
         # We just verify the system runs and produces a ratio.
-        assert 0.0 <= result.cost_ratio <= 1.0, \
+        assert 0.0 <= result.cost_ratio <= 1.0, (
             f"Cost ratio should be in [0,1], got {result.cost_ratio}"
+        )
 
         print("  PASS: Cost ratio within expected bounds")
     finally:

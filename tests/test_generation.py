@@ -187,14 +187,18 @@ class TestMinResonanceFilter:
     def test_min_resonance_above_max_emits_nothing(self, tmp_path):
         """min_resonance > 1.0 (above maximum possible Pearson r) → empty sequence."""
         store_test_memory("test memory 15", tmp_path)
-        result = trajectory_resonance("test memory 15", data_dir=tmp_path, min_resonance=1.01)
+        result = trajectory_resonance(
+            "test memory 15", data_dir=tmp_path, min_resonance=1.01
+        )
 
         assert result.sequence == []
 
     def test_min_resonance_0_0_may_emit_all(self, tmp_path):
         """min_resonance=0.0 allows all above floor to emit."""
         store_test_memory("test memory 16", tmp_path)
-        result = trajectory_resonance("test memory 16", data_dir=tmp_path, min_resonance=0.0)
+        result = trajectory_resonance(
+            "test memory 16", data_dir=tmp_path, min_resonance=0.0
+        )
 
         # With threshold at 0.0, at least some ticks should emit
         # (ticks with positive correlation above the floor)
@@ -206,7 +210,9 @@ class TestMinResonanceFilter:
     def test_min_resonance_midpoint_filters_correctly(self, tmp_path):
         """min_resonance=0.5 filters appropriately."""
         store_test_memory("test memory 17", tmp_path)
-        result = trajectory_resonance("test memory 17", data_dir=tmp_path, min_resonance=0.5)
+        result = trajectory_resonance(
+            "test memory 17", data_dir=tmp_path, min_resonance=0.5
+        )
 
         # All emitted ticks should have peak_sim >= 0.5
         for tick in result.ticks:
@@ -221,7 +227,9 @@ class TestDedupStrategies:
         """dedup='first' emits first occurrence of each text."""
         store_test_memory("mem1", tmp_path)
         store_test_memory("mem2", tmp_path)
-        result = trajectory_resonance("query dedup first", data_dir=tmp_path, dedup="first")
+        result = trajectory_resonance(
+            "query dedup first", data_dir=tmp_path, dedup="first"
+        )
 
         # Verify sequence is built by dedup logic
         assert isinstance(result.sequence, list)
@@ -230,7 +238,9 @@ class TestDedupStrategies:
         """dedup='last' emits last occurrence of each text."""
         store_test_memory("mem3", tmp_path)
         store_test_memory("mem4", tmp_path)
-        result = trajectory_resonance("query dedup last", data_dir=tmp_path, dedup="last")
+        result = trajectory_resonance(
+            "query dedup last", data_dir=tmp_path, dedup="last"
+        )
 
         assert isinstance(result.sequence, list)
 
@@ -238,7 +248,9 @@ class TestDedupStrategies:
         """dedup='peak' emits tick with max similarity per run."""
         store_test_memory("mem5", tmp_path)
         store_test_memory("mem6", tmp_path)
-        result = trajectory_resonance("query dedup peak", data_dir=tmp_path, dedup="peak")
+        result = trajectory_resonance(
+            "query dedup peak", data_dir=tmp_path, dedup="peak"
+        )
 
         assert isinstance(result.sequence, list)
 
@@ -246,7 +258,9 @@ class TestDedupStrategies:
         """dedup='none' emits all ticks above threshold."""
         store_test_memory("mem7", tmp_path)
         store_test_memory("mem8", tmp_path)
-        result = trajectory_resonance("query dedup none", data_dir=tmp_path, dedup="none")
+        result = trajectory_resonance(
+            "query dedup none", data_dir=tmp_path, dedup="none"
+        )
 
         # With 'none', sequence may be longer (no dedup)
         assert isinstance(result.sequence, list)
@@ -255,7 +269,9 @@ class TestDedupStrategies:
         """All dedup strategies produce valid sequence lists."""
         store_test_memory("mem9", tmp_path)
         for strategy in ["first", "last", "peak", "none"]:
-            result = trajectory_resonance("query dedup all", data_dir=tmp_path, dedup=strategy)
+            result = trajectory_resonance(
+                "query dedup all", data_dir=tmp_path, dedup=strategy
+            )
             assert isinstance(result.sequence, list)
             assert all(isinstance(s, str) for s in result.sequence)
 
@@ -412,7 +428,9 @@ class TestTickHistory:
         """If emitted=True, peak_sim >= min_resonance."""
         store_test_memory("test memory threshold", tmp_path)
         min_res = 0.25
-        result = trajectory_resonance("query threshold", data_dir=tmp_path, min_resonance=min_res)
+        result = trajectory_resonance(
+            "query threshold", data_dir=tmp_path, min_resonance=min_res
+        )
 
         for tick in result.ticks:
             if tick.emitted:
@@ -503,7 +521,9 @@ class TestSequenceConsistency:
         """With dedup='first', sequence has no consecutive duplicates."""
         store_test_memory("dedup test 1", tmp_path)
         store_test_memory("dedup test 2", tmp_path)
-        result = trajectory_resonance("dedup first query", data_dir=tmp_path, dedup="first")
+        result = trajectory_resonance(
+            "dedup first query", data_dir=tmp_path, dedup="first"
+        )
 
         # Check that sequence respects first-occurrence logic
         # (no consecutive identical values in deduplicated output)

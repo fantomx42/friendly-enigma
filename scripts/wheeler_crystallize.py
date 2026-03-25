@@ -78,7 +78,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Wheeler Memory data directory (default: ~/.wheeler_memory).",
     )
     p.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Print progress to stderr.",
     )

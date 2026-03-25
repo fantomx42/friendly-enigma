@@ -18,8 +18,15 @@ from wheeler_memory.decoder import (
 # ── State extraction ──────────────────────────────────────────────────────────
 
 
-def _make_hit(text, similarity=0.5, temperature=0.5, tier="warm",
-              state="CONVERGED", ticks=42, chunk="general"):
+def _make_hit(
+    text,
+    similarity=0.5,
+    temperature=0.5,
+    tier="warm",
+    state="CONVERGED",
+    ticks=42,
+    chunk="general",
+):
     return {
         "text": text,
         "similarity": similarity,
@@ -223,9 +230,7 @@ class TestWheelerPrimaryAgentRun:
         mock_recall.return_value = [
             _make_hit("vague", similarity=0.1),
         ]
-        mock_ollama.return_value = {
-            "message": {"content": "I'm not sure about this."}
-        }
+        mock_ollama.return_value = {"message": {"content": "I'm not sure about this."}}
 
         agent = WheelerPrimaryAgent(confidence_floor=0.5)
         agent.run("obscure query")

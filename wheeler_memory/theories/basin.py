@@ -98,12 +98,14 @@ def find_basin_gaps(
                     break
 
             if corr_a < 0.9 and corr_b < 0.9 and converged_to is None:
-                gaps.append({
-                    "point": result["attractor"],
-                    "neighbors": (key_a, key_b),
-                    "blend_alpha": float(alpha),
-                    "converged_to": converged_to,
-                })
+                gaps.append(
+                    {
+                        "point": result["attractor"],
+                        "neighbors": (key_a, key_b),
+                        "blend_alpha": float(alpha),
+                        "converged_to": converged_to,
+                    }
+                )
 
     return gaps
 

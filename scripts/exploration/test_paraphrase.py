@@ -22,15 +22,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="Wheeler Memory paraphrase similarity test (Quora QQP)"
     )
-    parser.add_argument(
-        "--n", type=int, default=5000, help="Number of pairs to test"
-    )
+    parser.add_argument("--n", type=int, default=5000, help="Number of pairs to test")
     parser.add_argument(
         "--output", default="paraphrase_report.png", help="Output image path"
     )
-    parser.add_argument(
-        "--gpu", action="store_true", help="Use GPU batch evolution"
-    )
+    parser.add_argument("--gpu", action="store_true", help="Use GPU batch evolution")
     args = parser.parse_args()
 
     use_gpu = args.gpu and gpu_available()
@@ -89,7 +85,7 @@ def main():
             attractor_map[text] = result["attractor"].flatten()
             if (i + 1) % 1000 == 0:
                 elapsed = time.time() - t0
-                print(f"    [{i+1:>6}/{len(all_texts)}] {elapsed:.1f}s")
+                print(f"    [{i + 1:>6}/{len(all_texts)}] {elapsed:.1f}s")
 
     evolve_time = time.time() - t0
     print(f"  Done in {evolve_time:.1f}s ({len(all_texts) / evolve_time:.0f} q/s)")
@@ -133,9 +129,9 @@ def main():
     rand_corrs = np.array(rand_corrs)
 
     # ── Phase 4: Report ───────────────────────────────────────────────
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print(f"  PARAPHRASE SIMILARITY TEST  (Quora QQP)")
-    print(f"{'='*65}")
+    print(f"{'=' * 65}")
     print(f"  Duplicate pairs:      {n_dup:,}")
     print(f"  Non-duplicate pairs:  {n_non:,}")
     print(f"  Random pairs:         {len(rand_corrs):,}")
@@ -168,7 +164,7 @@ def main():
         verdict = "NO SEMANTIC SIGNAL"
         print(f"  Verdict: {verdict} — SHA-256 hash destroys meaning, as expected")
 
-    print(f"{'='*65}\n")
+    print(f"{'=' * 65}\n")
 
     # ── Phase 5: Visual report ────────────────────────────────────────
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -176,15 +172,37 @@ def main():
         f"Wheeler Memory × Quora Question Pairs — {verdict}\n"
         f"Dup avg|r|={dup_corrs.mean():.4f}  Random avg|r|={rand_corrs.mean():.4f}  "
         f"Separation={separation:+.4f}",
-        fontsize=14, fontweight="bold"
+        fontsize=14,
+        fontweight="bold",
     )
 
     # 1. Overlapping histograms
     ax = axes[0, 0]
     bins = np.linspace(0, 0.15, 60)
-    ax.hist(dup_corrs, bins=bins, alpha=0.6, label=f"Duplicates (n={n_dup:,})", color="#EF4444", density=True)
-    ax.hist(non_corrs, bins=bins, alpha=0.6, label=f"Non-duplicates (n={n_non:,})", color="#3B82F6", density=True)
-    ax.hist(rand_corrs, bins=bins, alpha=0.4, label=f"Random (n={len(rand_corrs):,})", color="#9CA3AF", density=True)
+    ax.hist(
+        dup_corrs,
+        bins=bins,
+        alpha=0.6,
+        label=f"Duplicates (n={n_dup:,})",
+        color="#EF4444",
+        density=True,
+    )
+    ax.hist(
+        non_corrs,
+        bins=bins,
+        alpha=0.6,
+        label=f"Non-duplicates (n={n_non:,})",
+        color="#3B82F6",
+        density=True,
+    )
+    ax.hist(
+        rand_corrs,
+        bins=bins,
+        alpha=0.4,
+        label=f"Random (n={len(rand_corrs):,})",
+        color="#9CA3AF",
+        density=True,
+    )
     ax.set_xlabel("|Pearson r|")
     ax.set_ylabel("Density")
     ax.set_title("Correlation Distribution by Pair Type")
@@ -217,9 +235,16 @@ def main():
         examples.append(f"  Q1: {q1[:70]}")
         examples.append(f"  Q2: {q2[:70]}")
         examples.append("")
-    ax.text(0.02, 0.98, "\n".join(examples), transform=ax.transAxes,
-            fontsize=8, verticalalignment="top", fontfamily="monospace",
-            bbox=dict(boxstyle="round", facecolor="#F3F4F6"))
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(examples),
+        transform=ax.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=dict(boxstyle="round", facecolor="#F3F4F6"),
+    )
 
     # 4. Stats panel
     ax = axes[1, 1]
@@ -249,9 +274,16 @@ def main():
         f"To fix: add an embedding layer",
         f"before the CA stage.",
     ]
-    ax.text(0.02, 0.98, "\n".join(analysis), transform=ax.transAxes,
-            fontsize=9, verticalalignment="top", fontfamily="monospace",
-            bbox=dict(boxstyle="round", facecolor="#F3F4F6"))
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(analysis),
+        transform=ax.transAxes,
+        fontsize=9,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=dict(boxstyle="round", facecolor="#F3F4F6"),
+    )
 
     plt.tight_layout()
     plt.savefig(args.output, dpi=150, bbox_inches="tight")

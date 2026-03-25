@@ -33,42 +33,33 @@ from wheeler_memory.eviction import _delete_memory_files
 
 # Pattern definitions
 PATTERNS = {
-    'trivia': re.compile(
-        r'^\s*(what|who|when|where|why|how|which|whose|whom).*\?',
-        re.IGNORECASE
+    "trivia": re.compile(
+        r"^\s*(what|who|when|where|why|how|which|whose|whom).*\?", re.IGNORECASE
     ),
-    'dialogue': re.compile(
-        r'^(dialogue|[a-z]+:\s*)',
-        re.IGNORECASE
-    ),
-    'passage': re.compile(
-        r'^(passage|[a-z]{3,20}:|visit|read)',
-        re.IGNORECASE
-    ),
-    'short_fragment': re.compile(
-        r'^.{0,30}$'
-    ),
+    "dialogue": re.compile(r"^(dialogue|[a-z]+:\s*)", re.IGNORECASE),
+    "passage": re.compile(r"^(passage|[a-z]{3,20}:|visit|read)", re.IGNORECASE),
+    "short_fragment": re.compile(r"^.{0,30}$"),
 }
 
 # Recommended cleanup by chunk
 CLEANUP_RECOMMENDATIONS = {
-    'daily_tasks': {
-        'pattern': 'dialogue',
-        'reason': '77.1% of daily_tasks are dialogue training data, not personal tasks',
-        'priority': 'CRITICAL',
-        'estimated_removal': 84,
+    "daily_tasks": {
+        "pattern": "dialogue",
+        "reason": "77.1% of daily_tasks are dialogue training data, not personal tasks",
+        "priority": "CRITICAL",
+        "estimated_removal": 84,
     },
-    'code': {
-        'pattern': ['dialogue', 'passage'],
-        'reason': '12% of code are dialogue/passage format—mismatch, likely leaked from daily_tasks',
-        'priority': 'HIGH',
-        'estimated_removal': 258,
+    "code": {
+        "pattern": ["dialogue", "passage"],
+        "reason": "12% of code are dialogue/passage format—mismatch, likely leaked from daily_tasks",
+        "priority": "HIGH",
+        "estimated_removal": 258,
     },
-    'general': {
-        'pattern': 'trivia',
-        'reason': '46.9% of general are trivia Q&A—causes similarity floor problem',
-        'priority': 'HIGH',
-        'estimated_removal': 625,
+    "general": {
+        "pattern": "trivia",
+        "reason": "46.9% of general are trivia Q&A—causes similarity floor problem",
+        "priority": "HIGH",
+        "estimated_removal": 625,
     },
 }
 
@@ -104,7 +95,7 @@ def find_matches(
         Dict mapping chunk_name -> list of (hex_key, text) tuples
     """
     if isinstance(patterns, str):
-        patterns = [p.strip() for p in patterns.split('|')]
+        patterns = [p.strip() for p in patterns.split("|")]
 
     # Resolve pattern objects
     compiled_patterns = []
@@ -172,10 +163,12 @@ def estimate_impact(
         total_after = total_before - removed_count
 
         impact[chunk_name] = {
-            'before': total_before,
-            'after': total_after,
-            'removed': removed_count,
-            'pct_removed': 100 * removed_count / total_before if total_before > 0 else 0,
+            "before": total_before,
+            "after": total_after,
+            "removed": removed_count,
+            "pct_removed": 100 * removed_count / total_before
+            if total_before > 0
+            else 0,
         }
 
     return impact
@@ -183,17 +176,19 @@ def estimate_impact(
 
 def display_impact(impact: dict[str, dict]):
     """Pretty-print corpus impact estimate."""
-    total_before = sum(v['before'] for v in impact.values())
-    total_removed = sum(v['removed'] for v in impact.values())
+    total_before = sum(v["before"] for v in impact.values())
+    total_removed = sum(v["removed"] for v in impact.values())
     total_after = total_before - total_removed
 
     print(f"\nEstimated Impact:")
-    print(f"  Total:    {total_before:,} → {total_after:,} ({100*total_removed/total_before:.1f}% removed)")
+    print(
+        f"  Total:    {total_before:,} → {total_after:,} ({100 * total_removed / total_before:.1f}% removed)"
+    )
     print(f"\n  By chunk:")
 
     for chunk_name in sorted(impact.keys()):
         info = impact[chunk_name]
-        if info['removed'] > 0:
+        if info["removed"] > 0:
             print(
                 f"    {chunk_name:15} "
                 f"{info['before']:4d} → {info['after']:4d} "
@@ -203,7 +198,10 @@ def display_impact(impact: dict[str, dict]):
 
 def backup_corpus(data_dir: Path) -> Path:
     """Create timestamped backup of corpus."""
-    backup_dir = data_dir.parent / f"wheeler_memory_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    backup_dir = (
+        data_dir.parent
+        / f"wheeler_memory_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    )
     chunks_dir = data_dir / "chunks"
 
     print(f"\nBacking up corpus to: {backup_dir}")

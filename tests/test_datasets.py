@@ -33,7 +33,7 @@ from conftest import store_test_memory
 # Dataset paths
 # ---------------------------------------------------------------------------
 
-DATASETS_DIR = Path("/home/tristan/wheeler memory/datasets")
+DATASETS_DIR = Path("/home/tristan/projects/wheeler-memory/datasets")
 
 MBPP_TRAIN_PATH = DATASETS_DIR / "mbpp" / "full" / "train-00000-of-00001.parquet"
 MBPP_TEST_PATH = DATASETS_DIR / "mbpp" / "full" / "test-00000-of-00001.parquet"
@@ -242,9 +242,7 @@ class TestSWEBench:
         # Self-recall: query with exact stored text
         for text in texts:
             results = recall_memory(text, top_k=5, data_dir=tmp_path, chunk="code")
-            assert len(results) > 0, (
-                f"No results for SWE-bench issue: {text[:60]}..."
-            )
+            assert len(results) > 0, f"No results for SWE-bench issue: {text[:60]}..."
             # Exact text self-recall should be a perfect match
             assert results[0]["text"] == text, (
                 f"Top result text does not match query for: {text[:60]}..."
@@ -679,6 +677,7 @@ class TestBABILongEmbed:
 
             # Clear store for next item to avoid cross-contamination
             import shutil
+
             shutil.rmtree(tmp_path / "chunks", ignore_errors=True)
 
         assert attempts > 0, "No valid BABILong items found for needle-in-haystack test"
@@ -701,6 +700,4 @@ class TestBABILongEmbed:
             if evolve_and_interpret(embed_to_frame(text))["state"] != "CHAOTIC"
         )
         rate = converged / len(texts)
-        assert rate >= 0.90, (
-            f"BABILong embed convergence rate {rate:.0%} < 90%"
-        )
+        assert rate >= 0.90, f"BABILong embed convergence rate {rate:.0%} < 90%"

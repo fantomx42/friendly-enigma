@@ -30,6 +30,17 @@
 - **Log**: `mmlu_cortex_l3_2026-03-21.log`
 - **Notes**: +1.6% over zero-shot, +0.6% over learned-without-L3. Top: jurisprudence 36.1%, public_relations 34.5%, conceptual_physics 33.6%. L3 helps modestly — loss barely moved from chance (1.39 vs 1.386), needs more training data or richer features.
 
+## Cortex + Trajectory Similarity (hybrid retrieval, no L3)
+- **Date**: 2026-03-21
+- **Mode**: `--mode cortex --all` (with trajectory cache)
+- **Score**: 25.2% (3,545/14,042)
+- **Encoder**: blended (hippocampus 0.7 + language wheeler 0.3)
+- **Stored memories**: 3,207 (all chunks) with trajectory signatures
+- **L3 classifier**: untrained (argmax on settled opinions)
+- **Trajectory alpha**: 0.7 (attractor) / 0.3 (trajectory)
+- **Log**: `mmlu_cortex_trajectory_2026-03-21.log`
+- **Notes**: -0.1% vs learned-facts baseline. With L3: 25.9% (same as without trajectory). Trajectory re-ranking neutral — doesn't help or hurt. Hypotheses: (1) alpha=0.7 too conservative — trajectory signal drowned out, (2) hippocampus n-gram encoding produces similar seed frames for lexically similar text → similar trajectories, meaning trajectory doesn't add new discrimination power, (3) need to test lower alpha values to weight trajectory higher. Tunable: alpha, similarity weights, curve length.
+
 ## Previous MiniLM Semantic Baseline
 - **Date**: 2026-03-17
 - **Mode**: `--mode semantic` (MiniLM encoder)

@@ -1,15 +1,23 @@
 """Unit tests for the attention model (variable tick rates)."""
+
 import pytest
 import numpy as np
 from wheeler_memory.attention import (
-    AttentionBudget, compute_attention_budget, salience_from_label, salience_from_temperature,
+    AttentionBudget,
+    compute_attention_budget,
+    salience_from_label,
+    salience_from_temperature,
 )
 from wheeler_memory.dynamics import evolve_and_interpret
 from wheeler_memory.hashing import hash_to_frame
 from wheeler_memory.temperature import (
     SALIENCE_DEFAULT,
-    SALIENCE_MAX_ITERS_LOW, SALIENCE_MAX_ITERS_MED, SALIENCE_MAX_ITERS_HIGH,
-    SALIENCE_THRESHOLD_LOW, SALIENCE_THRESHOLD_MED, SALIENCE_THRESHOLD_HIGH,
+    SALIENCE_MAX_ITERS_LOW,
+    SALIENCE_MAX_ITERS_MED,
+    SALIENCE_MAX_ITERS_HIGH,
+    SALIENCE_THRESHOLD_LOW,
+    SALIENCE_THRESHOLD_MED,
+    SALIENCE_THRESHOLD_HIGH,
 )
 
 
@@ -124,11 +132,17 @@ class TestBackwardsCompat:
         """evolve with default params == evolve with max_iters=1000, threshold=1e-4."""
         frame = hash_to_frame("backwards compatibility test")
         result_default = evolve_and_interpret(frame.copy())
-        result_explicit = evolve_and_interpret(frame.copy(), max_iters=1000, stability_threshold=1e-4)
+        result_explicit = evolve_and_interpret(
+            frame.copy(), max_iters=1000, stability_threshold=1e-4
+        )
         assert result_default["state"] == result_explicit["state"]
-        assert result_default["convergence_ticks"] == result_explicit["convergence_ticks"]
+        assert (
+            result_default["convergence_ticks"] == result_explicit["convergence_ticks"]
+        )
         if result_default["state"] == "CONVERGED":
-            delta = np.abs(result_default["attractor"] - result_explicit["attractor"]).max()
+            delta = np.abs(
+                result_default["attractor"] - result_explicit["attractor"]
+            ).max()
             assert delta < 1e-10
 
     def test_default_budget_values(self):

@@ -63,10 +63,14 @@ def compute_attention_budget(salience: float) -> AttentionBudget:
     # Piecewise linear interpolation for max_iters
     if salience <= 0.5:
         t = salience / 0.5
-        max_iters = SALIENCE_MAX_ITERS_LOW + t * (SALIENCE_MAX_ITERS_MED - SALIENCE_MAX_ITERS_LOW)
+        max_iters = SALIENCE_MAX_ITERS_LOW + t * (
+            SALIENCE_MAX_ITERS_MED - SALIENCE_MAX_ITERS_LOW
+        )
     else:
         t = (salience - 0.5) / 0.5
-        max_iters = SALIENCE_MAX_ITERS_MED + t * (SALIENCE_MAX_ITERS_HIGH - SALIENCE_MAX_ITERS_MED)
+        max_iters = SALIENCE_MAX_ITERS_MED + t * (
+            SALIENCE_MAX_ITERS_HIGH - SALIENCE_MAX_ITERS_MED
+        )
 
     # Log-linear interpolation for threshold
     # salience=0 → THRESHOLD_LOW, salience=0.5 → THRESHOLD_MED, salience=1.0 → THRESHOLD_HIGH

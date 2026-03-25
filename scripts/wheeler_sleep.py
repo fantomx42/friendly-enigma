@@ -27,9 +27,7 @@ def main():
         action="store_true",
         help="Show what would be consolidated without modifying bricks",
     )
-    parser.add_argument(
-        "--chunk", default=None, help="Consolidate only this chunk"
-    )
+    parser.add_argument("--chunk", default=None, help="Consolidate only this chunk")
     parser.add_argument(
         "--stats",
         action="store_true",
@@ -64,9 +62,7 @@ def _run(args, data_dir):
         total_frames = 0
         total_potential = 0
         for s in stats:
-            text_preview = (
-                s["text"][:35] + "..." if len(s["text"]) > 35 else s["text"]
-            )
+            text_preview = s["text"][:35] + "..." if len(s["text"]) > 35 else s["text"]
             savings = s["frame_count"] - s["potential_frames"]
             cons = "yes" if s["consolidated"] else "no"
             print(
@@ -78,9 +74,13 @@ def _run(args, data_dir):
             total_potential += s["potential_frames"]
 
         total_savings = total_frames - total_potential
-        print(f"\nTotal: {total_frames} frames -> {total_potential} frames "
-              f"({total_savings} saveable, "
-              f"{total_savings / total_frames * 100:.0f}%)" if total_frames > 0 else "")
+        print(
+            f"\nTotal: {total_frames} frames -> {total_potential} frames "
+            f"({total_savings} saveable, "
+            f"{total_savings / total_frames * 100:.0f}%)"
+            if total_frames > 0
+            else ""
+        )
         return
 
     # --- Consolidation mode ---
@@ -91,9 +91,7 @@ def _run(args, data_dir):
     if result.memories_consolidated:
         print(f"{prefix}Consolidated ({len(result.memories_consolidated)}):")
         for m in result.memories_consolidated:
-            text_preview = (
-                m["text"][:35] + "..." if len(m["text"]) > 35 else m["text"]
-            )
+            text_preview = m["text"][:35] + "..." if len(m["text"]) > 35 else m["text"]
             print(
                 f"  {m['tier']:<5} {m['frames_before']:>3} -> {m['frames_after']:>3} frames  "
                 f"{m['chunk']:<15} {text_preview}"

@@ -32,7 +32,9 @@ CHAT_FILE = Path(__file__).parent.parent / "ui" / "chat.html"
 
 # ── Chat session management ────────────────────────────────────────────────────
 
-_sessions: dict[str, dict] = {}  # session_id -> {"agent": WheelerAgent, "last_active": float, "lock": Lock}
+_sessions: dict[
+    str, dict
+] = {}  # session_id -> {"agent": WheelerAgent, "last_active": float, "lock": Lock}
 _sessions_lock = threading.Lock()
 _SESSION_TTL = 3600  # 1 hour
 
@@ -66,9 +68,12 @@ def _get_or_create_session(session_id: str | None) -> tuple[str, dict]:
 def _reap_stale_sessions() -> None:
     now = time.time()
     with _sessions_lock:
-        stale = [k for k, v in _sessions.items() if now - v["last_active"] > _SESSION_TTL]
+        stale = [
+            k for k, v in _sessions.items() if now - v["last_active"] > _SESSION_TTL
+        ]
         for k in stale:
             del _sessions[k]
+
 
 SEED_MEMORIES = [
     "cellular automata evolve through local neighbor rules toward stable attractors",
@@ -92,7 +97,6 @@ def _seed_if_empty(data_dir):
 
 
 class WheelerHandler(BaseHTTPRequestHandler):
-
     def log_message(self, format, *args):
         pass  # suppress per-request logging
 
@@ -147,9 +151,13 @@ class WheelerHandler(BaseHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=3) as resp:
                     data = json.loads(resp.read())
                 models = [m.get("name", "") for m in data.get("models", [])]
-                self.send_json({"ollama": True, "models": models, "default_model": DEFAULT_MODEL})
+                self.send_json(
+                    {"ollama": True, "models": models, "default_model": DEFAULT_MODEL}
+                )
             except Exception:
-                self.send_json({"ollama": False, "models": [], "default_model": DEFAULT_MODEL})
+                self.send_json(
+                    {"ollama": False, "models": [], "default_model": DEFAULT_MODEL}
+                )
             return
 
         if path == "/api/memories":
@@ -174,7 +182,7 @@ class WheelerHandler(BaseHTTPRequestHandler):
             return
 
         if path.startswith("/api/attractor/"):
-            key = path[len("/api/attractor/"):]
+            key = path[len("/api/attractor/") :]
             params = parse_qs(parsed.query)
             chunk = params.get("chunk", ["general"])[0]
             npy_path = DEFAULT_DATA_DIR / "chunks" / chunk / "attractors" / f"{key}.npy"
@@ -209,13 +217,15 @@ class WheelerHandler(BaseHTTPRequestHandler):
                 r = store_with_rotation_retry(text, data_dir=DEFAULT_DATA_DIR)
                 chunk = select_chunk(text)
                 key = text_to_hex(text)
-                self.send_json({
-                    "stored": r["state"] == "CONVERGED",
-                    "key": key,
-                    "state": r["state"],
-                    "ticks": r["convergence_ticks"],
-                    "chunk": chunk,
-                })
+                self.send_json(
+                    {
+                        "stored": r["state"] == "CONVERGED",
+                        "key": key,
+                        "state": r["state"],
+                        "ticks": r["convergence_ticks"],
+                        "chunk": chunk,
+                    }
+                )
             except Exception as e:
                 self.send_error_json(str(e), 500)
             return
@@ -228,20 +238,22 @@ class WheelerHandler(BaseHTTPRequestHandler):
             top_k = int(body.get("top_k", 10))
             try:
                 results = recall_memory(text, top_k=top_k, data_dir=DEFAULT_DATA_DIR)
-                self.send_json([
-                    {
-                        "key": m["hex_key"],
-                        "chunk": m["chunk"],
-                        "temperature": m["temperature"],
-                        "tier": m["temperature_tier"],
-                        "text": m["text"],
-                        "state": m["state"],
-                        "ticks": m["convergence_ticks"],
-                        "similarity": m["similarity"],
-                        "timestamp": m["timestamp"],
-                    }
-                    for m in results
-                ])
+                self.send_json(
+                    [
+                        {
+                            "key": m["hex_key"],
+                            "chunk": m["chunk"],
+                            "temperature": m["temperature"],
+                            "tier": m["temperature_tier"],
+                            "text": m["text"],
+                            "state": m["state"],
+                            "ticks": m["convergence_ticks"],
+                            "similarity": m["similarity"],
+                            "timestamp": m["timestamp"],
+                        }
+                        for m in results
+                    ]
+                )
             except Exception as e:
                 self.send_error_json(str(e), 500)
             return
@@ -261,10 +273,12 @@ class WheelerHandler(BaseHTTPRequestHandler):
         if path == "/api/sleep":
             try:
                 result = sleep_consolidate(DEFAULT_DATA_DIR)
-                self.send_json({
-                    "consolidated": len(result.memories_consolidated),
-                    "skipped": len(result.memories_skipped),
-                })
+                self.send_json(
+                    {
+                        "consolidated": len(result.memories_consolidated),
+                        "skipped": len(result.memories_skipped),
+                    }
+                )
             except Exception as e:
                 self.send_error_json(str(e), 500)
             return
@@ -291,8 +305,7 @@ class WheelerHandler(BaseHTTPRequestHandler):
                 """Write one SSE frame. Returns False if client disconnected."""
                 try:
                     frame = (
-                        f"event: {event_type}\n"
-                        f"data: {json.dumps(data)}\n\n"
+                        f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
                     ).encode()
                     self.wfile.write(frame)
                     self.wfile.flush()

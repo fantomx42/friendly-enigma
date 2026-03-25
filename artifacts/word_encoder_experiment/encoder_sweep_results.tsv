@@ -1,0 +1,11 @@
+encoder	blend	accuracy	correct	total	time_s	sociology	virology
+hippocampus		31.6	116	367	6.3	29.9	33.7
+word		22.9	84	367	5.8	22.4	23.5
+word-blended		24.0	88	367	5.8	22.4	25.9
+hippo-word	0.1	27.0	99	367	7.7	25.9	28.3
+hippo-word	0.2	31.1	114	367	8.2	32.3	29.5
+hippo-word	0.3	28.3	104	367	7.5	31.3	24.7
+hippo-word	0.4	26.7	98	367	8.0	27.9	25.3
+hippo-word	0.5	25.9	95	367	7.9	24.4	27.7
+hippo-word	0.6	23.7	87	367	8.3	22.4	25.3
+hippo-word	0.7	22.9	84	367	7.6	22.4	23.5

@@ -80,7 +80,9 @@ def _load_corpus(data_dir: Path) -> tuple[list[str], list[np.ndarray]]:
 
 def _random_projection() -> np.ndarray:
     rng = np.random.Generator(np.random.PCG64(PROJECTION_SEED))
-    return rng.standard_normal((EMBED_DIM, FRAME_CELLS)).astype(np.float32) / np.sqrt(FRAME_CELLS)
+    return rng.standard_normal((EMBED_DIM, FRAME_CELLS)).astype(np.float32) / np.sqrt(
+        FRAME_CELLS
+    )
 
 
 def _fidelity(frames: np.ndarray, stored: np.ndarray) -> np.ndarray:
@@ -153,9 +155,11 @@ def train(
 
     # ── Step 5: Ridge regression ──────────────────────────────────────────────
     print(f"\nFitting Ridge regression (alpha={alpha})...")
-    assert A_seed_train.shape == (len(train_idx), FRAME_CELLS), \
+    assert A_seed_train.shape == (len(train_idx), FRAME_CELLS), (
         f"Expected ({len(train_idx)}, {FRAME_CELLS}), got {A_seed_train.shape}"
+    )
     from sklearn.linear_model import Ridge
+
     reg = Ridge(alpha=alpha, fit_intercept=False)
     reg.fit(E_train, A_seed_train)
     W_learned = reg.coef_.T.astype(np.float32)  # (384, 4096)
@@ -178,11 +182,15 @@ def train(
             frames_flat = np.tanh(seeds * 3.0)
             return frames_flat.reshape(-1, FRAME_SIZE, FRAME_SIZE).astype(np.float32)
 
-        print(f"\nEvaluating learned projection fidelity on {len(test_idx)} test examples...")
+        print(
+            f"\nEvaluating learned projection fidelity on {len(test_idx)} test examples..."
+        )
         frames_learned = _frames_from(W_learned, E_test)
         scores_learned = _fidelity(frames_learned, attractors_test)
 
-        print(f"\nEvaluating random projection fidelity on {len(test_idx)} test examples...")
+        print(
+            f"\nEvaluating random projection fidelity on {len(test_idx)} test examples..."
+        )
         frames_random = _frames_from(W_random, E_test)
         scores_random = _fidelity(frames_random, attractors_test)
 
@@ -231,12 +239,24 @@ def train(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train learned projection for Wheeler Memory")
+    parser = argparse.ArgumentParser(
+        description="Train learned projection for Wheeler Memory"
+    )
     parser.add_argument("--data-dir", default=None, help="Wheeler data directory")
-    parser.add_argument("--alpha", type=float, default=1.0, help="Ridge regularization (default: 1.0)")
-    parser.add_argument("--test-frac", type=float, default=0.2, help="Fraction held out for evaluation")
-    parser.add_argument("--dry-run", action="store_true", help="Evaluate only, do not save")
-    parser.add_argument("--output", default=None, help="Output path for .npy (default: ~/.wheeler_memory/learned_projection.npy)")
+    parser.add_argument(
+        "--alpha", type=float, default=1.0, help="Ridge regularization (default: 1.0)"
+    )
+    parser.add_argument(
+        "--test-frac", type=float, default=0.2, help="Fraction held out for evaluation"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Evaluate only, do not save"
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Output path for .npy (default: ~/.wheeler_memory/learned_projection.npy)",
+    )
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir) if args.data_dir else DEFAULT_DATA_DIR

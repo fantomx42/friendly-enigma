@@ -61,7 +61,9 @@ def check(name: str, condition: bool, detail: str = ""):
         print(msg)
 
 
-def make_synthetic_history(n_frames: int, transitions: list[int] | None = None) -> list[np.ndarray]:
+def make_synthetic_history(
+    n_frames: int, transitions: list[int] | None = None
+) -> list[np.ndarray]:
     """Create a synthetic evolution history with known transition points.
 
     Frames are mostly constant with small noise. At transition indices,
@@ -88,7 +90,9 @@ def make_uniform_history(n_frames: int) -> list[np.ndarray]:
     """Create a history where all frames are nearly identical."""
     rng = np.random.RandomState(99)
     base = rng.randn(64, 64).astype(np.float32) * 0.5
-    return [base + rng.randn(64, 64).astype(np.float32) * 0.0001 for _ in range(n_frames)]
+    return [
+        base + rng.randn(64, 64).astype(np.float32) * 0.0001 for _ in range(n_frames)
+    ]
 
 
 def store_test_memory(text: str, data_dir: Path, chunk: str = "general") -> str:
@@ -96,7 +100,9 @@ def store_test_memory(text: str, data_dir: Path, chunk: str = "general") -> str:
     frame = hash_to_frame(text)
     result = evolve_and_interpret(frame)
     brick = MemoryBrick.from_evolution_result(result)
-    return store_memory(text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False)
+    return store_memory(
+        text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False
+    )
 
 
 def age_memory(data_dir: Path, chunk: str, hex_key: str, days: float) -> None:
@@ -128,14 +134,20 @@ def main():
 
     check("seed (frame 0) kept", 0 in kept)
     check("attractor (frame 19) kept", 19 in kept)
-    check("at least some transition frames kept", len(kept) >= 4,
-          f"kept {len(kept)} frames: {kept}")
+    check(
+        "at least some transition frames kept",
+        len(kept) >= 4,
+        f"kept {len(kept)} frames: {kept}",
+    )
     check("kept < total", len(kept) < 20, f"kept {len(kept)}")
 
     # Verify transition frames are captured (at least some of 5, 10, 15)
     transitions_kept = [i for i in [5, 10, 15] if i in kept]
-    check("transition frames captured", len(transitions_kept) >= 2,
-          f"transitions kept: {transitions_kept}")
+    check(
+        "transition frames captured",
+        len(transitions_kept) >= 2,
+        f"transitions kept: {transitions_kept}",
+    )
 
     # ==================================================================
     # Test 2: min_frames floor
@@ -143,11 +155,15 @@ def main():
     print("\n[2] min_frames floor")
 
     uniform = make_uniform_history(20)
-    kept_uniform = select_keyframes(uniform, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
+    kept_uniform = select_keyframes(
+        uniform, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD
+    )
 
-    check(f"uniform history keeps >= {CONSOLIDATION_MIN_FRAMES} frames",
-          len(kept_uniform) >= CONSOLIDATION_MIN_FRAMES,
-          f"kept {len(kept_uniform)}")
+    check(
+        f"uniform history keeps >= {CONSOLIDATION_MIN_FRAMES} frames",
+        len(kept_uniform) >= CONSOLIDATION_MIN_FRAMES,
+        f"kept {len(kept_uniform)}",
+    )
     check("seed kept in uniform", 0 in kept_uniform)
     check("attractor kept in uniform", 19 in kept_uniform)
 
@@ -165,32 +181,58 @@ def main():
         metadata={"test": True},
     )
 
-    consolidated = consolidate_brick(brick, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
+    consolidated = consolidate_brick(
+        brick, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD
+    )
 
-    check("frame count reduced",
-          len(consolidated.evolution_history) < len(brick.evolution_history),
-          f"{len(consolidated.evolution_history)} vs {len(brick.evolution_history)}")
-    check("metadata: consolidated=True", consolidated.metadata.get("consolidated") is True)
+    check(
+        "frame count reduced",
+        len(consolidated.evolution_history) < len(brick.evolution_history),
+        f"{len(consolidated.evolution_history)} vs {len(brick.evolution_history)}",
+    )
+    check(
+        "metadata: consolidated=True", consolidated.metadata.get("consolidated") is True
+    )
     check("metadata: consolidated_at set", "consolidated_at" in consolidated.metadata)
-    check("metadata: original_frame_count",
-          consolidated.metadata.get("original_frame_count") == 30,
-          f"got {consolidated.metadata.get('original_frame_count')}")
-    check("metadata: retained_frame_count",
-          consolidated.metadata.get("retained_frame_count") == len(consolidated.evolution_history))
-    check("metadata: frames_pruned",
-          consolidated.metadata.get("frames_pruned") == 30 - len(consolidated.evolution_history))
-    check("metadata: delta_threshold",
-          consolidated.metadata.get("consolidation_delta_threshold") == CONSOLIDATION_DELTA_COLD)
-    check("metadata: role_threshold",
-          consolidated.metadata.get("consolidation_role_threshold") == CONSOLIDATION_ROLE_COLD)
+    check(
+        "metadata: original_frame_count",
+        consolidated.metadata.get("original_frame_count") == 30,
+        f"got {consolidated.metadata.get('original_frame_count')}",
+    )
+    check(
+        "metadata: retained_frame_count",
+        consolidated.metadata.get("retained_frame_count")
+        == len(consolidated.evolution_history),
+    )
+    check(
+        "metadata: frames_pruned",
+        consolidated.metadata.get("frames_pruned")
+        == 30 - len(consolidated.evolution_history),
+    )
+    check(
+        "metadata: delta_threshold",
+        consolidated.metadata.get("consolidation_delta_threshold")
+        == CONSOLIDATION_DELTA_COLD,
+    )
+    check(
+        "metadata: role_threshold",
+        consolidated.metadata.get("consolidation_role_threshold")
+        == CONSOLIDATION_ROLE_COLD,
+    )
 
     # Seed and attractor preserved
-    check("seed frame preserved",
-          np.array_equal(consolidated.evolution_history[0], brick.evolution_history[0]))
-    check("attractor frame preserved",
-          np.array_equal(consolidated.evolution_history[-1], brick.evolution_history[-1]))
-    check("final_attractor unchanged",
-          np.array_equal(consolidated.final_attractor, brick.final_attractor))
+    check(
+        "seed frame preserved",
+        np.array_equal(consolidated.evolution_history[0], brick.evolution_history[0]),
+    )
+    check(
+        "attractor frame preserved",
+        np.array_equal(consolidated.evolution_history[-1], brick.evolution_history[-1]),
+    )
+    check(
+        "final_attractor unchanged",
+        np.array_equal(consolidated.final_attractor, brick.final_attractor),
+    )
     check("original metadata preserved", consolidated.metadata.get("test") is True)
 
     # ==================================================================
@@ -201,11 +243,16 @@ def main():
     first = consolidate_brick(brick, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
     second = consolidate_brick(first, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
 
-    check("second consolidation returns same object",
-          len(second.evolution_history) == len(first.evolution_history),
-          f"first={len(first.evolution_history)}, second={len(second.evolution_history)}")
-    check("no double-consolidation metadata change",
-          second.metadata.get("original_frame_count") == first.metadata.get("original_frame_count"))
+    check(
+        "second consolidation returns same object",
+        len(second.evolution_history) == len(first.evolution_history),
+        f"first={len(first.evolution_history)}, second={len(second.evolution_history)}",
+    )
+    check(
+        "no double-consolidation metadata change",
+        second.metadata.get("original_frame_count")
+        == first.metadata.get("original_frame_count"),
+    )
 
     # ==================================================================
     # Test 5: skips small history
@@ -221,12 +268,18 @@ def main():
         metadata={},
     )
 
-    result_small = consolidate_brick(small_brick, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
-    check("small brick unchanged",
-          len(result_small.evolution_history) == len(small_history),
-          f"got {len(result_small.evolution_history)}")
-    check("small brick not marked consolidated",
-          not result_small.metadata.get("consolidated"))
+    result_small = consolidate_brick(
+        small_brick, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD
+    )
+    check(
+        "small brick unchanged",
+        len(result_small.evolution_history) == len(small_history),
+        f"got {len(result_small.evolution_history)}",
+    )
+    check(
+        "small brick not marked consolidated",
+        not result_small.metadata.get("consolidated"),
+    )
 
     # ==================================================================
     # Test 6: temperature-tiered
@@ -241,23 +294,31 @@ def main():
     warm_thresh = thresholds_for_temperature(0.4)
     check("warm returns thresholds", warm_thresh is not None)
     if warm_thresh:
-        check("warm delta threshold",
-              warm_thresh[0] == CONSOLIDATION_DELTA_WARM,
-              f"got {warm_thresh[0]}")
-        check("warm role threshold",
-              warm_thresh[1] == CONSOLIDATION_ROLE_WARM,
-              f"got {warm_thresh[1]}")
+        check(
+            "warm delta threshold",
+            warm_thresh[0] == CONSOLIDATION_DELTA_WARM,
+            f"got {warm_thresh[0]}",
+        )
+        check(
+            "warm role threshold",
+            warm_thresh[1] == CONSOLIDATION_ROLE_WARM,
+            f"got {warm_thresh[1]}",
+        )
 
     # Cold
     cold_thresh = thresholds_for_temperature(0.1)
     check("cold returns thresholds", cold_thresh is not None)
     if cold_thresh:
-        check("cold delta threshold",
-              cold_thresh[0] == CONSOLIDATION_DELTA_COLD,
-              f"got {cold_thresh[0]}")
-        check("cold role threshold",
-              cold_thresh[1] == CONSOLIDATION_ROLE_COLD,
-              f"got {cold_thresh[1]}")
+        check(
+            "cold delta threshold",
+            cold_thresh[0] == CONSOLIDATION_DELTA_COLD,
+            f"got {cold_thresh[0]}",
+        )
+        check(
+            "cold role threshold",
+            cold_thresh[1] == CONSOLIDATION_ROLE_COLD,
+            f"got {cold_thresh[1]}",
+        )
 
     # Warm keeps more frames than cold
     history_6 = make_synthetic_history(40, transitions=[5, 10, 15, 20, 25, 30, 35])
@@ -269,14 +330,20 @@ def main():
         metadata={},
     )
 
-    warm_consolidated = consolidate_brick(brick_6, CONSOLIDATION_DELTA_WARM, CONSOLIDATION_ROLE_WARM)
-    cold_consolidated = consolidate_brick(brick_6, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
+    warm_consolidated = consolidate_brick(
+        brick_6, CONSOLIDATION_DELTA_WARM, CONSOLIDATION_ROLE_WARM
+    )
+    cold_consolidated = consolidate_brick(
+        brick_6, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD
+    )
 
     warm_frames = len(warm_consolidated.evolution_history)
     cold_frames = len(cold_consolidated.evolution_history)
-    check("warm keeps more frames than cold",
-          warm_frames >= cold_frames,
-          f"warm={warm_frames}, cold={cold_frames}")
+    check(
+        "warm keeps more frames than cold",
+        warm_frames >= cold_frames,
+        f"warm={warm_frames}, cold={cold_frames}",
+    )
 
     # ==================================================================
     # Test 7: dry_run
@@ -293,37 +360,51 @@ def main():
         brick_before = MemoryBrick.load(brick_path)
         frames_before = len(brick_before.evolution_history)
 
-        check("brick has enough frames for consolidation",
-              frames_before >= CONSOLIDATION_MIN_HISTORY,
-              f"got {frames_before}")
+        check(
+            "brick has enough frames for consolidation",
+            frames_before >= CONSOLIDATION_MIN_HISTORY,
+            f"got {frames_before}",
+        )
 
         result = sleep_consolidate(tmp7, dry_run=True)
 
         # Report should show savings
         if result.memories_consolidated:
-            check("dry_run shows consolidation candidates",
-                  len(result.memories_consolidated) > 0)
+            check(
+                "dry_run shows consolidation candidates",
+                len(result.memories_consolidated) > 0,
+            )
 
             # But brick should be unchanged on disk
             brick_after = MemoryBrick.load(brick_path)
-            check("brick unchanged after dry_run",
-                  len(brick_after.evolution_history) == frames_before,
-                  f"before={frames_before}, after={len(brick_after.evolution_history)}")
-            check("brick not marked consolidated after dry_run",
-                  not brick_after.metadata.get("consolidated"))
+            check(
+                "brick unchanged after dry_run",
+                len(brick_after.evolution_history) == frames_before,
+                f"before={frames_before}, after={len(brick_after.evolution_history)}",
+            )
+            check(
+                "brick not marked consolidated after dry_run",
+                not brick_after.metadata.get("consolidated"),
+            )
         else:
             # The CA-generated brick might not have enough delta to consolidate.
             # In that case, verify it was skipped for "no_reduction" reason
             skip_reasons = [m["reason"] for m in result.memories_skipped]
-            check("dry_run: brick skipped (no reduction or too few frames)",
-                  "no_reduction" in skip_reasons or "too_few_frames" in skip_reasons,
-                  f"skip reasons: {skip_reasons}")
+            check(
+                "dry_run: brick skipped (no reduction or too few frames)",
+                "no_reduction" in skip_reasons or "too_few_frames" in skip_reasons,
+                f"skip reasons: {skip_reasons}",
+            )
             # Still verify brick is unchanged
             brick_after = MemoryBrick.load(brick_path)
-            check("brick unchanged after dry_run (skipped)",
-                  len(brick_after.evolution_history) == frames_before)
-            check("brick not marked consolidated",
-                  not brick_after.metadata.get("consolidated"))
+            check(
+                "brick unchanged after dry_run (skipped)",
+                len(brick_after.evolution_history) == frames_before,
+            )
+            check(
+                "brick not marked consolidated",
+                not brick_after.metadata.get("consolidated"),
+            )
     finally:
         shutil.rmtree(tmp7, ignore_errors=True)
 
@@ -348,42 +429,54 @@ def main():
         brick_8.save(brick_path)
 
         # Consolidate and save
-        consolidated = consolidate_brick(brick_8, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD)
+        consolidated = consolidate_brick(
+            brick_8, CONSOLIDATION_DELTA_COLD, CONSOLIDATION_ROLE_COLD
+        )
         consolidated.save(brick_path)
 
         # Reload and verify
         reloaded = MemoryBrick.load(brick_path)
 
-        check("reloaded frame count matches",
-              len(reloaded.evolution_history) == len(consolidated.evolution_history),
-              f"expected {len(consolidated.evolution_history)}, got {len(reloaded.evolution_history)}")
-        check("reloaded attractor matches",
-              np.allclose(reloaded.final_attractor, brick_8.final_attractor))
-        check("reloaded seed matches",
-              np.allclose(reloaded.evolution_history[0], brick_8.evolution_history[0]))
-        check("reloaded last frame matches original attractor",
-              np.allclose(reloaded.evolution_history[-1], brick_8.evolution_history[-1]))
-        check("reloaded metadata: consolidated",
-              reloaded.metadata.get("consolidated") is True)
-        check("reloaded metadata: source preserved",
-              reloaded.metadata.get("source") == "test")
-        check("reloaded state preserved",
-              reloaded.state == "CONVERGED")
-        check("reloaded convergence_ticks preserved",
-              reloaded.convergence_ticks == 30)
+        check(
+            "reloaded frame count matches",
+            len(reloaded.evolution_history) == len(consolidated.evolution_history),
+            f"expected {len(consolidated.evolution_history)}, got {len(reloaded.evolution_history)}",
+        )
+        check(
+            "reloaded attractor matches",
+            np.allclose(reloaded.final_attractor, brick_8.final_attractor),
+        )
+        check(
+            "reloaded seed matches",
+            np.allclose(reloaded.evolution_history[0], brick_8.evolution_history[0]),
+        )
+        check(
+            "reloaded last frame matches original attractor",
+            np.allclose(reloaded.evolution_history[-1], brick_8.evolution_history[-1]),
+        )
+        check(
+            "reloaded metadata: consolidated",
+            reloaded.metadata.get("consolidated") is True,
+        )
+        check(
+            "reloaded metadata: source preserved",
+            reloaded.metadata.get("source") == "test",
+        )
+        check("reloaded state preserved", reloaded.state == "CONVERGED")
+        check("reloaded convergence_ticks preserved", reloaded.convergence_ticks == 30)
     finally:
         shutil.rmtree(tmp8, ignore_errors=True)
 
     # ==================================================================
     # Summary
     # ==================================================================
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  CONSOLIDATION TEST RESULTS")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Passed: {passes}")
     print(f"  Failed: {fails}")
     print(f"  Overall: {'PASS' if fails == 0 else 'FAIL'}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     sys.exit(0 if fails == 0 else 1)
 

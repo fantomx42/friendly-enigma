@@ -18,8 +18,12 @@ def get_cell_roles(frame: np.ndarray) -> np.ndarray:
     n_left = np.roll(frame, 1, axis=1)
     n_right = np.roll(frame, -1, axis=1)
 
-    is_max = (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
-    is_min = (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
+    is_max = (
+        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
+    )
+    is_min = (
+        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
+    )
 
     roles = np.zeros(frame.shape, dtype=np.int8)
     roles[is_max] = 1
@@ -41,7 +45,12 @@ def detect_oscillation(history: list[np.ndarray], window: int = 20) -> dict:
       - cycle_states: list of role matrices for one cycle, or None
     """
     if len(history) < window:
-        return {"oscillating": False, "period": None, "oscillating_cells": 0, "cycle_states": None}
+        return {
+            "oscillating": False,
+            "period": None,
+            "oscillating_cells": 0,
+            "cycle_states": None,
+        }
 
     recent = history[-window:]
     role_matrices = np.array([get_cell_roles(f) for f in recent], dtype=np.int8)
@@ -50,7 +59,12 @@ def detect_oscillation(history: list[np.ndarray], window: int = 20) -> dict:
     # Check if any cells actually change roles
     role_changes = np.any(role_matrices != role_matrices[0:1], axis=0)
     if not np.any(role_changes):
-        return {"oscillating": False, "period": None, "oscillating_cells": 0, "cycle_states": None}
+        return {
+            "oscillating": False,
+            "period": None,
+            "oscillating_cells": 0,
+            "cycle_states": None,
+        }
 
     for p in range(2, 11):
         if p >= window:
@@ -75,4 +89,9 @@ def detect_oscillation(history: list[np.ndarray], window: int = 20) -> dict:
                 "cycle_states": cycle_states,
             }
 
-    return {"oscillating": False, "period": None, "oscillating_cells": 0, "cycle_states": None}
+    return {
+        "oscillating": False,
+        "period": None,
+        "oscillating_cells": 0,
+        "cycle_states": None,
+    }

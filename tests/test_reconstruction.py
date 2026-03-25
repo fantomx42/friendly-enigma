@@ -4,6 +4,7 @@ Tests the reconstructive recall mechanism where stored and query attractors
 are blended and re-evolved through the CA to produce context-dependent
 reconstructions.
 """
+
 import numpy as np
 import pytest
 
@@ -85,12 +86,8 @@ class TestReconstruction:
         )
 
         attractor = result["attractor"]
-        assert np.all(attractor >= -1.0), (
-            f"Some values < -1.0: min={attractor.min()}"
-        )
-        assert np.all(attractor <= 1.0), (
-            f"Some values > 1.0: max={attractor.max()}"
-        )
+        assert np.all(attractor >= -1.0), f"Some values < -1.0: min={attractor.min()}"
+        assert np.all(attractor <= 1.0), f"Some values > 1.0: max={attractor.max()}"
 
     def test_reconstruct_correlation_bounds(self):
         """Both correlation_with_stored and correlation_with_query are in [-1, 1]."""
@@ -179,7 +176,9 @@ class TestReconstruction:
         stored_attractor = stored_result["attractor"]
 
         # Two very different queries
-        query_frame_a = hash_to_frame("query context A: machine learning and data science")
+        query_frame_a = hash_to_frame(
+            "query context A: machine learning and data science"
+        )
         query_result_a = evolve_and_interpret(query_frame_a, max_iters=1000)
 
         query_frame_b = hash_to_frame("query context B: web development and REST APIs")

@@ -1,4 +1,5 @@
 """Unit tests for CA dynamics engine."""
+
 import numpy as np
 import pytest
 from wheeler_memory.dynamics import apply_ca_dynamics, evolve_and_interpret
@@ -97,14 +98,20 @@ class TestEvolveAndInterpret:
         """convergence_ticks <= max_iters."""
         frame = hash_to_frame("test")
         max_iters = 50
-        result = evolve_and_interpret(frame, max_iters=max_iters, stability_threshold=1e-4)
+        result = evolve_and_interpret(
+            frame, max_iters=max_iters, stability_threshold=1e-4
+        )
         assert result["convergence_ticks"] <= max_iters
 
     def test_evolve_deterministic(self):
         """same input → same state and same attractor."""
         frame = hash_to_frame("deterministic test")
-        result1 = evolve_and_interpret(frame.copy(), max_iters=100, stability_threshold=1e-4)
-        result2 = evolve_and_interpret(frame.copy(), max_iters=100, stability_threshold=1e-4)
+        result1 = evolve_and_interpret(
+            frame.copy(), max_iters=100, stability_threshold=1e-4
+        )
+        result2 = evolve_and_interpret(
+            frame.copy(), max_iters=100, stability_threshold=1e-4
+        )
         assert result1["state"] == result2["state"]
         assert np.array_equal(result1["attractor"], result2["attractor"])
 
@@ -125,5 +132,7 @@ class TestEvolveAndInterpret:
     def test_evolve_first_frame_is_input(self):
         """first frame in history matches input."""
         frame = hash_to_frame("first frame test")
-        result = evolve_and_interpret(frame.copy(), max_iters=100, stability_threshold=1e-4)
+        result = evolve_and_interpret(
+            frame.copy(), max_iters=100, stability_threshold=1e-4
+        )
         assert np.array_equal(result["history"][0], frame)

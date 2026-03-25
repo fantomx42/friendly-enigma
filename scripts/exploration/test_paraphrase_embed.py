@@ -30,7 +30,9 @@ def main():
         description="Wheeler Memory paraphrase test (embedding mode)"
     )
     parser.add_argument("--n", type=int, default=2000, help="Number of pairs to test")
-    parser.add_argument("--output", default="paraphrase_embed_report.png", help="Output image")
+    parser.add_argument(
+        "--output", default="paraphrase_embed_report.png", help="Output image"
+    )
     parser.add_argument("--gpu", action="store_true", help="Use GPU batch evolution")
     args = parser.parse_args()
 
@@ -91,7 +93,7 @@ def main():
             result = evolve_and_interpret(frame)
             attractor_map[text] = result["attractor"].flatten()
             if (i + 1) % 500 == 0:
-                print(f"    [{i+1:>6}/{len(all_texts)}]")
+                print(f"    [{i + 1:>6}/{len(all_texts)}]")
 
     evolve_time = time.time() - t_evolve
     total_time = time.time() - t_embed
@@ -109,18 +111,23 @@ def main():
             return 0.0
         return float((a * b).sum() / norm)
 
-    dup_corrs = np.array([pearson_r(attractor_map[q1], attractor_map[q2])
-                          for q1, q2 in dup_pairs])
-    non_corrs = np.array([pearson_r(attractor_map[q1], attractor_map[q2])
-                          for q1, q2 in non_pairs])
+    dup_corrs = np.array(
+        [pearson_r(attractor_map[q1], attractor_map[q2]) for q1, q2 in dup_pairs]
+    )
+    non_corrs = np.array(
+        [pearson_r(attractor_map[q1], attractor_map[q2]) for q1, q2 in non_pairs]
+    )
 
     # Random baseline
     rng = np.random.default_rng(42)
     rand_indices = rng.choice(len(all_texts), size=(args.n, 2), replace=True)
-    rand_corrs = np.array([
-        pearson_r(attractor_map[all_texts[i]], attractor_map[all_texts[j]])
-        for i, j in rand_indices if i != j
-    ])
+    rand_corrs = np.array(
+        [
+            pearson_r(attractor_map[all_texts[i]], attractor_map[all_texts[j]])
+            for i, j in rand_indices
+            if i != j
+        ]
+    )
 
     # Use absolute values
     dup_abs = np.abs(dup_corrs)
@@ -135,9 +142,9 @@ def main():
     dup_pos_frac = (dup_corrs > 0).mean()
     non_pos_frac = (non_corrs > 0).mean()
 
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print(f"  EMBEDDING PARAPHRASE TEST  (Quora QQP)")
-    print(f"{'='*65}")
+    print(f"{'=' * 65}")
     print(f"  Mode:                 Sentence Embedding (all-MiniLM-L6-v2)")
     print(f"  Duplicate pairs:      {n_dup:,}")
     print(f"  Non-duplicate pairs:  {n_non:,}")
@@ -153,8 +160,8 @@ def main():
     print(f"  Non avg r (signed):   {non_corrs.mean():+.6f}")
     print(f"  Random avg r:         {rand_corrs.mean():+.6f}")
     print(f"  ─────────────────────────────────")
-    print(f"  Dup % positive r:     {dup_pos_frac*100:.1f}%")
-    print(f"  Non % positive r:     {non_pos_frac*100:.1f}%")
+    print(f"  Dup % positive r:     {dup_pos_frac * 100:.1f}%")
+    print(f"  Non % positive r:     {non_pos_frac * 100:.1f}%")
     print(f"  ─────────────────────────────────")
     print(f"  |r| separation:       {separation:+.6f}")
     print(f"  signed separation:    {signed_sep:+.6f}")
@@ -167,7 +174,7 @@ def main():
         verdict = "NO SIGNAL"
 
     print(f"\n  Verdict: {verdict}")
-    print(f"{'='*65}\n")
+    print(f"{'=' * 65}\n")
 
     # ── Phase 5: Visual report ────────────────────────────────────────
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -175,18 +182,37 @@ def main():
         f"Wheeler Memory × Quora QQP — EMBEDDING MODE — {verdict}\n"
         f"Dup avg|r|={dup_abs.mean():.4f}  Random avg|r|={rand_abs.mean():.4f}  "
         f"Separation={separation:+.4f}",
-        fontsize=14, fontweight="bold"
+        fontsize=14,
+        fontweight="bold",
     )
 
     # 1. Overlapping histograms (signed r)
     ax = axes[0, 0]
     bins = np.linspace(-0.3, 0.3, 80)
-    ax.hist(dup_corrs, bins=bins, alpha=0.6, label=f"Duplicates (n={n_dup:,})",
-            color="#EF4444", density=True)
-    ax.hist(non_corrs, bins=bins, alpha=0.6, label=f"Non-duplicates (n={n_non:,})",
-            color="#3B82F6", density=True)
-    ax.hist(rand_corrs, bins=bins, alpha=0.4, label=f"Random (n={len(rand_corrs):,})",
-            color="#9CA3AF", density=True)
+    ax.hist(
+        dup_corrs,
+        bins=bins,
+        alpha=0.6,
+        label=f"Duplicates (n={n_dup:,})",
+        color="#EF4444",
+        density=True,
+    )
+    ax.hist(
+        non_corrs,
+        bins=bins,
+        alpha=0.6,
+        label=f"Non-duplicates (n={n_non:,})",
+        color="#3B82F6",
+        density=True,
+    )
+    ax.hist(
+        rand_corrs,
+        bins=bins,
+        alpha=0.4,
+        label=f"Random (n={len(rand_corrs):,})",
+        color="#9CA3AF",
+        density=True,
+    )
     ax.set_xlabel("Pearson r (signed)")
     ax.set_ylabel("Density")
     ax.set_title("Correlation Distribution (Signed)")
@@ -198,7 +224,8 @@ def main():
     bp = ax.boxplot(
         [dup_abs, non_abs, rand_abs],
         tick_labels=["Duplicates", "Non-duplicates", "Random"],
-        patch_artist=True, widths=0.5,
+        patch_artist=True,
+        widths=0.5,
     )
     colors = ["#EF4444", "#3B82F6", "#9CA3AF"]
     for patch, color in zip(bp["boxes"], colors):
@@ -210,7 +237,9 @@ def main():
     # 3. Example pairs with their correlation
     ax = axes[1, 0]
     ax.axis("off")
-    ax.set_title("Example Duplicate Pairs (with embedding)", fontsize=12, fontweight="bold")
+    ax.set_title(
+        "Example Duplicate Pairs (with embedding)", fontsize=12, fontweight="bold"
+    )
     examples = []
     for i in range(min(8, n_dup)):
         q1, q2 = dup_pairs[i]
@@ -219,9 +248,16 @@ def main():
         examples.append(f"  Q1: {q1[:70]}")
         examples.append(f"  Q2: {q2[:70]}")
         examples.append("")
-    ax.text(0.02, 0.98, "\n".join(examples), transform=ax.transAxes,
-            fontsize=8, verticalalignment="top", fontfamily="monospace",
-            bbox=dict(boxstyle="round", facecolor="#F3F4F6"))
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(examples),
+        transform=ax.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=dict(boxstyle="round", facecolor="#F3F4F6"),
+    )
 
     # 4. Comparison: SHA-256 vs Embedding
     ax = axes[1, 1]
@@ -247,9 +283,16 @@ def main():
         f"Projection: JL random (384→4096)",
         f"Embed: {embed_time:.1f}s  Evolve: {evolve_time:.1f}s",
     ]
-    ax.text(0.02, 0.98, "\n".join(comparison), transform=ax.transAxes,
-            fontsize=9, verticalalignment="top", fontfamily="monospace",
-            bbox=dict(boxstyle="round", facecolor="#F3F4F6"))
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(comparison),
+        transform=ax.transAxes,
+        fontsize=9,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=dict(boxstyle="round", facecolor="#F3F4F6"),
+    )
 
     plt.tight_layout()
     plt.savefig(args.output, dpi=150, bbox_inches="tight")

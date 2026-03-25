@@ -139,3 +139,8 @@ WORD_PROJECTION_SEED = 0xBEEF_CAFE  # seeds word → 384-dim matrix
 WORD_HASH_SPACE = 2**16  # 65536 buckets (same size as hippocampus)
 WORD_HIPPO_BLEND = 0.3  # word weight in hippo+word hybrid (1-this → hippocampus)
 ENSEMBLE_MARGIN_THRESHOLD = 16  # hippo margin below this → defer to secondary encoder
+
+# ---------------------------------------------------------------------------
+# Spatial similarity (topology-aware retrieval)
+# ---------------------------------------------------------------------------
+SPATIAL_PEARSON_WEIGHT = 0.5  # Pearson vs spatial blend (1.0 = pure Pearson, 0.0 = pure spatial)

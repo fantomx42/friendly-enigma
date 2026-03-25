@@ -156,7 +156,7 @@ Local: qwen3.5:9b (code generation)
 Orchestration: Claude opus (loop management)
 
 ### Budget
-- Max iterations: 20
+- Max iterations: 50
 - Stop condition: MMLU semantic > 32% OR max iterations reached
 
 ### Benchmark Command Override

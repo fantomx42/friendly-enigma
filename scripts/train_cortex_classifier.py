@@ -49,7 +49,8 @@ def load_training_data(
     2. Retrieve top-K attractors using cache (if available)
     3. Run cortex_reason() for graph reasoning and settlement
     4. Compute SCM scores
-    5. Build feature vector: settlement + choice_sims + scm_layers
+    5. Compute co-evolution scores
+    6. Build feature vector: settlement + choice_sims + scm_layers + coevo_layers
 
     Args:
         subjects: List of MMLU subjects (None = all 57)
@@ -58,7 +59,7 @@ def load_training_data(
 
     Returns:
         Tuple of (features, targets) where:
-        - features: (N, 21) array where N = number of questions, 21 = K + 4 + 7
+        - features: (N, 24) array where N = number of questions, 24 = K + 4 + 7 + 3
         - targets: (N,) int array with correct answer index (0-3)
     """
     from wheeler_memory.storage import DEFAULT_DATA_DIR
@@ -79,6 +80,7 @@ def load_training_data(
     if subjects is None:
         # All 57 MMLU subjects
         from scripts.wheeler_mmlu import MMLU_SUBJECTS
+
         subjects = MMLU_SUBJECTS
 
     print(f"\nLoading MMLU data for {len(subjects)} subjects...")
@@ -88,6 +90,7 @@ def load_training_data(
     cache = None
     try:
         from scripts.wheeler_mmlu import AttractorCache
+
         cache = AttractorCache(d)
     except Exception as e:
         print(f"  Warning: failed to load attractor cache: {e}")
@@ -122,7 +125,10 @@ def load_training_data(
                     question_frame = question_frame_2d.flatten().astype(np.float32)
 
                     choice_sims = np.array(
-                        [_pearson_correlation(question_frame, fc) for fc in frames_flat],
+                        [
+                            _pearson_correlation(question_frame, fc)
+                            for fc in frames_flat
+                        ],
                         dtype=np.float32,
                     )
 
@@ -137,11 +143,15 @@ def load_training_data(
                             retrieved_sims = np.concatenate(
                                 [
                                     retrieved_sims,
-                                    np.zeros(cortex_k - len(retrieved_sims), dtype=np.float32),
+                                    np.zeros(
+                                        cortex_k - len(retrieved_sims), dtype=np.float32
+                                    ),
                                 ]
                             )
                         # Create fake attractors from question frame for cortex_reason
-                        attractors = np.tile(question_frame, (cortex_k, 1)).astype(np.float32)
+                        attractors = np.tile(question_frame, (cortex_k, 1)).astype(
+                            np.float32
+                        )
                     else:
                         # No cache: use choice attractors as input (4 items), pad to cortex_k
                         retrieved_sims = np.zeros(cortex_k, dtype=np.float32)
@@ -149,9 +159,9 @@ def load_training_data(
                         attractors = np.vstack(
                             [
                                 np.vstack(frames_flat),
-                                np.random.randn(cortex_k - len(frames_flat), frames_flat[0].shape[0]).astype(
-                                    np.float32
-                                ),
+                                np.random.randn(
+                                    cortex_k - len(frames_flat), frames_flat[0].shape[0]
+                                ).astype(np.float32),
                             ]
                         )
 
@@ -166,12 +176,16 @@ def load_training_data(
                         inertia=CORTEX_SETTLE_INERTIA,
                     )
 
-                    settled = result["settlement"]["settled"][:cortex_k].astype(np.float32)
+                    settled = result["settlement"]["settled"][:cortex_k].astype(
+                        np.float32
+                    )
                     graph = result["graph"]
 
                     # Ensure settled has exactly K elements
                     if len(settled) < cortex_k:
-                        settled = np.concatenate([settled, np.zeros(cortex_k - len(settled))])
+                        settled = np.concatenate(
+                            [settled, np.zeros(cortex_k - len(settled))]
+                        )
                     settled = settled[:cortex_k]
 
                     # Compute SCM
@@ -201,11 +215,62 @@ def load_training_data(
                         dtype=np.float32,
                     )
 
-                    # Build feature vector: settlement + choice_sims + scm_layers
-                    features = np.concatenate([settled, choice_sims, scm_layers]).astype(np.float32)
+                    # Co-evolution: blend question + each choice, evolve together
+                    from wheeler_memory.dynamics import apply_ca_dynamics
+                    from wheeler_memory.cortex_scm import (
+                        score_coevolution_convergence,
+                        score_coevolution_spread,
+                        score_coevolution_energy,
+                    )
+
+                    coevo_ticks_list = []
+                    coevo_energy_list = []
+                    for cf in frames:  # frames is the list of 4 choice frames (64x64)
+                        blended = np.tanh(0.5 * question_frame_2d + 0.5 * cf).astype(
+                            np.float32
+                        )
+                        frame_t = blended.copy()
+                        initial_delta = None
+                        final_delta = 0.0
+                        ticks_t = 0
+                        for t in range(200):
+                            frame_old_t = frame_t
+                            frame_t = apply_ca_dynamics(frame_t)
+                            delta_t = float(np.abs(frame_t - frame_old_t).mean())
+                            if initial_delta is None:
+                                initial_delta = delta_t
+                            final_delta = delta_t
+                            ticks_t = t + 1
+                            if delta_t < 1e-4:
+                                break
+                        coevo_ticks_list.append(ticks_t)
+                        energy_drop = (
+                            (initial_delta - final_delta) / max(initial_delta, 1e-10)
+                            if initial_delta
+                            else 0.0
+                        )
+                        coevo_energy_list.append(max(0.0, energy_drop))
+
+                    coevo_ticks_arr = np.array(coevo_ticks_list, dtype=np.float32)
+                    coevo_energies_arr = np.array(coevo_energy_list, dtype=np.float32)
+                    coevo_layers = np.array(
+                        [
+                            score_coevolution_convergence(
+                                coevo_ticks_arr, max_iters=200
+                            ),
+                            score_coevolution_spread(coevo_ticks_arr),
+                            score_coevolution_energy(coevo_energies_arr),
+                        ],
+                        dtype=np.float32,
+                    )
+
+                    # Build feature vector: settlement + choice_sims + scm_layers + coevo_layers
+                    features = np.concatenate(
+                        [settled, choice_sims, scm_layers, coevo_layers]
+                    ).astype(np.float32)
 
                     # Check shape
-                    if features.shape[0] != 21:
+                    if features.shape[0] != 24:
                         continue
 
                     features_list.append(features)
@@ -248,7 +313,7 @@ def train_classifier(
     """Train the classifier with SGD.
 
     Args:
-        features: (N, 21) array
+        features: (N, 24) array
         targets: (N,) int array with correct answer indices
         epochs: Number of training epochs
         learning_rate: SGD learning rate
@@ -281,12 +346,12 @@ def train_classifier(
     print(f"  Learning rate: {learning_rate}")
     print(f"  Seed: {seed}")
 
-    weights = init_weights(input_dim=21, seed=seed)
+    weights = init_weights(input_dim=24, seed=seed)
     history = {"train_loss": [], "val_accuracy": []}
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"{'Epoch':>6} {'Loss':>12} {'Val Acc':>10}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     for epoch in range(epochs):
         # Shuffle training data
@@ -311,6 +376,7 @@ def train_classifier(
                 x[10:14],  # choice_sims (4)
                 x[14:21],  # scm_layers (7)
                 weights,
+                x[21:24],  # coevo_layers (3)
             )
             if pred_idx == target:
                 val_correct += 1
@@ -320,7 +386,7 @@ def train_classifier(
 
         print(f"{epoch + 1:>6} {avg_loss:>12.4f} {val_acc:>10.1%}")
 
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     return {"weights": weights, "history": history}
 
@@ -341,7 +407,9 @@ def main():
         default=None,
         help="Max samples per subject (default: all)",
     )
-    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs"
+    )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
@@ -363,7 +431,9 @@ def main():
     if args.output:
         output_path = Path(args.output)
     else:
-        data_dir = Path(args.data_dir) if args.data_dir else Path.home() / ".wheeler_memory"
+        data_dir = (
+            Path(args.data_dir) if args.data_dir else Path.home() / ".wheeler_memory"
+        )
         output_path = data_dir / "cortex_classifier.npz"
 
     try:
@@ -391,11 +461,14 @@ def main():
         print(f"\nWeights saved to {output_path}")
 
         print(f"\nTraining complete!")
-        print(f"  Final validation accuracy: {result['history']['val_accuracy'][-1]:.1%}")
+        print(
+            f"  Final validation accuracy: {result['history']['val_accuracy'][-1]:.1%}"
+        )
 
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

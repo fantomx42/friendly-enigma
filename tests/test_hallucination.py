@@ -1,4 +1,5 @@
 """Tests for hallucination vs synthesis discrimination (theories/metrics.py)."""
+
 import numpy as np
 import pytest
 from wheeler_memory.hashing import hash_to_frame
@@ -81,5 +82,6 @@ class TestHallucinationScore:
         attractor = _make_attractor("test for empty attractor list")
         score = hallucination_score(attractor, [])
         from wheeler_memory.theories.metrics import energy
+
         e = energy(attractor)
         assert abs(score - e) < 1e-6

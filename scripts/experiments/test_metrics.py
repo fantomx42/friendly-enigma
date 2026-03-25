@@ -79,11 +79,11 @@ def test_context_weight():
     """Context weight combines hit count and basin width."""
     print("\n--- Test: Context Weight ---")
     cases = [
-        (0, 0.5, 0.0),     # No hits
-        (5, 0.5, 0.25),    # Half saturated
-        (10, 0.5, 0.5),    # Fully saturated
-        (20, 0.5, 0.5),    # Over saturated (capped)
-        (10, 0.0, 0.0),    # Zero width
+        (0, 0.5, 0.0),  # No hits
+        (5, 0.5, 0.25),  # Half saturated
+        (10, 0.5, 0.5),  # Fully saturated
+        (20, 0.5, 0.5),  # Over saturated (capped)
+        (10, 0.0, 0.0),  # Zero width
     ]
     for hits, width, expected in cases:
         w = context_weight(hits, width)

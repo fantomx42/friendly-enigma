@@ -18,7 +18,9 @@ def _print_polar_firing(r: dict, polar_decay: bool) -> None:
     if "polar_firing" not in r:
         return
     pf = r["polar_firing"]
-    print(f"  \u26a0  POLAR FIRES  weight={pf['weight']:.2f}  decay_count={pf['decay_count']}")
+    print(
+        f"  \u26a0  POLAR FIRES  weight={pf['weight']:.2f}  decay_count={pf['decay_count']}"
+    )
     print(f'     "{pf["text"]}"')
     if polar_decay and "new_weight" in pf:
         print(f"     \u2192 weight after polar decay: {pf['new_weight']:.4f}")
@@ -27,35 +29,60 @@ def _print_polar_firing(r: dict, polar_decay: bool) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Recall similar Wheeler memories")
     parser.add_argument("query", help="Query text to search for")
-    parser.add_argument("--top-k", type=int, default=5, help="Number of results (default: 5)")
-    parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)")
-    parser.add_argument("--chunk", default=None, help="Search only this chunk (default: auto-select)")
     parser.add_argument(
-        "--temperature-boost", type=float, default=0.0,
+        "--top-k", type=int, default=5, help="Number of results (default: 5)"
+    )
+    parser.add_argument(
+        "--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)"
+    )
+    parser.add_argument(
+        "--chunk", default=None, help="Search only this chunk (default: auto-select)"
+    )
+    parser.add_argument(
+        "--temperature-boost",
+        type=float,
+        default=0.0,
         help="Boost ranking by temperature (0.0 = no boost, default: 0.0)",
     )
     parser.add_argument(
-        "--embed", action="store_true",
+        "--embed",
+        action="store_true",
         help="Use sentence embedding for query (deprecated: use --encoder)",
     )
     parser.add_argument(
-        "--encoder", choices=["hash", "hippocampus", "embedding", "language", "blended"],
-        default=None, help="Encoder to use for query frame (default: hash; hippocampus replaces MiniLM)",
+        "--encoder",
+        choices=[
+            "hash",
+            "hippocampus",
+            "embedding",
+            "language",
+            "blended",
+            "word",
+            "word-blended",
+        ],
+        default=None,
+        help="Encoder to use for query frame (default: hash; hippocampus replaces MiniLM)",
     )
     parser.add_argument(
-        "--reconstruct", action="store_true",
+        "--reconstruct",
+        action="store_true",
         help="Enable reconstructive recall (Darman architecture)",
     )
     parser.add_argument(
-        "--alpha", type=float, default=0.3,
+        "--alpha",
+        type=float,
+        default=0.3,
         help="Reconstruction weight: 0=pure memory, 1=pure query (default: 0.3)",
     )
     parser.add_argument(
-        "--salience", choices=["low", "medium", "high"], default=None,
+        "--salience",
+        choices=["low", "medium", "high"],
+        default=None,
         help="Attention level: low (fast/loose), medium (default), high (deep/tight)",
     )
     parser.add_argument(
-        "--polar-decay", action="store_true",
+        "--polar-decay",
+        action="store_true",
         help="Apply polar decay: increment decay_count on any polarity link that fires, decaying its weight",
     )
     args = parser.parse_args()
@@ -96,7 +123,9 @@ def main():
         return
 
     if args.reconstruct:
-        print(f"{'Rank':<5} {'Sim':>6} {'r→stored':>9} {'r→query':>8} {'RState':<12} {'Chunk':<12} Text")
+        print(
+            f"{'Rank':<5} {'Sim':>6} {'r→stored':>9} {'r→query':>8} {'RState':<12} {'Chunk':<12} Text"
+        )
         print("-" * 80)
         for i, r in enumerate(results, 1):
             text_preview = r["text"][:35] + "..." if len(r["text"]) > 35 else r["text"]
@@ -110,7 +139,9 @@ def main():
             )
             _print_polar_firing(r, args.polar_decay)
     else:
-        print(f"{'Rank':<5} {'Similarity':>10}  {'Temp':>5} {'Tier':<5} {'Chunk':<12} {'State':<12} {'Ticks':>5}  Text")
+        print(
+            f"{'Rank':<5} {'Similarity':>10}  {'Temp':>5} {'Tier':<5} {'Chunk':<12} {'State':<12} {'Ticks':>5}  Text"
+        )
         print("-" * 95)
         for i, r in enumerate(results, 1):
             text_preview = r["text"][:40] + "..." if len(r["text"]) > 40 else r["text"]

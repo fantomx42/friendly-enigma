@@ -37,16 +37,16 @@ def _load_lib():
 
             # int ca_evolve_batch_v2(float*, float*, int*, int*, int, int, int, float, float, float)
             lib.ca_evolve_batch_v2.argtypes = [
-                ctypes.POINTER(ctypes.c_float),   # frames_in
-                ctypes.POINTER(ctypes.c_float),   # frames_out
-                ctypes.POINTER(ctypes.c_int),     # ticks_out
-                ctypes.POINTER(ctypes.c_int),     # states_out
-                ctypes.c_int,                     # batch_size
-                ctypes.c_int,                     # grid_w
-                ctypes.c_int,                     # max_iters
-                ctypes.c_float,                   # stability_threshold
-                ctypes.c_float,                   # push_strength
-                ctypes.c_float,                   # slope_strength
+                ctypes.POINTER(ctypes.c_float),  # frames_in
+                ctypes.POINTER(ctypes.c_float),  # frames_out
+                ctypes.POINTER(ctypes.c_int),  # ticks_out
+                ctypes.POINTER(ctypes.c_int),  # states_out
+                ctypes.c_int,  # batch_size
+                ctypes.c_int,  # grid_w
+                ctypes.c_int,  # max_iters
+                ctypes.c_float,  # stability_threshold
+                ctypes.c_float,  # push_strength
+                ctypes.c_float,  # slope_strength
             ]
             lib.ca_evolve_batch_v2.restype = ctypes.c_int
 
@@ -56,11 +56,11 @@ def _load_lib():
                 ctypes.POINTER(ctypes.c_float),
                 ctypes.POINTER(ctypes.c_int),
                 ctypes.POINTER(ctypes.c_int),
-                ctypes.c_int,                     # grid_w
-                ctypes.c_int,                     # max_iters
-                ctypes.c_float,                   # stability_threshold
-                ctypes.c_float,                   # push_strength
-                ctypes.c_float,                   # slope_strength
+                ctypes.c_int,  # grid_w
+                ctypes.c_int,  # max_iters
+                ctypes.c_float,  # stability_threshold
+                ctypes.c_float,  # push_strength
+                ctypes.c_float,  # slope_strength
             ]
             lib.ca_evolve_single_v2.restype = ctypes.c_int
 
@@ -81,12 +81,12 @@ def _load_lib():
 
             # int ca_evolve_batch(float*, float*, int*, int*, int, int)
             lib.ca_evolve_batch.argtypes = [
-                ctypes.POINTER(ctypes.c_float),   # frames_in
-                ctypes.POINTER(ctypes.c_float),   # frames_out
-                ctypes.POINTER(ctypes.c_int),     # ticks_out
-                ctypes.POINTER(ctypes.c_int),     # states_out
-                ctypes.c_int,                     # batch_size
-                ctypes.c_int,                     # max_iters
+                ctypes.POINTER(ctypes.c_float),  # frames_in
+                ctypes.POINTER(ctypes.c_float),  # frames_out
+                ctypes.POINTER(ctypes.c_int),  # ticks_out
+                ctypes.POINTER(ctypes.c_int),  # states_out
+                ctypes.c_int,  # batch_size
+                ctypes.c_int,  # max_iters
             ]
             lib.ca_evolve_batch.restype = ctypes.c_int
 
@@ -140,10 +140,14 @@ def gpu_evolve_single(
     """
     lib = _load_lib()
     if lib is None:
-        raise RuntimeError("GPU library not available. Build with: cd wheeler_memory/gpu && make")
+        raise RuntimeError(
+            "GPU library not available. Build with: cd wheeler_memory/gpu && make"
+        )
 
     if frame.shape != (grid_w, grid_w):
-        raise ValueError(f"Expected frame shape ({grid_w}, {grid_w}), got {frame.shape}")
+        raise ValueError(
+            f"Expected frame shape ({grid_w}, {grid_w}), got {frame.shape}"
+        )
 
     cells = grid_w * grid_w
     frame_in = np.ascontiguousarray(frame.flatten(), dtype=np.float32)
@@ -206,7 +210,9 @@ def gpu_evolve_batch(
     """
     lib = _load_lib()
     if lib is None:
-        raise RuntimeError("GPU library not available. Build with: cd wheeler_memory/gpu && make")
+        raise RuntimeError(
+            "GPU library not available. Build with: cd wheeler_memory/gpu && make"
+        )
 
     batch_size = len(frames)
     if batch_size == 0:
@@ -251,13 +257,17 @@ def gpu_evolve_batch(
 
     results = []
     for i in range(batch_size):
-        results.append({
-            "state": state_names.get(int(states_out[i]), "CHAOTIC"),
-            "attractor": flat_out[i * cells : (i + 1) * cells].reshape(grid_w, grid_w).copy(),
-            "convergence_ticks": int(ticks_out[i]),
-            "history": [],
-            "metadata": {"backend": f"gpu_v{_lib_version}", "grid_w": grid_w},
-        })
+        results.append(
+            {
+                "state": state_names.get(int(states_out[i]), "CHAOTIC"),
+                "attractor": flat_out[i * cells : (i + 1) * cells]
+                .reshape(grid_w, grid_w)
+                .copy(),
+                "convergence_ticks": int(ticks_out[i]),
+                "history": [],
+                "metadata": {"backend": f"gpu_v{_lib_version}", "grid_w": grid_w},
+            }
+        )
 
     return results
 

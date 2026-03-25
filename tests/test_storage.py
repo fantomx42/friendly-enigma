@@ -1,4 +1,5 @@
 """Integration tests for attractor storage and recall."""
+
 import sys
 from pathlib import Path
 
@@ -56,6 +57,7 @@ class TestStoreCreatesFiles:
         assert index_path.exists()
 
         import json
+
         index = json.loads(index_path.read_text())
         assert key in index
         assert index[key]["text"] == text
@@ -106,7 +108,12 @@ class TestRecallReturnsResults:
 
     def test_recall_top_k_respected(self, tmp_path):
         """Recall with top_k=2 returns at most 2 results."""
-        texts = ["test storage 9a", "test storage 9b", "test storage 9c", "test storage 9d"]
+        texts = [
+            "test storage 9a",
+            "test storage 9b",
+            "test storage 9c",
+            "test storage 9d",
+        ]
         for text in texts:
             store_test_memory(text, tmp_path)
 
@@ -156,6 +163,7 @@ class TestStoreIdempotent:
 
         # Index should have exactly one entry for this text
         import json
+
         index_path = tmp_path / "chunks" / "general" / "index.json"
         index = json.loads(index_path.read_text())
         assert len(index) == 1

@@ -30,11 +30,11 @@ def plot_attractor(ax, attractor, title, subtitle=""):
                 grid[r, (c + 1) % 64],
             ]
             if val >= max(neighbors):
-                display[r, c] = 1.0   # local max → red
+                display[r, c] = 1.0  # local max → red
             elif val <= min(neighbors):
                 display[r, c] = -1.0  # local min → blue
             else:
-                display[r, c] = 0.0   # slope → gray
+                display[r, c] = 0.0  # slope → gray
 
     cmap = ListedColormap(["#3B82F6", "#9CA3AF", "#EF4444"])
     ax.imshow(display, cmap=cmap, vmin=-1, vmax=1, interpolation="nearest")
@@ -67,7 +67,9 @@ def main():
     stored_frame = hash_to_frame(stored_text)
     stored_result = evolve_and_interpret(stored_frame)
     stored_att = stored_result["attractor"]
-    print(f"  Stored: {stored_result['state']} in {stored_result['convergence_ticks']} ticks")
+    print(
+        f"  Stored: {stored_result['state']} in {stored_result['convergence_ticks']} ticks"
+    )
 
     # ── Evolve context queries ────────────────────────────────────
     context_results = []
@@ -84,10 +86,12 @@ def main():
         for alpha in alphas:
             recon = reconstruct(stored_att, ctx_result["attractor"], alpha=alpha)
             reconstructions[(ctx_name, alpha)] = recon
-            print(f"  {ctx_name} α={alpha:.2f}: "
-                  f"r→stored={recon['correlation_with_stored']:.4f}, "
-                  f"r→query={recon['correlation_with_query']:.4f}, "
-                  f"{recon['state']} in {recon['convergence_ticks']} ticks")
+            print(
+                f"  {ctx_name} α={alpha:.2f}: "
+                f"r→stored={recon['correlation_with_stored']:.4f}, "
+                f"r→query={recon['correlation_with_query']:.4f}, "
+                f"{recon['state']} in {recon['convergence_ticks']} ticks"
+            )
 
     # ── Cross-context comparison ──────────────────────────────────
     print("\nCross-context divergence at α=0.3:")
@@ -105,43 +109,66 @@ def main():
     n_ctx = len(contexts)
     n_alpha = len(alphas)
     fig, axes = plt.subplots(
-        n_ctx + 1, n_alpha + 1,
+        n_ctx + 1,
+        n_alpha + 1,
         figsize=(3 * (n_alpha + 1), 3 * (n_ctx + 1)),
     )
 
     fig.suptitle(
         "Reconstructive Recall — Darman Architecture\n"
         f"Same memory, different contexts, different reconstructions",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
 
     # Row 0: stored memory repeated + alphas as headers
-    plot_attractor(axes[0, 0], stored_att, "STORED MEMORY",
-                   f"'{stored_text[:40]}...'")
+    plot_attractor(axes[0, 0], stored_att, "STORED MEMORY", f"'{stored_text[:40]}...'")
     for j, alpha in enumerate(alphas):
         axes[0, j + 1].axis("off")
         axes[0, j + 1].text(
-            0.5, 0.5, f"α = {alpha}",
-            ha="center", va="center", fontsize=14, fontweight="bold",
+            0.5,
+            0.5,
+            f"α = {alpha}",
+            ha="center",
+            va="center",
+            fontsize=14,
+            fontweight="bold",
             transform=axes[0, j + 1].transAxes,
         )
         if alpha == 0.0:
-            axes[0, j + 1].text(0.5, 0.3, "(pure memory)",
-                                ha="center", va="center", fontsize=9,
-                                color="#666", transform=axes[0, j + 1].transAxes)
+            axes[0, j + 1].text(
+                0.5,
+                0.3,
+                "(pure memory)",
+                ha="center",
+                va="center",
+                fontsize=9,
+                color="#666",
+                transform=axes[0, j + 1].transAxes,
+            )
         elif alpha == 0.3:
-            axes[0, j + 1].text(0.5, 0.3, "(default)",
-                                ha="center", va="center", fontsize=9,
-                                color="#22C55E", fontweight="bold",
-                                transform=axes[0, j + 1].transAxes)
+            axes[0, j + 1].text(
+                0.5,
+                0.3,
+                "(default)",
+                ha="center",
+                va="center",
+                fontsize=9,
+                color="#22C55E",
+                fontweight="bold",
+                transform=axes[0, j + 1].transAxes,
+            )
 
     # Rows 1+: each context × each alpha
     for i, (ctx_text, ctx_name, ctx_result) in enumerate(context_results):
         row = i + 1
         # Column 0: context attractor
-        plot_attractor(axes[row, 0], ctx_result["attractor"],
-                       f"CONTEXT: {ctx_name}",
-                       f"'{ctx_text[:35]}...'")
+        plot_attractor(
+            axes[row, 0],
+            ctx_result["attractor"],
+            f"CONTEXT: {ctx_name}",
+            f"'{ctx_text[:35]}...'",
+        )
 
         # Columns 1+: reconstructions
         for j, alpha in enumerate(alphas):
@@ -149,7 +176,8 @@ def main():
             r_stored = recon["correlation_with_stored"]
             r_query = recon["correlation_with_query"]
             plot_attractor(
-                axes[row, j + 1], recon["attractor"],
+                axes[row, j + 1],
+                recon["attractor"],
                 f"r→S={r_stored:.3f}  r→Q={r_query:.3f}",
                 f"{recon['state']} ({recon['convergence_ticks']}t)",
             )

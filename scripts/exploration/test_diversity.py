@@ -39,6 +39,7 @@ TEST_INPUTS = [
     "Compile FFmpeg with hardware acceleration",
 ]
 
+
 def make_edge_cases():
     """Construct synthetic frames designed to trigger non-convergent states.
 
@@ -53,14 +54,17 @@ def make_edge_cases():
     cases = []
 
     # Chaotic: normal hash but far too few iterations
-    cases.append({
-        "label": "short-circuit stress test (chaotic)",
-        "frame": hash_to_frame("chaotic short-circuit stress test"),
-        "max_iters": 15,
-        "expected": "CHAOTIC",
-    })
+    cases.append(
+        {
+            "label": "short-circuit stress test (chaotic)",
+            "frame": hash_to_frame("chaotic short-circuit stress test"),
+            "max_iters": 15,
+            "expected": "CHAOTIC",
+        }
+    )
 
     return cases
+
 
 # Discrete 3-color map for cell roles: min=-1 (blue), slope=0 (gray), max=+1 (red)
 ROLE_CMAP = mcolors.ListedColormap(["#3B82F6", "#9CA3AF", "#EF4444"])
@@ -68,8 +72,12 @@ ROLE_NORM = mcolors.BoundaryNorm([-1.5, -0.5, 0.5, 1.5], ROLE_CMAP.N)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Wheeler Memory attractor diversity test")
-    parser.add_argument("--output", default="diversity_report.png", help="Output image path")
+    parser = argparse.ArgumentParser(
+        description="Wheeler Memory attractor diversity test"
+    )
+    parser.add_argument(
+        "--output", default="diversity_report.png", help="Output image path"
+    )
     args = parser.parse_args()
 
     n = len(TEST_INPUTS)
@@ -93,7 +101,9 @@ def main():
         all_results.append((text, result))
 
         label = text[:50]
-        print(f"  [{i + 1:2d}/{n}] {result['state']:<11} {result['convergence_ticks']:>4} ticks  {elapsed:.3f}s  {label}")
+        print(
+            f"  [{i + 1:2d}/{n}] {result['state']:<11} {result['convergence_ticks']:>4} ticks  {elapsed:.3f}s  {label}"
+        )
 
     # Run edge-case inputs with synthetic frames
     edge_cases = make_edge_cases()
@@ -111,7 +121,9 @@ def main():
         expected = ec["expected"]
         actual = result["state"]
         match = "✓" if actual == expected else "✗"
-        print(f"  {match} {actual:<11} {result['convergence_ticks']:>4} ticks  {elapsed:.3f}s  {label}")
+        print(
+            f"  {match} {actual:<11} {result['convergence_ticks']:>4} ticks  {elapsed:.3f}s  {label}"
+        )
 
     total_time = time.time() - total_start
 
@@ -171,7 +183,9 @@ def main():
     ax2 = fig.add_subplot(3, 2, 2)
     ax2.hist(off_diag, bins=30, edgecolor="black", alpha=0.7)
     ax2.axvline(0.85, color="red", linestyle="--", label="Max threshold (0.85)")
-    ax2.axvline(avg_corr, color="orange", linestyle="--", label=f"Avg |r| = {avg_corr:.3f}")
+    ax2.axvline(
+        avg_corr, color="orange", linestyle="--", label=f"Avg |r| = {avg_corr:.3f}"
+    )
     ax2.set_title("Off-Diagonal Correlation Distribution")
     ax2.set_xlim(-1, 1)
     ax2.set_xlabel("Pearson Correlation")
@@ -199,8 +213,14 @@ def main():
     ax_bar.set_ylabel("Count")
     for bar, count in zip(bars, state_counts):
         if count > 0:
-            ax_bar.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.2,
-                        str(count), ha="center", va="bottom", fontweight="bold")
+            ax_bar.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.2,
+                str(count),
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
 
     # Edge-case attractor snapshots (roles view)
     ax_edge = fig.add_subplot(3, 2, 6)
@@ -209,18 +229,28 @@ def main():
         ec, result = edge_results[0]
         roles = get_cell_roles(result["attractor"])
         ax_edge.imshow(roles, cmap=ROLE_CMAP, norm=ROLE_NORM, interpolation="nearest")
-        ax_edge.set_title(f"Edge: {result['state']} ({result['convergence_ticks']} ticks)", fontsize=9)
+        ax_edge.set_title(
+            f"Edge: {result['state']} ({result['convergence_ticks']} ticks)", fontsize=9
+        )
     ax_edge.axis("off")
 
     # Role legend
     from matplotlib.patches import Patch
+
     legend_elements = [
         Patch(facecolor="#EF4444", edgecolor="black", label="Local Max (+1)"),
         Patch(facecolor="#9CA3AF", edgecolor="black", label="Slope (0)"),
         Patch(facecolor="#3B82F6", edgecolor="black", label="Local Min (-1)"),
     ]
-    fig.legend(handles=legend_elements, loc="lower center", ncol=3, fontsize=10,
-               frameon=True, fancybox=True, shadow=True)
+    fig.legend(
+        handles=legend_elements,
+        loc="lower center",
+        ncol=3,
+        fontsize=10,
+        frameon=True,
+        fancybox=True,
+        shadow=True,
+    )
 
     plt.suptitle(
         f"Wheeler Memory Diversity Report\n"

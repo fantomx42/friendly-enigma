@@ -109,9 +109,7 @@ def extract_state(
                 and a.get("similarity", 0) > confidence_floor
                 and b.get("similarity", 0) > confidence_floor
             ):
-                co_activated.append(
-                    (a["text"][:60], b["text"][:60])
-                )
+                co_activated.append((a["text"][:60], b["text"][:60]))
 
     return DecoderState(
         query=query,
@@ -183,7 +181,7 @@ def format_state(state: DecoderState) -> str:
 
             lines.append(
                 f"  {i}. [sim={sim:.2f}, temp={tier}, "
-                f"CA={ca_state}/{ticks}/{spd}{struct}] \"{text}\""
+                f'CA={ca_state}/{ticks}/{spd}{struct}] "{text}"'
             )
         lines.append("")
     else:
@@ -193,7 +191,7 @@ def format_state(state: DecoderState) -> str:
     if state.co_activated:
         lines.append("CO-ACTIVATION (memories that fired together):")
         for a_text, b_text in state.co_activated:
-            lines.append(f"  \"{a_text}\" <-> \"{b_text}\"")
+            lines.append(f'  "{a_text}" <-> "{b_text}"')
         lines.append("")
 
     if state.uncertain:
@@ -237,8 +235,7 @@ def _ollama_generate(
             return json.loads(resp.read())
     except urllib.error.URLError as exc:
         raise RuntimeError(
-            f"Could not reach Ollama at {base_url}. "
-            "Is it running? Try: ollama serve"
+            f"Could not reach Ollama at {base_url}. Is it running? Try: ollama serve"
         ) from exc
 
 
@@ -272,8 +269,7 @@ def _ollama_generate_stream(
                     break
     except urllib.error.URLError as exc:
         raise RuntimeError(
-            f"Could not reach Ollama at {base_url}. "
-            "Is it running? Try: ollama serve"
+            f"Could not reach Ollama at {base_url}. Is it running? Try: ollama serve"
         ) from exc
 
 

@@ -166,6 +166,64 @@ def score_explanation_readiness(
     return float(np.clip(explain, 0.0, 1.0))
 
 
+def score_coevolution_convergence(
+    choice_ticks: np.ndarray, max_iters: int = 1000
+) -> float:
+    """Co-evolution convergence layer: how fast the best Q+A combination settled.
+
+    Args:
+        choice_ticks: (4,) convergence ticks for each choice co-evolution.
+        max_iters: Maximum possible iterations.
+
+    Returns:
+        float in [0, 1]. 1.0 = instant convergence, 0.0 = hit max iterations.
+    """
+    if len(choice_ticks) == 0:
+        return 0.0
+    best = float(np.min(choice_ticks))
+    return float(np.clip(1.0 - best / max_iters, 0.0, 1.0))
+
+
+def score_coevolution_spread(choice_ticks: np.ndarray) -> float:
+    """Co-evolution discrimination layer: how much dynamics distinguish between choices.
+
+    High spread = CA dynamics clearly prefer one Q+A combination.
+    Low spread = all combinations equally (in)coherent.
+
+    Args:
+        choice_ticks: (4,) convergence ticks for each choice co-evolution.
+
+    Returns:
+        float in [0, 1]. 1.0 = maximum discrimination, 0.0 = all identical.
+    """
+    if len(choice_ticks) < 2:
+        return 0.0
+    ticks = choice_ticks.astype(np.float64)
+    spread = float(np.max(ticks) - np.min(ticks))
+    denom = float(np.max(ticks))
+    if denom < 1.0:
+        return 0.0
+    return float(np.clip(spread / denom, 0.0, 1.0))
+
+
+def score_coevolution_energy(choice_energies: np.ndarray) -> float:
+    """Co-evolution energy layer: steepest energy drop among the 4 choices.
+
+    Measures how much the best Q+A combination's CA dynamics reduced energy
+    (mean absolute delta) from start to end of evolution.
+
+    Args:
+        choice_energies: (4,) total energy drop for each choice (initial - final delta).
+
+    Returns:
+        float in [0, 1]. 1.0 = maximum energy dissipation, 0.0 = no energy change.
+    """
+    if len(choice_energies) == 0:
+        return 0.0
+    best = float(np.max(choice_energies))
+    return float(np.clip(best, 0.0, 1.0))
+
+
 @dataclass
 class SCMResult:
     """Structural Coherence Measure result with all layers and final score."""
@@ -177,6 +235,9 @@ class SCMResult:
     polarity: float
     net_warrant: float
     explanation_readiness: float
+    coevolution_convergence: float
+    coevolution_spread: float
+    coevolution_energy: float
     scm: float
     mode: str
 
@@ -190,6 +251,9 @@ def compute_scm(
     choice_similarity: float,
     high_threshold: float = 0.7,
     low_threshold: float = 0.3,
+    coevo_convergence: float = 0.0,
+    coevo_spread: float = 0.0,
+    coevo_energy: float = 0.0,
 ) -> SCMResult:
     """Compute structural coherence measure and classification.
 
@@ -202,9 +266,12 @@ def compute_scm(
         choice_similarity: Chosen answer similarity to best retrieval.
         high_threshold: SCM threshold for SYNTHESIS (default 0.7).
         low_threshold: SCM threshold for NOVEL (default 0.3).
+        coevo_convergence: Co-evolution convergence score (default 0.0).
+        coevo_spread: Co-evolution spread score (default 0.0).
+        coevo_energy: Co-evolution energy score (default 0.0).
 
     Returns:
-        SCMResult with all seven layer scores, net warrant, and classification.
+        SCMResult with all ten layer scores, net warrant, and classification.
     """
     # Compute each layer
     temp = score_temperature(similarities)
@@ -239,6 +306,9 @@ def compute_scm(
         polarity=float(np.clip(polar, 0.0, 1.0)),
         net_warrant=float(np.clip(warrant, 0.0, 1.0)),
         explanation_readiness=float(np.clip(readiness, 0.0, 1.0)),
+        coevolution_convergence=float(np.clip(coevo_convergence, 0.0, 1.0)),
+        coevolution_spread=float(np.clip(coevo_spread, 0.0, 1.0)),
+        coevolution_energy=float(np.clip(coevo_energy, 0.0, 1.0)),
         scm=scm_score,
         mode=mode,
     )

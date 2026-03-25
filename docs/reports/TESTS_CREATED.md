@@ -4,7 +4,7 @@ This document summarizes the unit test files created for the Wheeler Memory proj
 
 ## Created Test Files
 
-All test files are located in `/home/tristan/wheeler memory/tests/` and follow pytest conventions for pure computation testing (no disk I/O, no fixtures).
+All test files are located in `/home/tristan/projects/wheeler-memory/tests/` and follow pytest conventions for pure computation testing (no disk I/O, no fixtures).
 
 ### 1. test_hashing.py (58 lines, 8 tests)
 Tests for SHA-256 hashing and deterministic frame generation.
@@ -219,7 +219,7 @@ Tests for cellular automata dynamics engine.
 ## Running the Tests
 
 ```bash
-cd "/home/tristan/wheeler memory"
+cd "/home/tristan/projects/wheeler-memory"
 pytest tests/test_hashing.py -v
 pytest tests/test_temperature.py -v
 pytest tests/test_attention.py -v

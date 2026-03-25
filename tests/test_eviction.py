@@ -66,15 +66,15 @@ class TestEvictionScoreMemories:
         assert len(scored) == 5, f"Expected 5 entries, got {len(scored)}"
 
         # Coldest first — the oldest (60 days) should be first
-        assert (
-            scored[0]["temperature"] <= scored[-1]["temperature"]
-        ), f"Coldest first check failed: first={scored[0]['temperature']:.6f}, last={scored[-1]['temperature']:.6f}"
+        assert scored[0]["temperature"] <= scored[-1]["temperature"], (
+            f"Coldest first check failed: first={scored[0]['temperature']:.6f}, last={scored[-1]['temperature']:.6f}"
+        )
 
         # The 60-day-old should be the coldest
         sixty_day_key = keys[4]
-        assert (
-            scored[0]["hex_key"] == sixty_day_key
-        ), f"60-day memory not coldest: expected {sixty_day_key[:8]}..., got {scored[0]['hex_key'][:8]}..."
+        assert scored[0]["hex_key"] == sixty_day_key, (
+            f"60-day memory not coldest: expected {sixty_day_key[:8]}..., got {scored[0]['hex_key'][:8]}..."
+        )
 
 
 class TestEvictionFadeColdMemories:
@@ -99,8 +99,12 @@ class TestEvictionFadeColdMemories:
         # The 30-day-old should have temp < TIER_FADING
         scored = score_memories(tmp_path)
         thirty_key = keys[3]
-        thirty_temp = next(m["temperature"] for m in scored if m["hex_key"] == thirty_key)
-        assert thirty_temp < TIER_FADING, f"30-day memory temp not < TIER_FADING: {thirty_temp:.6f}"
+        thirty_temp = next(
+            m["temperature"] for m in scored if m["hex_key"] == thirty_key
+        )
+        assert thirty_temp < TIER_FADING, (
+            f"30-day memory temp not < TIER_FADING: {thirty_temp:.6f}"
+        )
 
         brick_path = tmp_path / "chunks" / "general" / "bricks" / f"{thirty_key}.npz"
         assert brick_path.exists(), "Brick should exist before fade"
@@ -119,7 +123,10 @@ class TestEvictionFadeColdMemories:
 
         # Memory should still be recallable (attractor exists)
         results = recall_memory(
-            "eviction test memory thirty days", top_k=5, data_dir=tmp_path, chunk="general"
+            "eviction test memory thirty days",
+            top_k=5,
+            data_dir=tmp_path,
+            chunk="general",
         )
         found_keys = [r["hex_key"] for r in results]
         assert thirty_key in found_keys, "Faded memory should still be recallable"
@@ -154,13 +161,17 @@ class TestEvictionEvictDeadMemories:
         scored = score_memories(tmp_path)
         sixty_key = keys[4]
         sixty_temp = next(m["temperature"] for m in scored if m["hex_key"] == sixty_key)
-        assert sixty_temp < TIER_DEAD, f"60-day memory temp not < TIER_DEAD: {sixty_temp:.6f}"
+        assert sixty_temp < TIER_DEAD, (
+            f"60-day memory temp not < TIER_DEAD: {sixty_temp:.6f}"
+        )
 
         evicted = evict_dead_memories(tmp_path)
         assert len(evicted) > 0, f"Evict should return entries, got {len(evicted)}"
 
         # All artifacts should be gone
-        att_path_60 = tmp_path / "chunks" / "general" / "attractors" / f"{sixty_key}.npy"
+        att_path_60 = (
+            tmp_path / "chunks" / "general" / "attractors" / f"{sixty_key}.npy"
+        )
         brick_path_60 = tmp_path / "chunks" / "general" / "bricks" / f"{sixty_key}.npz"
         assert not att_path_60.exists(), "Attractor should be removed"
         assert not brick_path_60.exists(), "Brick should be removed"
@@ -170,7 +181,10 @@ class TestEvictionEvictDeadMemories:
 
         # Not recallable
         results = recall_memory(
-            "eviction test memory sixty days", top_k=5, data_dir=tmp_path, chunk="general"
+            "eviction test memory sixty days",
+            top_k=5,
+            data_dir=tmp_path,
+            chunk="general",
         )
         found_keys = [r["hex_key"] for r in results]
         assert sixty_key not in found_keys, "Evicted memory should not be recallable"
@@ -199,14 +213,18 @@ class TestEvictionAssociationCleanup:
 
         # k3's edges should be gone
         n3_after = get_neighbors(chunk_dir, k3)
-        assert len(n3_after) == 0, f"Evicted memory k3 should have no neighbors, got {len(n3_after)}"
+        assert len(n3_after) == 0, (
+            f"Evicted memory k3 should have no neighbors, got {len(n3_after)}"
+        )
 
         # k1 should no longer reference k3
         n1_after = get_neighbors(chunk_dir, k1)
         assert k3 not in n1_after, f"k1 should no longer reference evicted k3"
 
         # k1 and k2 edge should still exist
-        assert k2 in n1_after, f"k1-k2 edge should be preserved, k1 neighbors: {list(n1_after.keys())}"
+        assert k2 in n1_after, (
+            f"k1-k2 edge should be preserved, k1 neighbors: {list(n1_after.keys())}"
+        )
 
 
 class TestEvictionForgetMemory:
@@ -237,7 +255,10 @@ class TestEvictionHotProtection:
         # Recall it 10 times to make it hot
         for _ in range(10):
             recall_memory(
-                "hot memory survives eviction", top_k=1, data_dir=tmp_path, chunk="general"
+                "hot memory survives eviction",
+                top_k=1,
+                data_dir=tmp_path,
+                chunk="general",
             )
 
         # Age it moderately
@@ -255,7 +276,9 @@ class TestEvictionHotProtection:
 
         # Try to evict — should not touch warm/hot
         evict_dead_memories(tmp_path)
-        assert k in _load_index(tmp_path / "chunks" / "general"), "Hot memory should not be evicted"
+        assert k in _load_index(tmp_path / "chunks" / "general"), (
+            "Hot memory should not be evicted"
+        )
 
 
 class TestEvictionMinAgeProtection:
@@ -272,8 +295,12 @@ class TestEvictionMinAgeProtection:
         evicted = evict_dead_memories(tmp_path)
 
         assert k not in [m["hex_key"] for m in faded], "New memory should not be faded"
-        assert k not in [m["hex_key"] for m in evicted], "New memory should not be evicted"
-        assert k in _load_index(tmp_path / "chunks" / "general"), "New memory should still be in index"
+        assert k not in [m["hex_key"] for m in evicted], (
+            "New memory should not be evicted"
+        )
+        assert k in _load_index(tmp_path / "chunks" / "general"), (
+            "New memory should still be in index"
+        )
 
 
 class TestEvictionDryRun:
@@ -291,9 +318,9 @@ class TestEvictionDryRun:
         assert total_items > 0, f"Dry run report should have items, got {total_items}"
 
         # But nothing should be deleted
-        assert k in _load_index(
-            tmp_path / "chunks" / "general"
-        ), "Memory should still be in index after dry_run"
+        assert k in _load_index(tmp_path / "chunks" / "general"), (
+            "Memory should still be in index after dry_run"
+        )
 
         att = tmp_path / "chunks" / "general" / "attractors" / f"{k}.npy"
         assert att.exists(), "Attractor should still exist after dry_run"
@@ -306,7 +333,9 @@ class TestEvictionCapacityEviction:
         """Monkeypatch MAX_ATTRACTORS=5, store 8 memories, evict_for_capacity, oldest evicted."""
         cap_keys = []
         for i in range(8):
-            k = store_test_memory(f"capacity test memory {i}", tmp_path, chunk="general")
+            k = store_test_memory(
+                f"capacity test memory {i}", tmp_path, chunk="general"
+            )
             # Age them progressively: 2, 4, 6, 8, 10, 12, 14, 16 days
             age_memory(tmp_path, "general", k, (i + 1) * 2)
             cap_keys.append(k)
@@ -325,4 +354,6 @@ class TestEvictionCapacityEviction:
         # The evicted should be the coldest (oldest)
         evicted_keys = {m["hex_key"] for m in evicted}
         # The oldest key (16 days) should have been evicted
-        assert cap_keys[-1] in evicted_keys, "Oldest memory (16 days) should have been evicted"
+        assert cap_keys[-1] in evicted_keys, (
+            "Oldest memory (16 days) should have been evicted"
+        )

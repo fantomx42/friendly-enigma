@@ -33,6 +33,7 @@ from .temperature import SALIENCE_DEFAULT
 @dataclass
 class TickResult:
     """Per-tick resonance data."""
+
     tick: int
     peak_text: str
     peak_sim: float
@@ -42,12 +43,13 @@ class TickResult:
 @dataclass
 class GenerationResult:
     """Full output from trajectory_resonance."""
+
     query: str
     query_attractor: np.ndarray
     convergence_state: str
     convergence_ticks: int
-    sequence: list[str]          # deduplicated output sequence (texts)
-    ticks: list[TickResult]      # per-tick data for introspection
+    sequence: list[str]  # deduplicated output sequence (texts)
+    ticks: list[TickResult]  # per-tick data for introspection
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +80,7 @@ def _load_chunk_attractors(chunk_dir: Path) -> dict[str, dict]:
         if not att_path.exists():
             continue
         try:
-            att = np.load(att_path, mmap_mode='r')
+            att = np.load(att_path, mmap_mode="r")
             if att.shape != (64, 64):
                 continue
             flat = att.flatten().copy()  # copy so we own the data
@@ -239,6 +241,7 @@ def trajectory_resonance(
 
     # Encode query → initial frame
     from .rotation import _get_frame_fn
+
     frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
     query_frame = frame_fn(query_text)
 
@@ -266,8 +269,8 @@ def trajectory_resonance(
     # Pre-flatten attractor arrays for vectorised scoring
     att_keys = list(all_attractors.keys())
     att_matrix = np.stack([all_attractors[k]["flat"] for k in att_keys])  # (N, 4096)
-    att_means = np.array([all_attractors[k]["mean"] for k in att_keys])   # (N,)
-    att_stds = np.array([all_attractors[k]["std"] for k in att_keys])     # (N,)
+    att_means = np.array([all_attractors[k]["mean"] for k in att_keys])  # (N,)
+    att_stds = np.array([all_attractors[k]["std"] for k in att_keys])  # (N,)
 
     # Score each frame in history
     for tick_i, frame in enumerate(history):
@@ -276,7 +279,9 @@ def trajectory_resonance(
         frame_std = float(frame_flat.std())
 
         if frame_std <= 0:
-            tick_results.append(TickResult(tick=tick_i, peak_text="", peak_sim=0.0, emitted=False))
+            tick_results.append(
+                TickResult(tick=tick_i, peak_text="", peak_sim=0.0, emitted=False)
+            )
             continue
 
         frame_centered = frame_flat - frame_mean
@@ -287,7 +292,9 @@ def trajectory_resonance(
         sims = np.zeros(len(att_keys))
         if valid_mask.any():
             dots = att_centered[valid_mask] @ frame_centered  # (K,)
-            sims[valid_mask] = dots / (len(frame_flat) * frame_std * att_stds[valid_mask])
+            sims[valid_mask] = dots / (
+                len(frame_flat) * frame_std * att_stds[valid_mask]
+            )
         # NaN guard
         sims = np.where(np.isnan(sims), 0.0, sims)
 
@@ -296,12 +303,14 @@ def trajectory_resonance(
         best_text = all_attractors[att_keys[best_idx]]["text"]
 
         emitted = best_sim >= min_resonance
-        tick_results.append(TickResult(
-            tick=tick_i,
-            peak_text=best_text,
-            peak_sim=best_sim,
-            emitted=emitted,
-        ))
+        tick_results.append(
+            TickResult(
+                tick=tick_i,
+                peak_text=best_text,
+                peak_sim=best_sim,
+                emitted=emitted,
+            )
+        )
 
     sequence = _dedup(tick_results, dedup)
 

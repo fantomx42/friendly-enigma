@@ -23,8 +23,10 @@ class TheoryFrame:
     text: str
     temperature: float
     basin_width: float
-    confidence: float        # temperature * basin_width (normalized)
-    relationships: list[str] = field(default_factory=list)  # hex_keys of associated frames
+    confidence: float  # temperature * basin_width (normalized)
+    relationships: list[str] = field(
+        default_factory=list
+    )  # hex_keys of associated frames
 
 
 @dataclass
@@ -128,7 +130,7 @@ def theory_to_prompt(theory: Theory) -> str:
         for frame in theory.active_frames:
             budget = theory.context_budget.get(frame.hex_key, 0.0)
             lines.append(
-                f"  - \"{frame.text}\" "
+                f'  - "{frame.text}" '
                 f"(confidence: {frame.confidence:.3f}, "
                 f"temperature: {frame.temperature:.3f}, "
                 f"basin width: {frame.basin_width:.3f}, "

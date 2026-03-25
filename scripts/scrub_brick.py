@@ -19,12 +19,18 @@ from wheeler_memory.storage import DEFAULT_DATA_DIR
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Scrub through a Wheeler Memory brick timeline")
+    parser = argparse.ArgumentParser(
+        description="Scrub through a Wheeler Memory brick timeline"
+    )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("path", nargs="?", help="Path to brick .npz file")
     group.add_argument("--text", help="Look up brick by original text")
-    parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)")
-    parser.add_argument("--chunk", default=None, help="Chunk to search in (default: search all)")
+    parser.add_argument(
+        "--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)"
+    )
+    parser.add_argument(
+        "--chunk", default=None, help="Chunk to search in (default: search all)"
+    )
     args = parser.parse_args()
 
     if args.text:

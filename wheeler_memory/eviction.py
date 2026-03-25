@@ -56,8 +56,11 @@ def _load_index(chunk_dir: Path) -> dict:
             return json.loads(index_path.read_text())
         except (json.JSONDecodeError, ValueError):
             import sys
-            print(f"Warning: corrupted index at {index_path}, treating as empty",
-                  file=sys.stderr)
+
+            print(
+                f"Warning: corrupted index at {index_path}, treating as empty",
+                file=sys.stderr,
+            )
             return {}
     return {}
 
@@ -92,14 +95,16 @@ def score_memories(data_dir: str | Path) -> list[dict]:
             )
             created = datetime.fromisoformat(entry["timestamp"])
             age_days = (now - created).total_seconds() / 86400.0
-            scored.append({
-                "hex_key": hex_key,
-                "chunk": chunk_name,
-                "text": entry["text"],
-                "temperature": temp,
-                "age_days": age_days,
-                "hit_count": entry["metadata"]["hit_count"],
-            })
+            scored.append(
+                {
+                    "hex_key": hex_key,
+                    "chunk": chunk_name,
+                    "text": entry["text"],
+                    "temperature": temp,
+                    "age_days": age_days,
+                    "hit_count": entry["metadata"]["hit_count"],
+                }
+            )
 
     scored.sort(key=lambda m: m["temperature"])
     return scored

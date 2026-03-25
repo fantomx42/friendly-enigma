@@ -30,9 +30,11 @@ from .temperature import (
 # I/O helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_associations(chunk_dir: Path) -> dict:
     """Load associations.json for a chunk, returning default if absent."""
     from .cache import cached_load_json
+
     return cached_load_json(
         chunk_dir / "associations.json",
         default={"edges": {}, "warmth": {}},
@@ -42,6 +44,7 @@ def _load_associations(chunk_dir: Path) -> dict:
 def _save_associations(chunk_dir: Path, assoc: dict) -> None:
     """Write associations.json for a chunk (locked + atomic)."""
     from .cache import invalidate
+
     lock_path = chunk_dir / "associations.json.lock"
     with open(lock_path, "w") as lock_fd:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
@@ -81,6 +84,7 @@ def load_warmth(chunk_dir: Path) -> dict:
 # Edge helpers
 # ---------------------------------------------------------------------------
 
+
 def _add_edge(assoc: dict, key_a: str, key_b: str, weight: float, source: str) -> None:
     """Add a bidirectional edge to the association graph."""
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -112,6 +116,7 @@ def get_neighbors(chunk_dir: Path, hex_key: str) -> dict:
 # Association building
 # ---------------------------------------------------------------------------
 
+
 def build_store_associations(
     chunk_dir: Path,
     new_hex_key: str,
@@ -138,7 +143,13 @@ def build_store_associations(
         other_att = np.load(att_path).flatten()
         corr, _ = pearsonr(new_att, other_att)
         if corr >= threshold:
-            _add_edge(assoc, new_hex_key, other_key, weight=float(corr), source="store_correlation")
+            _add_edge(
+                assoc,
+                new_hex_key,
+                other_key,
+                weight=float(corr),
+                source="store_correlation",
+            )
             count += 1
 
     if count > 0:
@@ -158,7 +169,7 @@ def build_co_recall_associations(chunk_dir: Path, hex_keys: list[str]) -> int:
     count = 0
 
     for i, a in enumerate(hex_keys):
-        for b in hex_keys[i + 1:]:
+        for b in hex_keys[i + 1 :]:
             if _has_edge(assoc, a, b):
                 continue
             att_a_path = chunk_dir / "attractors" / f"{a}.npy"
@@ -179,6 +190,7 @@ def build_co_recall_associations(chunk_dir: Path, hex_keys: list[str]) -> int:
 # ---------------------------------------------------------------------------
 # Warmth propagation
 # ---------------------------------------------------------------------------
+
 
 def remove_memory_from_associations(chunk_dir: Path, hex_key: str) -> int:
     """Remove all edges and warmth for a memory. Returns edges removed."""
@@ -219,6 +231,7 @@ def propagate_warmth(chunk_dir: Path, fired_keys: list[str]) -> dict[str, float]
     now_iso = datetime.now(timezone.utc).isoformat()
 
     from .polarity import EDGE_SOURCE_POLARITY
+
     _polar_sources = (EDGE_SOURCE_POLARITY, "avoidance_link")
     fired_set = set(fired_keys)
     warmed: dict[str, float] = {}
@@ -270,6 +283,7 @@ _CROSS_CHUNK_INDEX = "cross_chunk_edges.json"
 def _load_cross_chunk_edges(data_dir: Path) -> dict:
     """Load cross-chunk edge index from data_dir root."""
     from .cache import cached_load_json
+
     return cached_load_json(
         data_dir / _CROSS_CHUNK_INDEX,
         default={"edges": {}},
@@ -279,6 +293,7 @@ def _load_cross_chunk_edges(data_dir: Path) -> dict:
 def _save_cross_chunk_edges(data_dir: Path, edges: dict) -> None:
     """Save cross-chunk edge index (locked + atomic)."""
     from .cache import invalidate
+
     path = data_dir / _CROSS_CHUNK_INDEX
     lock_path = data_dir / "cross_chunk_edges.json.lock"
     with open(lock_path, "w") as lock_fd:
@@ -317,10 +332,12 @@ def build_cross_chunk_co_recall(
     # Create edges between all cross-chunk pairs
     chunks = list(by_chunk.keys())
     for i, chunk_a in enumerate(chunks):
-        for chunk_b in chunks[i + 1:]:
+        for chunk_b in chunks[i + 1 :]:
             for key_a in by_chunk[chunk_a]:
                 for key_b in by_chunk[chunk_b]:
-                    edge_id = f"{key_a}:{key_b}" if key_a < key_b else f"{key_b}:{key_a}"
+                    edge_id = (
+                        f"{key_a}:{key_b}" if key_a < key_b else f"{key_b}:{key_a}"
+                    )
                     if edge_id not in edges:
                         edges[edge_id] = {
                             "chunks": sorted([chunk_a, chunk_b]),

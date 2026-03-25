@@ -18,6 +18,7 @@ from .hashing import hash_to_frame
 from .storage import DEFAULT_DATA_DIR, store_memory
 from .temperature import SALIENCE_DEFAULT
 
+
 def _get_frame_fn(use_embedding: bool = False, *, encoder: str | None = None):
     """Return the text→frame function for the requested encoder.
 
@@ -37,22 +38,55 @@ def _get_frame_fn(use_embedding: bool = False, *, encoder: str | None = None):
         return hash_to_frame
     elif encoder == "hippocampus":
         from .hippocampus import hippocampus_to_frame
+
         return hippocampus_to_frame
     elif encoder == "embedding":
         from .embedding import embed_to_frame
+
         return embed_to_frame
     elif encoder == "language":
         from .language_wheeler import language_to_frame
+
         return language_to_frame
     elif encoder == "blended":
         from .hippocampus import hippocampus_to_frame
         from .language_wheeler import language_to_frame
         from .constants import BLEND_ALPHA
+
         def _blended(text: str, size: int = 64) -> "np.ndarray":
             h = hippocampus_to_frame(text, size)
             l = language_to_frame(text, size)
             return np.tanh(BLEND_ALPHA * h + (1 - BLEND_ALPHA) * l).astype(np.float32)
+
         return _blended
+    elif encoder == "word":
+        from .word_encoder import word_to_frame
+
+        return word_to_frame
+    elif encoder == "word-blended":
+        from .word_encoder import word_to_frame
+        from .language_wheeler import language_to_frame
+        from .constants import BLEND_ALPHA
+
+        def _word_blended(text: str, size: int = 64) -> "np.ndarray":
+            w = word_to_frame(text, size)
+            l = language_to_frame(text, size)
+            return np.tanh(BLEND_ALPHA * w + (1 - BLEND_ALPHA) * l).astype(np.float32)
+
+        return _word_blended
+    elif encoder == "hippo-word":
+        from .hippocampus import hippocampus_to_frame
+        from .word_encoder import word_to_frame
+        from .constants import WORD_HIPPO_BLEND
+
+        def _hippo_word(text: str, size: int = 64) -> "np.ndarray":
+            h = hippocampus_to_frame(text, size)
+            w = word_to_frame(text, size)
+            return np.tanh((1 - WORD_HIPPO_BLEND) * h + WORD_HIPPO_BLEND * w).astype(
+                np.float32
+            )
+
+        return _hippo_word
     else:
         raise ValueError(f"Unknown encoder: {encoder!r}")
 
@@ -70,7 +104,9 @@ def _save_rotation_stats(data_dir: Path, stats: dict) -> None:
     path.write_text(json.dumps(stats, indent=2))
 
 
-def update_rotation_stats(angle: int, success: bool, data_dir: str | Path | None = None) -> None:
+def update_rotation_stats(
+    angle: int, success: bool, data_dir: str | Path | None = None
+) -> None:
     """Track per-angle success counts."""
     d = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
     d.mkdir(parents=True, exist_ok=True)
@@ -99,7 +135,9 @@ def store_with_rotation_retry(
         salience, attention_label, stability_threshold
     """
     d = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
-    budget = compute_attention_budget(salience if salience is not None else SALIENCE_DEFAULT)
+    budget = compute_attention_budget(
+        salience if salience is not None else SALIENCE_DEFAULT
+    )
     frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
     base_frame = frame_fn(text)
     angles = [0, 90, 180, 270][:max_rotations]
@@ -111,7 +149,8 @@ def store_with_rotation_retry(
 
         start = time.time()
         result = evolve_and_interpret(
-            frame, max_iters=budget.max_iters,
+            frame,
+            max_iters=budget.max_iters,
             stability_threshold=budget.stability_threshold,
         )
         wall_time = time.time() - start

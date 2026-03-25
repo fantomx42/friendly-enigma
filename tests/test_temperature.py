@@ -1,10 +1,18 @@
 """Unit tests for temperature computation."""
+
 from datetime import datetime, timedelta, timezone
 import pytest
 from wheeler_memory.temperature import (
-    HALF_LIFE_DAYS, HIT_SATURATION, TIER_HOT, TIER_WARM,
-    WARMTH_FLOOR, WARMTH_HALF_LIFE_DAYS,
-    compute_temperature, compute_warmth, effective_temperature, temperature_tier,
+    HALF_LIFE_DAYS,
+    HIT_SATURATION,
+    TIER_HOT,
+    TIER_WARM,
+    WARMTH_FLOOR,
+    WARMTH_HALF_LIFE_DAYS,
+    compute_temperature,
+    compute_warmth,
+    effective_temperature,
+    temperature_tier,
 )
 
 
@@ -120,8 +128,9 @@ class TestEffectiveTemperature:
         now = datetime.now(timezone.utc)
         base_temp = compute_temperature(0, now, now=now)
         warmth_boost = 0.05
-        eff_temp = effective_temperature(0, now, warmth_boost=warmth_boost,
-                                        warmth_applied_at=now, now=now)
+        eff_temp = effective_temperature(
+            0, now, warmth_boost=warmth_boost, warmth_applied_at=now, now=now
+        )
         expected = base_temp + warmth_boost
         assert abs(eff_temp - expected) < 0.01
 
@@ -129,10 +138,7 @@ class TestEffectiveTemperature:
         """high hits + high warmth → capped at 1.0."""
         now = datetime.now(timezone.utc)
         eff_temp = effective_temperature(
-            HIT_SATURATION, now,
-            warmth_boost=0.5,
-            warmth_applied_at=now,
-            now=now
+            HIT_SATURATION, now, warmth_boost=0.5, warmth_applied_at=now, now=now
         )
         assert eff_temp == 1.0
 

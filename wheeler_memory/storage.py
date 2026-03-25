@@ -41,15 +41,20 @@ from .warming import (
     propagate_warmth_cross_chunk,
 )
 
+
 # Lazy import for embedding (optional dependency)
 def _get_embed_to_frame():
     from .embedding import embed_to_frame
+
     return embed_to_frame
+
 
 # Default encoder from constants
 def _get_default_encoder():
     from .constants import DEFAULT_ENCODER
+
     return DEFAULT_ENCODER
+
 
 DEFAULT_DATA_DIR = Path.home() / ".wheeler_memory"
 
@@ -62,11 +67,13 @@ def _get_data_dir(data_dir: str | Path | None = None) -> Path:
 
 def _load_index(chunk_dir: Path) -> dict:
     from .cache import cached_load_json
+
     return cached_load_json(chunk_dir / "index.json", default={})
 
 
 def _save_index(chunk_dir: Path, index: dict) -> None:
     from .cache import invalidate
+
     index_path = chunk_dir / "index.json"
     tmp_path = index_path.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(index, indent=2))
@@ -109,7 +116,9 @@ def batch_store_memories(
                 hex_key = text_to_hex(text)
                 # Write attractor + brick files (fast, outside lock in ideal world
                 # but done here for simplicity since they're independent files)
-                np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
+                np.save(
+                    chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"]
+                )
                 brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
                 # Build index entry
                 meta = dict(result.get("metadata", {}))
@@ -187,6 +196,7 @@ def store_memory(
 
     if auto_evict:
         from .eviction import evict_for_capacity
+
         evict_for_capacity(d)
 
     return hex_key
@@ -242,10 +252,12 @@ def recall_memory(
 
     if query_frame is None:
         from .rotation import _get_frame_fn
+
         frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
         query_frame = frame_fn(text)
     query_result = evolve_and_interpret(
-        query_frame, max_iters=budget.max_iters,
+        query_frame,
+        max_iters=budget.max_iters,
         stability_threshold=budget.stability_threshold,
     )
     query_flat = query_result["attractor"].flatten()
@@ -280,7 +292,7 @@ def recall_memory(
 
     def _score_item(item):
         hex_key, meta, attractor_path, w, chunk_name = item
-        attractor = np.load(attractor_path, mmap_mode='r')
+        attractor = np.load(attractor_path, mmap_mode="r")
         if attractor.shape != (64, 64):
             return None
         att_flat = attractor.flatten()
@@ -288,9 +300,17 @@ def recall_memory(
         att_mean = md.get("att_mean")
         att_std = md.get("att_std")
         try:
-            if att_mean is not None and att_std is not None and att_std > 0 and query_std > 0:
+            if (
+                att_mean is not None
+                and att_std is not None
+                and att_std > 0
+                and query_std > 0
+            ):
                 att_centered = att_flat - att_mean
-                sim = float(np.dot(query_centered, att_centered) / (len(query_flat) * query_std * att_std))
+                sim = float(
+                    np.dot(query_centered, att_centered)
+                    / (len(query_flat) * query_std * att_std)
+                )
             else:
                 corr, _ = pearsonr(query_flat, att_flat)
                 sim = float(corr)
@@ -320,21 +340,21 @@ def recall_memory(
         }
 
     from concurrent.futures import ThreadPoolExecutor
+
     with ThreadPoolExecutor(max_workers=4) as executor:
-        results = [
-            r for r in executor.map(_score_item, work_items)
-            if r is not None
-        ]
+        results = [r for r in executor.map(_score_item, work_items) if r is not None]
 
     top_results = heapq.nlargest(
-        top_k, results, key=lambda r: r["effective_similarity"],
+        top_k,
+        results,
+        key=lambda r: r["effective_similarity"],
     )
 
     # Lazy feature extraction: only compute for top_k results
     for r in top_results:
         chunk_dir = d / "chunks" / r["chunk"]
         att_path = chunk_dir / "attractors" / f"{r['hex_key']}.npy"
-        att = np.load(att_path, mmap_mode='r')
+        att = np.load(att_path, mmap_mode="r")
         feats = compute_attractor_features(att)
         r["grid_entropy"] = feats["grid_entropy"]
         r["cluster_count"] = feats["cluster_count"]
@@ -343,6 +363,7 @@ def recall_memory(
     # Polar companion injection: batch by chunk to minimise disk reads.
     # For top_k results all in the same chunk this reduces 5–10 reads to 1–2.
     from .polarity import apply_polar_decay_in_place, get_polar_companion_from_assoc
+
     by_chunk: dict[str, list] = {}
     for r in top_results:
         by_chunk.setdefault(r["chunk"], []).append(r)
@@ -365,6 +386,7 @@ def recall_memory(
     # Reconstructive recall: blend each result with query context
     if reconstruct and top_results:
         from .reconstruction import reconstruct as _reconstruct
+
         query_att = query_result["attractor"]
         for r in top_results:
             # Load the stored attractor for reconstruction
@@ -373,12 +395,15 @@ def recall_memory(
             stored_att = np.load(att_path)
             # Derive reconstruction salience from explicit or temperature
             recon_salience = (
-                salience if salience is not None
+                salience
+                if salience is not None
                 else salience_from_temperature(r["temperature"])
             )
             recon_budget = compute_attention_budget(recon_salience)
             recon = _reconstruct(
-                stored_att, query_att, alpha=reconstruct_alpha,
+                stored_att,
+                query_att,
+                alpha=reconstruct_alpha,
                 max_iters=recon_budget.max_iters,
                 stability_threshold=recon_budget.stability_threshold,
             )
@@ -454,12 +479,14 @@ def list_memories(
                 warmth_boost=w.get("boost", 0.0),
                 warmth_applied_at=w.get("applied_at"),
             )
-            all_memories.append({
-                "hex_key": k,
-                "chunk": c,
-                "temperature": temp,
-                "temperature_tier": temperature_tier(temp),
-                **v,
-            })
+            all_memories.append(
+                {
+                    "hex_key": k,
+                    "chunk": c,
+                    "temperature": temp,
+                    "temperature_tier": temperature_tier(temp),
+                    **v,
+                }
+            )
 
     return all_memories

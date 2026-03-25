@@ -27,8 +27,13 @@ from wheeler_memory.theories.basin import (
 def test_basin_widths():
     """Store frames, measure basin widths, verify > 0."""
     print("\n--- Test: Basin Width Measurement ---")
-    texts = ["hello world", "quantum physics", "chocolate cake",
-             "ocean waves", "mountain peak"]
+    texts = [
+        "hello world",
+        "quantum physics",
+        "chocolate cake",
+        "ocean waves",
+        "mountain peak",
+    ]
 
     for text in texts:
         frame = hash_to_frame(text)
@@ -40,7 +45,9 @@ def test_basin_widths():
         bw = measure_basin_width(result["attractor"], n_probes=20, steps=10)
         print(f"  '{text}': width={bw['width']:.4f}")
         assert bw["width"] >= 0, f"Basin width should be >= 0, got {bw['width']}"
-        assert len(bw["profile"]) == 10, f"Expected 10 profile points, got {len(bw['profile'])}"
+        assert len(bw["profile"]) == 10, (
+            f"Expected 10 profile points, got {len(bw['profile'])}"
+        )
 
     print("  PASS: All basin widths measured")
 
@@ -77,7 +84,7 @@ def test_basin_consistency():
     for i in range(3):
         bw = measure_basin_width(result["attractor"], n_probes=30, steps=10)
         measurements.append(bw["width"])
-        print(f"  Measurement {i+1}: width={bw['width']:.4f}")
+        print(f"  Measurement {i + 1}: width={bw['width']:.4f}")
 
     if measurements[0] > 0:
         max_w = max(measurements)

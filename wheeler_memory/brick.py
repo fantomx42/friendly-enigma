@@ -84,7 +84,9 @@ class MemoryBrick:
         )
 
     @classmethod
-    def from_evolution_result(cls, result: dict, extra_metadata: dict | None = None) -> MemoryBrick:
+    def from_evolution_result(
+        cls, result: dict, extra_metadata: dict | None = None
+    ) -> MemoryBrick:
         """Construct a brick from an evolve_and_interpret result dict."""
         metadata = dict(result.get("metadata", {}))
         if extra_metadata:

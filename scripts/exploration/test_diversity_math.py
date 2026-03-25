@@ -140,10 +140,14 @@ def main():
         "--offset", type=int, default=0, help="Row offset into the dataset"
     )
     parser.add_argument(
-        "--gpu", action="store_true", help="Use GPU batch evolution (requires libwheeler_ca.so)"
+        "--gpu",
+        action="store_true",
+        help="Use GPU batch evolution (requires libwheeler_ca.so)",
     )
     parser.add_argument(
-        "--local", action="store_true", help="Load from local HF cache (faster, no rate limits)"
+        "--local",
+        action="store_true",
+        help="Load from local HF cache (faster, no rate limits)",
     )
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for local sampling"
@@ -188,7 +192,9 @@ def main():
             ticks_list.append(result["convergence_ticks"])
             labels.append(math_texts[i][:60].replace("\n", " "))
         evolve_time = time.time() - evolve_start
-        print(f"  GPU batch done in {evolve_time:.2f}s ({n / evolve_time:.0f} samples/s)")
+        print(
+            f"  GPU batch done in {evolve_time:.2f}s ({n / evolve_time:.0f} samples/s)"
+        )
     else:
         # Sequential CPU evolution
         for i, text in enumerate(math_texts):
@@ -275,7 +281,9 @@ def main():
     else:
         display_corr = corr_matrix
         ax1.set_title("Attractor Correlation Matrix")
-    im = ax1.imshow(display_corr, cmap="RdBu_r", vmin=-1, vmax=1, interpolation="nearest")
+    im = ax1.imshow(
+        display_corr, cmap="RdBu_r", vmin=-1, vmax=1, interpolation="nearest"
+    )
     ax1.set_xlabel("Memory Index")
     ax1.set_ylabel("Memory Index")
     fig.colorbar(im, ax=ax1, shrink=0.8)
@@ -283,9 +291,13 @@ def main():
     # Histogram
     ax2 = fig.add_subplot(3, 2, 2)
     ax2.hist(off_diag, bins=100, edgecolor="none", alpha=0.8, color="#3B82F6")
-    ax2.axvline(0.85, color="red", linestyle="--", linewidth=1.5, label="Max threshold (0.85)")
+    ax2.axvline(
+        0.85, color="red", linestyle="--", linewidth=1.5, label="Max threshold (0.85)"
+    )
     ax2.axvline(-0.85, color="red", linestyle="--", linewidth=1.5)
-    ax2.axvline(avg_corr, color="orange", linestyle="--", label=f"Avg |r| = {avg_corr:.4f}")
+    ax2.axvline(
+        avg_corr, color="orange", linestyle="--", label=f"Avg |r| = {avg_corr:.4f}"
+    )
     ax2.set_title(f"Correlation Distribution ({len(off_diag):,} pairs)")
     ax2.set_xlim(-1, 1)
     ax2.set_xlabel("Pearson Correlation")
@@ -324,7 +336,10 @@ def main():
                 bar.get_x() + bar.get_width() / 2,
                 bar.get_height() + max(1, n * 0.005),
                 f"{count:,}",
-                ha="center", va="bottom", fontweight="bold", fontsize=9,
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+                fontsize=9,
             )
 
     # Info panel
@@ -350,21 +365,32 @@ def main():
         f"Total:       {total_time:.1f}s"
     )
     ax_info.text(
-        0.05, 0.95, info_text, transform=ax_info.transAxes,
-        fontsize=10, verticalalignment="top", fontfamily="monospace",
+        0.05,
+        0.95,
+        info_text,
+        transform=ax_info.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        fontfamily="monospace",
         bbox=dict(boxstyle="round,pad=0.5", facecolor="#F3F4F6", edgecolor="#D1D5DB"),
     )
 
     # Role legend
     from matplotlib.patches import Patch
+
     legend_elements = [
         Patch(facecolor="#EF4444", edgecolor="black", label="Local Max (+1)"),
         Patch(facecolor="#9CA3AF", edgecolor="black", label="Slope (0)"),
         Patch(facecolor="#3B82F6", edgecolor="black", label="Local Min (−1)"),
     ]
     fig.legend(
-        handles=legend_elements, loc="lower center", ncol=3,
-        fontsize=10, frameon=True, fancybox=True, shadow=True,
+        handles=legend_elements,
+        loc="lower center",
+        ncol=3,
+        fontsize=10,
+        frameon=True,
+        fancybox=True,
+        shadow=True,
     )
 
     plt.suptitle(
@@ -372,7 +398,8 @@ def main():
         f"Avg |r|={avg_corr:.4f},  Max |r|={max_corr:.4f}  —  "
         f"{'PASS ✓' if overall else 'FAIL ✗'}  |  "
         f"States: {n_converged:,}C / {n_oscillating:,}O / {n_chaotic:,}X",
-        fontsize=13, fontweight="bold",
+        fontsize=13,
+        fontweight="bold",
     )
     plt.tight_layout(rect=[0, 0.03, 1, 0.94])
     plt.savefig(args.output, dpi=150)

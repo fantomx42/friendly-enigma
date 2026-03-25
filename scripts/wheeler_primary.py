@@ -38,12 +38,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Query to process. Omit for --interactive mode.",
     )
     p.add_argument(
-        "--interactive", "-i",
+        "--interactive",
+        "-i",
         action="store_true",
         help="Run in interactive REPL mode.",
     )
     p.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default=DEFAULT_MODEL,
         metavar="MODEL",
         help=f"Ollama decoder model (default: {DEFAULT_MODEL}).",
@@ -80,7 +82,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Print Wheeler's decoded state before the response.",
     )
     p.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Print detailed pipeline info to stderr.",
     )

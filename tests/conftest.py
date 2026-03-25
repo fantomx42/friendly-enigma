@@ -24,7 +24,9 @@ def store_test_memory(text: str, data_dir: Path, chunk: str = "general") -> str:
     frame = hash_to_frame(text)
     result = evolve_and_interpret(frame)
     brick = MemoryBrick.from_evolution_result(result)
-    return store_memory(text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False)
+    return store_memory(
+        text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False
+    )
 
 
 def store_test_memory_embed(text: str, data_dir: Path, chunk: str = "general") -> str:
@@ -35,10 +37,13 @@ def store_test_memory_embed(text: str, data_dir: Path, chunk: str = "general") -
     Requires sentence-transformers to be installed.
     """
     from wheeler_memory.embedding import embed_to_frame
+
     frame = embed_to_frame(text)
     result = evolve_and_interpret(frame)
     brick = MemoryBrick.from_evolution_result(result)
-    return store_memory(text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False)
+    return store_memory(
+        text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False
+    )
 
 
 def age_memory(data_dir: Path, chunk: str, hex_key: str, days: float) -> None:
@@ -78,4 +83,6 @@ def make_uniform_history(n_frames: int) -> list[np.ndarray]:
     """Create a history where all frames are nearly identical."""
     rng = np.random.RandomState(99)
     base = rng.randn(64, 64).astype(np.float32) * 0.5
-    return [base + rng.randn(64, 64).astype(np.float32) * 0.0001 for _ in range(n_frames)]
+    return [
+        base + rng.randn(64, 64).astype(np.float32) * 0.0001 for _ in range(n_frames)
+    ]

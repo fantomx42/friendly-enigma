@@ -20,7 +20,9 @@ class ResonanceResult:
     total_chunks: int = 0
     resonant_chunks: int = 0
     skipped_chunks: int = 0
-    resonant_files: list[dict] = field(default_factory=list)  # [{path, chunk_text, resonance_score}]
+    resonant_files: list[dict] = field(
+        default_factory=list
+    )  # [{path, chunk_text, resonance_score}]
     cost_ratio: float = 0.0  # resonant / total
 
 
@@ -38,7 +40,7 @@ def _chunk_text(text: str, chunk_size: int) -> list[str]:
     """Split text into chunks of approximately chunk_size characters."""
     chunks = []
     for i in range(0, len(text), chunk_size):
-        chunk = text[i:i + chunk_size].strip()
+        chunk = text[i : i + chunk_size].strip()
         if chunk:
             chunks.append(chunk)
     return chunks
@@ -123,11 +125,13 @@ def query_corpus(
 
             if is_resonant:
                 result.resonant_chunks += 1
-                result.resonant_files.append({
-                    "path": str(file_path),
-                    "chunk_text": chunk_text[:200],  # Truncate for log
-                    "resonance_score": final_corr,
-                })
+                result.resonant_files.append(
+                    {
+                        "path": str(file_path),
+                        "chunk_text": chunk_text[:200],  # Truncate for log
+                        "resonance_score": final_corr,
+                    }
+                )
             else:
                 result.skipped_chunks += 1
 

@@ -30,10 +30,11 @@ EDGE_SOURCE_POLARITY = "polarity_link"
 # Weight helpers
 # ---------------------------------------------------------------------------
 
+
 def polar_weight(link_entry: dict) -> float:
     """Compute current link weight from decay count."""
     count = link_entry.get("decay_count", link_entry.get("safe_recall_count", 0))
-    return POLAR_WEIGHT_DECAY ** count
+    return POLAR_WEIGHT_DECAY**count
 
 
 def is_neutralized(link_entry: dict) -> bool:
@@ -44,6 +45,7 @@ def is_neutralized(link_entry: dict) -> bool:
 # ---------------------------------------------------------------------------
 # Internal: write polarity_link edge
 # ---------------------------------------------------------------------------
+
 
 def _link_polarity(
     chunk_dir: Path,
@@ -69,6 +71,7 @@ def _link_polarity(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def store_dual(
     text: str,
@@ -107,7 +110,12 @@ def store_dual(
 
     # ── 1. Experience attractor ──────────────────────────────────────────────
     exp_result = store_with_rotation_retry(
-        text, data_dir=d, chunk=chunk, use_embedding=use_embedding, encoder=encoder, salience=salience,
+        text,
+        data_dir=d,
+        chunk=chunk,
+        use_embedding=use_embedding,
+        encoder=encoder,
+        salience=salience,
     )
     experience_hex = text_to_hex(text)
 
@@ -142,8 +150,12 @@ def store_dual(
     # ── 3. Store polar entry in the same chunk ───────────────────────────────
     brick = MemoryBrick.from_evolution_result(pol_result, {"input_text": polar_text})
     store_memory(
-        polar_text, pol_result, brick, d,
-        chunk=chunk, memory_type="polar",
+        polar_text,
+        pol_result,
+        brick,
+        d,
+        chunk=chunk,
+        memory_type="polar",
     )
 
     # ── 4. Link experience → polar ───────────────────────────────────────────

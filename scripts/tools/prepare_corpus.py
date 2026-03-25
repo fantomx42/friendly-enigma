@@ -77,8 +77,16 @@ def extract_longbench(out) -> int:
 
     # Non-code, non-Chinese tasks with meaningful questions
     include_tasks = {
-        "hotpotqa", "2wikimqa", "musique", "narrativeqa", "qasper",
-        "gov_report", "multi_news", "triviaqa", "trec", "samsum",
+        "hotpotqa",
+        "2wikimqa",
+        "musique",
+        "narrativeqa",
+        "qasper",
+        "gov_report",
+        "multi_news",
+        "triviaqa",
+        "trec",
+        "samsum",
         "multifieldqa_en",
     }
 
@@ -99,7 +107,10 @@ def extract_longbench(out) -> int:
                     obj = json.loads(line.decode())
                     text = obj.get("input", "").strip()
                     if MIN_LEN <= len(text) <= MAX_LEN:
-                        out.write(json.dumps({"text": text, "source": f"longbench/{task}"}) + "\n")
+                        out.write(
+                            json.dumps({"text": text, "source": f"longbench/{task}"})
+                            + "\n"
+                        )
                         count += 1
 
     print(f"  LongBench: {count} entries")
@@ -118,7 +129,6 @@ def write_curated_ml(out) -> int:
         "Regularization techniques like dropout and weight decay prevent overfitting",
         "Batch normalization stabilizes training by normalizing layer inputs across minibatches",
         "Activation functions like ReLU introduce nonlinearity into neural network computations",
-
         # Attention and transformers
         "Attention mechanism allows models to focus on relevant parts of the input sequence",
         "Self-attention computes relationships between all positions in a sequence simultaneously",
@@ -128,7 +138,6 @@ def write_curated_ml(out) -> int:
         "Layer normalization normalizes activations across features within each training example",
         "Residual connections allow gradients to flow directly through the network via skip connections",
         "Feed-forward networks in transformers apply two linear transformations with a ReLU activation",
-
         # Architectures
         "Encoder-decoder architecture maps input sequences to output sequences through a bottleneck",
         "BERT uses bidirectional masked language modeling to pretrain deep representations",
@@ -139,7 +148,6 @@ def write_curated_ml(out) -> int:
         "Generative adversarial networks pit a generator against a discriminator in a minimax game",
         "Variational autoencoders learn latent representations by maximizing a variational lower bound",
         "Diffusion models generate data by learning to reverse a gradual noising process",
-
         # Training and optimization
         "Cross-entropy loss measures the divergence between predicted and true probability distributions",
         "Adam optimizer combines momentum and adaptive learning rates for efficient training",
@@ -148,21 +156,18 @@ def write_curated_ml(out) -> int:
         "Data augmentation increases training set diversity through random transformations",
         "Early stopping halts training when validation performance stops improving to prevent overfitting",
         "Curriculum learning trains on easy examples first then gradually increases difficulty",
-
         # Evaluation
         "Precision measures the fraction of positive predictions that are actually correct",
         "Recall measures the fraction of actual positives that are correctly identified",
         "F1 score is the harmonic mean of precision and recall balancing both metrics",
         "Perplexity measures how well a language model predicts a held-out text corpus",
         "BLEU score evaluates machine translation quality by comparing n-gram overlap with references",
-
         # Bridge sentences — connective tissue between concepts
         "The transformer architecture is built around self-attention as its core mechanism allowing it to weigh relationships between all sequence positions simultaneously",
         "BERT and GPT both use the transformer architecture for pretraining but BERT uses bidirectional masked prediction while GPT uses autoregressive left-to-right generation",
         "The encoder-decoder architecture also called sequence-to-sequence maps variable-length inputs to variable-length outputs through an intermediate representation",
         "Transformers replaced recurrent neural networks by using self-attention instead of sequential hidden state updates for parallel processing of sequences",
         "Multi-head attention in transformers projects queries keys and values into multiple subspaces enabling the model to attend to different relationship types simultaneously",
-
         # Specific techniques
         "Word embeddings map discrete tokens to dense continuous vectors preserving semantic similarity",
         "Tokenization breaks text into subword units like byte-pair encoding for open vocabulary models",
@@ -201,7 +206,6 @@ def write_curated_science(out) -> int:
         "Dark energy drives the accelerating expansion of the universe",
         "Thermodynamics governs heat energy transfer and the direction of spontaneous processes",
         "Entropy measures the disorder or number of microscopic configurations of a system",
-
         # Chemistry
         "Chemical bonds form when atoms share or transfer electrons to achieve stable configurations",
         "Covalent bonds share electron pairs between atoms while ionic bonds transfer electrons",
@@ -211,7 +215,6 @@ def write_curated_science(out) -> int:
         "Oxidation-reduction reactions involve the transfer of electrons between species",
         "Organic chemistry studies carbon-based compounds and their reactions",
         "Polymers are large molecules made of repeating structural units called monomers",
-
         # Biology
         "DNA encodes genetic information using four nucleotide bases adenine thymine guanine cytosine",
         "RNA transcription copies DNA sequences into messenger RNA for protein synthesis",
@@ -225,13 +228,11 @@ def write_curated_science(out) -> int:
         "The immune system defends against pathogens using innate and adaptive responses",
         "Enzymes are biological catalysts that accelerate specific biochemical reactions",
         "Homeostasis maintains stable internal conditions despite changing external environments",
-
         # Bridge sentences — connective tissue between concepts
         "Newton's laws of motion and the conservation of energy are foundational principles of classical mechanics where force equals mass times acceleration and energy transforms between kinetic and potential forms",
         "Photosynthesis in chloroplasts captures sunlight to produce glucose while mitochondria break down glucose through oxidative phosphorylation to produce ATP completing the cell's energy cycle",
         "The energy flow in cells connects photosynthesis which stores solar energy in glucose to mitochondrial respiration which releases that energy as ATP for cellular work",
         "The immune system relies on enzymes such as lysozyme and proteases to break down pathogen components as part of both innate and adaptive defense mechanisms",
-
         # Earth science / astronomy
         "Plate tectonics describes the movement of lithospheric plates on the asthenosphere",
         "The carbon cycle circulates carbon through atmosphere oceans organisms and geological deposits",

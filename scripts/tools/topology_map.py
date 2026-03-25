@@ -33,24 +33,33 @@ CONCEPT_PAIRS = [
     # ML cluster — should be densely connected
     ("self-attention mechanism", "transformer architecture", "core components"),
     ("backpropagation", "gradient descent optimization", "training pipeline"),
-    ("BERT masked language model", "GPT autoregressive generation", "pretraining approaches"),
-    ("convolutional neural networks", "recurrent neural networks", "architecture types"),
+    (
+        "BERT masked language model",
+        "GPT autoregressive generation",
+        "pretraining approaches",
+    ),
+    (
+        "convolutional neural networks",
+        "recurrent neural networks",
+        "architecture types",
+    ),
     ("dropout regularization", "overfitting prevention", "training technique"),
     ("encoder-decoder architecture", "sequence to sequence", "architecture pattern"),
     ("word embeddings", "tokenization", "input representation"),
-
     # Physics cluster — should be connected
     ("quantum superposition", "quantum entanglement", "quantum mechanics"),
     ("Newton's laws of motion", "conservation of energy", "classical mechanics"),
-    ("wave-particle duality", "Heisenberg uncertainty principle", "quantum foundations"),
+    (
+        "wave-particle duality",
+        "Heisenberg uncertainty principle",
+        "quantum foundations",
+    ),
     ("electromagnetic waves", "speed of light", "electromagnetism"),
-
     # Biology cluster — sparser, expect gaps
     ("DNA replication", "RNA transcription", "molecular biology"),
     ("natural selection evolution", "genetic mutations", "evolutionary biology"),
     ("photosynthesis", "mitochondria ATP", "cell energy"),
     ("immune system", "enzymes catalysts", "biological defense"),
-
     # Cross-domain — should NOT co-fire strongly
     ("self-attention mechanism", "quantum superposition", "cross: ML-physics"),
     ("backpropagation", "DNA replication", "cross: ML-biology"),
@@ -94,11 +103,13 @@ def compute_overlap(set_a: list[dict], set_b: list[dict]) -> dict:
                 (x["similarity"] for x in set_b if x["hex_key"] == h["hex_key"]),
                 0.0,
             )
-            shared_texts.append({
-                "text": h["text"][:80],
-                "sim_a": h["similarity"],
-                "sim_b": sim_in_b,
-            })
+            shared_texts.append(
+                {
+                    "text": h["text"][:80],
+                    "sim_a": h["similarity"],
+                    "sim_b": sim_in_b,
+                }
+            )
 
     jaccard = len(shared_keys) / len(keys_a | keys_b) if (keys_a | keys_b) else 0.0
 
@@ -138,8 +149,10 @@ def run_topology_map(data_dir: Path | None = None):
         results.append(result)
 
     # Print summary table
-    print(f"\n{'Relation':<22} {'Concept A':<30} {'Concept B':<30} {'Overlap':>7} {'Jaccard':>8}")
-    print(f"{'─'*22} {'─'*30} {'─'*30} {'─'*7} {'─'*8}")
+    print(
+        f"\n{'Relation':<22} {'Concept A':<30} {'Concept B':<30} {'Overlap':>7} {'Jaccard':>8}"
+    )
+    print(f"{'─' * 22} {'─' * 30} {'─' * 30} {'─' * 7} {'─' * 8}")
 
     for r in results:
         print(
@@ -160,12 +173,16 @@ def run_topology_map(data_dir: Path | None = None):
         print(f"\n  [{bridge}] {r['concept_a']} <-> {r['concept_b']}")
         print(f"  Relation: {r['relation']}")
         print(f"  Top sim A: {r['top_sim_a']:.3f}, Top sim B: {r['top_sim_b']:.3f}")
-        print(f"  Overlap: {r['overlap_count']}/{r['total_a']} attractors (Jaccard={r['jaccard']:.3f})")
+        print(
+            f"  Overlap: {r['overlap_count']}/{r['total_a']} attractors (Jaccard={r['jaccard']:.3f})"
+        )
 
         if r["shared"]:
             print(f"  Shared attractors:")
             for s in r["shared"]:
-                print(f"    '{s['text']}' (sim_a={s['sim_a']:.3f}, sim_b={s['sim_b']:.3f})")
+                print(
+                    f"    '{s['text']}' (sim_a={s['sim_a']:.3f}, sim_b={s['sim_b']:.3f})"
+                )
 
     # Cluster analysis
     print(f"\n{'=' * 75}")
@@ -179,7 +196,9 @@ def run_topology_map(data_dir: Path | None = None):
 
     for domain, domain_results in sorted(clusters.items()):
         avg_jaccard = sum(r["jaccard"] for r in domain_results) / len(domain_results)
-        avg_overlap = sum(r["overlap_count"] for r in domain_results) / len(domain_results)
+        avg_overlap = sum(r["overlap_count"] for r in domain_results) / len(
+            domain_results
+        )
         bridges = sum(1 for r in domain_results if r["overlap_count"] > 0)
         gaps = sum(1 for r in domain_results if r["overlap_count"] == 0)
 

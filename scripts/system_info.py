@@ -5,6 +5,7 @@ import json
 import sys
 from wheeler_memory.hardware import get_system_summary
 
+
 def main():
     try:
         summary = get_system_summary()
@@ -24,13 +25,16 @@ def main():
             for warn in warnings:
                 print(f"- {warn}")
     except ImportError as e:
-        print(f"Error: Missing dependency — {e}\nRun: pip install -e .", file=sys.stderr)
+        print(
+            f"Error: Missing dependency — {e}\nRun: pip install -e .", file=sys.stderr
+        )
         sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(0)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

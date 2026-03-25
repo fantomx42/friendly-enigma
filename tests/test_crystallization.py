@@ -98,7 +98,10 @@ class TestCrystallizeSmallCorpus:
         corpus.write_text("alpha concept\nbeta concept\ngamma concept\n")
 
         result = crystallize(
-            corpus, data_dir=tmp_path, use_embedding=False, batch_size=2,
+            corpus,
+            data_dir=tmp_path,
+            use_embedding=False,
+            batch_size=2,
         )
 
         assert result.stored == 3
@@ -166,7 +169,10 @@ class TestCrystallizeMaxItems:
         corpus.write_text("one\ntwo\nthree\nfour\nfive\n")
 
         result = crystallize(
-            corpus, data_dir=tmp_path, use_embedding=False, max_items=3,
+            corpus,
+            data_dir=tmp_path,
+            use_embedding=False,
+            max_items=3,
         )
 
         assert result.stored == 3
@@ -198,7 +204,10 @@ class TestCrystallizeAutoChunk:
         corpus.write_text("python debugging techniques\n")
 
         result = crystallize(
-            corpus, data_dir=tmp_path, use_embedding=False, chunk="science",
+            corpus,
+            data_dir=tmp_path,
+            use_embedding=False,
+            chunk="science",
         )
 
         assert "science" in result.chunks_used
@@ -208,8 +217,11 @@ class TestCrystallizeAutoChunk:
 class TestCrystallizationResult:
     def test_str_representation(self):
         r = CrystallizationResult(
-            stored=100, skipped=10, errors=2,
-            saturation_pct=1.12, elapsed_seconds=5.3,
+            stored=100,
+            skipped=10,
+            errors=2,
+            saturation_pct=1.12,
+            elapsed_seconds=5.3,
             chunks_used={"general": 80, "code": 20},
         )
         s = str(r)

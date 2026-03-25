@@ -39,12 +39,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Single message to process. Omit for --interactive mode.",
     )
     p.add_argument(
-        "--interactive", "-i",
+        "--interactive",
+        "-i",
         action="store_true",
         help="Run in interactive REPL mode.",
     )
     p.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default=DEFAULT_MODEL,
         metavar="MODEL",
         help=f"Ollama model name (default: {DEFAULT_MODEL}).",
@@ -62,7 +64,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Wheeler Memory data directory (default: ~/.wheeler_memory).",
     )
     p.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Print tool call details.",
     )

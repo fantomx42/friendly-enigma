@@ -18,16 +18,23 @@ VALID_VERDICTS = {"convergence", "dissolution", "hallucination"}
 def test_single_apple_test():
     """Run apple test on fruit domain."""
     print("\n--- Test: Single Apple Test (Fruits) ---")
-    fruits = ["apple", "orange", "banana", "grape", "mango",
-              "strawberry", "pear", "peach"]
+    fruits = [
+        "apple",
+        "orange",
+        "banana",
+        "grape",
+        "mango",
+        "strawberry",
+        "pear",
+        "peach",
+    ]
 
     result = apple_test(fruits, holdout="apple")
 
     for line in result["log"]:
         print(f"  {line}")
 
-    assert result["verdict"] in VALID_VERDICTS, \
-        f"Invalid verdict: {result['verdict']}"
+    assert result["verdict"] in VALID_VERDICTS, f"Invalid verdict: {result['verdict']}"
     assert result["holdout_attractor"] is not None, "Missing holdout attractor"
     assert result["candidate"] is not None, "Missing candidate"
     assert len(result["trajectory"]) > 0, "Empty trajectory"
@@ -46,14 +53,19 @@ def test_apple_battery():
     results = run_apple_battery()
 
     print("\n  Results Summary:")
-    print(f"  {'Domain':<12} {'Verdict':<15} {'Candidate Corr':<16} {'Max Neighbor':<14} {'Gaps'}")
-    print(f"  {'-'*12} {'-'*15} {'-'*16} {'-'*14} {'-'*5}")
+    print(
+        f"  {'Domain':<12} {'Verdict':<15} {'Candidate Corr':<16} {'Max Neighbor':<14} {'Gaps'}"
+    )
+    print(f"  {'-' * 12} {'-' * 15} {'-' * 16} {'-' * 14} {'-' * 5}")
 
     for domain, res in results.items():
-        print(f"  {domain:<12} {res['verdict']:<15} {res['correlation']:<16.4f} "
-              f"{res['max_neighbor_correlation']:<14.4f} {res['n_gaps']}")
-        assert res["verdict"] in VALID_VERDICTS, \
+        print(
+            f"  {domain:<12} {res['verdict']:<15} {res['correlation']:<16.4f} "
+            f"{res['max_neighbor_correlation']:<14.4f} {res['n_gaps']}"
+        )
+        assert res["verdict"] in VALID_VERDICTS, (
             f"Invalid verdict for {domain}: {res['verdict']}"
+        )
 
     print("\n  PASS: All domains produced valid verdicts")
 

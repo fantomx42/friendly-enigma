@@ -1,4 +1,5 @@
 """Unit tests for SHA-256 hashing and frame generation."""
+
 import numpy as np
 import pytest
 from wheeler_memory.hashing import hash_to_frame, text_to_hex

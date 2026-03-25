@@ -23,12 +23,22 @@ from wheeler_memory.temperature import temperature_tier_detailed
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evict cold memories or forget specific ones")
-    parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would happen without deleting")
+    parser = argparse.ArgumentParser(
+        description="Evict cold memories or forget specific ones"
+    )
+    parser.add_argument(
+        "--data-dir", default=None, help="Data directory (default: ~/.wheeler_memory)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would happen without deleting"
+    )
     parser.add_argument("--text", default=None, help="Forget a specific memory by text")
-    parser.add_argument("--hex", default=None, help="Forget a specific memory by hex key")
-    parser.add_argument("--coldest", type=int, default=None, metavar="N", help="Show N coldest memories")
+    parser.add_argument(
+        "--hex", default=None, help="Forget a specific memory by hex key"
+    )
+    parser.add_argument(
+        "--coldest", type=int, default=None, metavar="N", help="Show N coldest memories"
+    )
     args = parser.parse_args()
 
     data_dir = args.data_dir or DEFAULT_DATA_DIR
@@ -74,7 +84,9 @@ def _run(args, data_dir):
         for m in scored[:n]:
             tier = temperature_tier_detailed(m["temperature"])
             text_preview = m["text"][:40] + "..." if len(m["text"]) > 40 else m["text"]
-            print(f"{m['temperature']:>6.4f} {tier:<7} {m['hit_count']:>5} {m['age_days']:>5.1f}d {m['chunk']:<15} {text_preview}")
+            print(
+                f"{m['temperature']:>6.4f} {tier:<7} {m['hit_count']:>5} {m['age_days']:>5.1f}d {m['chunk']:<15} {text_preview}"
+            )
         return
 
     # --- Full sweep ---

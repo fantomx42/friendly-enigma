@@ -133,7 +133,9 @@ def consolidate_brick(
         return brick
 
     kept_indices = select_keyframes(
-        brick.evolution_history, delta_threshold, role_threshold,
+        brick.evolution_history,
+        delta_threshold,
+        role_threshold,
     )
 
     # No reduction possible
@@ -268,58 +270,68 @@ def sleep_consolidate(
             # Hot: skip
             thresholds = thresholds_for_temperature(temp)
             if thresholds is None:
-                result.memories_skipped.append({
-                    "hex_key": hex_key,
-                    "chunk": chunk_name,
-                    "text": text,
-                    "reason": "hot",
-                })
+                result.memories_skipped.append(
+                    {
+                        "hex_key": hex_key,
+                        "chunk": chunk_name,
+                        "text": text,
+                        "reason": "hot",
+                    }
+                )
                 continue
 
             delta_thresh, role_thresh = thresholds
             brick_path = chunk_dir / "bricks" / f"{hex_key}.npz"
 
             if not brick_path.exists():
-                result.memories_skipped.append({
-                    "hex_key": hex_key,
-                    "chunk": chunk_name,
-                    "text": text,
-                    "reason": "no_brick",
-                })
+                result.memories_skipped.append(
+                    {
+                        "hex_key": hex_key,
+                        "chunk": chunk_name,
+                        "text": text,
+                        "reason": "no_brick",
+                    }
+                )
                 continue
 
             brick = MemoryBrick.load(brick_path)
 
             if brick.metadata.get("consolidated"):
-                result.memories_skipped.append({
-                    "hex_key": hex_key,
-                    "chunk": chunk_name,
-                    "text": text,
-                    "reason": "already_consolidated",
-                })
+                result.memories_skipped.append(
+                    {
+                        "hex_key": hex_key,
+                        "chunk": chunk_name,
+                        "text": text,
+                        "reason": "already_consolidated",
+                    }
+                )
                 continue
 
             frames_before = len(brick.evolution_history)
 
             if frames_before < CONSOLIDATION_MIN_HISTORY:
-                result.memories_skipped.append({
-                    "hex_key": hex_key,
-                    "chunk": chunk_name,
-                    "text": text,
-                    "reason": "too_few_frames",
-                })
+                result.memories_skipped.append(
+                    {
+                        "hex_key": hex_key,
+                        "chunk": chunk_name,
+                        "text": text,
+                        "reason": "too_few_frames",
+                    }
+                )
                 continue
 
             consolidated = consolidate_brick(brick, delta_thresh, role_thresh)
             frames_after = len(consolidated.evolution_history)
 
             if frames_after >= frames_before:
-                result.memories_skipped.append({
-                    "hex_key": hex_key,
-                    "chunk": chunk_name,
-                    "text": text,
-                    "reason": "no_reduction",
-                })
+                result.memories_skipped.append(
+                    {
+                        "hex_key": hex_key,
+                        "chunk": chunk_name,
+                        "text": text,
+                        "reason": "no_reduction",
+                    }
+                )
                 continue
 
             result.total_frames_before += frames_before
@@ -383,16 +395,18 @@ def consolidation_stats(
 
             brick_path = chunk_dir / "bricks" / f"{hex_key}.npz"
             if not brick_path.exists():
-                stats.append({
-                    "hex_key": hex_key,
-                    "chunk": chunk_name,
-                    "text": text,
-                    "frame_count": 0,
-                    "temperature": temp,
-                    "tier": tier,
-                    "consolidated": False,
-                    "potential_frames": 0,
-                })
+                stats.append(
+                    {
+                        "hex_key": hex_key,
+                        "chunk": chunk_name,
+                        "text": text,
+                        "frame_count": 0,
+                        "temperature": temp,
+                        "tier": tier,
+                        "consolidated": False,
+                        "potential_frames": 0,
+                    }
+                )
                 continue
 
             brick = MemoryBrick.load(brick_path)
@@ -401,22 +415,30 @@ def consolidation_stats(
 
             # Estimate potential frames after consolidation
             thresholds = thresholds_for_temperature(temp)
-            if thresholds is None or already_consolidated or frame_count < CONSOLIDATION_MIN_HISTORY:
+            if (
+                thresholds is None
+                or already_consolidated
+                or frame_count < CONSOLIDATION_MIN_HISTORY
+            ):
                 potential = frame_count
             else:
                 delta_thresh, role_thresh = thresholds
-                kept = select_keyframes(brick.evolution_history, delta_thresh, role_thresh)
+                kept = select_keyframes(
+                    brick.evolution_history, delta_thresh, role_thresh
+                )
                 potential = len(kept)
 
-            stats.append({
-                "hex_key": hex_key,
-                "chunk": chunk_name,
-                "text": text,
-                "frame_count": frame_count,
-                "temperature": temp,
-                "tier": tier,
-                "consolidated": already_consolidated,
-                "potential_frames": potential,
-            })
+            stats.append(
+                {
+                    "hex_key": hex_key,
+                    "chunk": chunk_name,
+                    "text": text,
+                    "frame_count": frame_count,
+                    "temperature": temp,
+                    "tier": tier,
+                    "consolidated": already_consolidated,
+                    "potential_frames": potential,
+                }
+            )
 
     return stats

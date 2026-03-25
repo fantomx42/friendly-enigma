@@ -41,6 +41,7 @@ import numpy as np
 # CPU topology — detected once at import time
 # ---------------------------------------------------------------------------
 
+
 def _detect_core_groups() -> tuple[list[int], list[int]]:
     """Return (p_cores, e_cores) by reading cpufreq max-freq from /sys.
 
@@ -75,7 +76,7 @@ def _detect_core_groups() -> tuple[list[int], list[int]]:
 _P_CORES, _E_CORES = _detect_core_groups()
 # Embedding benefits from E-core cluster L2 cache; use E-cores when available
 _EMBED_CORES: list[int] = _E_CORES if _E_CORES else _P_CORES
-_IO_CORES:    list[int] = _E_CORES if _E_CORES else _P_CORES
+_IO_CORES: list[int] = _E_CORES if _E_CORES else _P_CORES
 
 
 def _pin(cpus: list[int]) -> None:
@@ -90,9 +91,11 @@ def _configure_torch_threads(n: int) -> None:
     """Set PyTorch intra-op thread count (silently ignored if torch unavailable)."""
     try:
         import torch
+
         torch.set_num_threads(n)
     except Exception:
         pass
+
 
 from .brick import MemoryBrick
 from .chunking import get_chunk_dir, list_existing_chunks, select_chunk
@@ -294,18 +297,23 @@ def crystallize(
     existing = _existing_keys(d) if resume else set()
 
     # Resolve encoder
-    _resolved_encoder = encoder if encoder is not None else ("embedding" if use_embedding else "hash")
+    _resolved_encoder = (
+        encoder if encoder is not None else ("embedding" if use_embedding else "hash")
+    )
 
     # Lazy-load batch functions
     _batch_fn = None
     if _resolved_encoder == "embedding":
         from .embedding import embed_to_frame_batch
+
         _batch_fn = embed_to_frame_batch
     elif _resolved_encoder == "hippocampus":
         from .hippocampus import hippocampus_to_frame_batch
+
         _batch_fn = hippocampus_to_frame_batch
     elif _resolved_encoder in ("language", "blended"):
         from .rotation import _get_frame_fn
+
         _single_fn = _get_frame_fn(encoder=_resolved_encoder)
         _batch_fn = lambda texts: [_single_fn(t) for t in texts]
 
@@ -347,8 +355,8 @@ def crystallize(
     # sentinel=None signals end-of-stream.
 
     SENTINEL = None
-    embed_q: Queue = Queue(maxsize=2)   # A→B
-    store_q: Queue = Queue(maxsize=2)   # B→C
+    embed_q: Queue = Queue(maxsize=2)  # A→B
+    store_q: Queue = Queue(maxsize=2)  # B→C
 
     def _embed_worker() -> None:
         _pin(_EMBED_CORES)
@@ -379,12 +387,17 @@ def crystallize(
                 except Exception as exc:
                     result.errors += 1
                     if verbose:
-                        print(f"  error preparing '{text[:50]}...': {exc}", file=sys.stderr)
+                        print(
+                            f"  error preparing '{text[:50]}...': {exc}",
+                            file=sys.stderr,
+                        )
             try:
                 n = batch_store_memories(entries, data_dir=data_dir)
                 result.stored += n
                 for _, _, _, text_chunk in entries[:n]:
-                    result.chunks_used[text_chunk] = result.chunks_used.get(text_chunk, 0) + 1
+                    result.chunks_used[text_chunk] = (
+                        result.chunks_used.get(text_chunk, 0) + 1
+                    )
                 if verbose and result.stored % 100 < len(entries):
                     milestone = (result.stored // 100) * 100
                     print(f"  crystallized {milestone} memories...", file=sys.stderr)

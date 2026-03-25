@@ -280,6 +280,86 @@ class AttractorCache:
             for i in top_idx
         ]
 
+    def _build_spatial(self):
+        """Pre-compute spatial topology features for all cached attractors."""
+        from wheeler_memory.dynamics import extract_spatial_features
+
+        t0 = time.time()
+        feature_vecs = []
+        for i in range(len(self._matrix)):
+            att_2d = self._matrix[i].reshape(64, 64)
+            fv = extract_spatial_features(att_2d)
+            feature_vecs.append(fv)
+
+        if feature_vecs:
+            self._spatial_matrix = np.stack(feature_vecs)  # (N, 51)
+            norms = np.linalg.norm(self._spatial_matrix, axis=1, keepdims=True)
+            norms = np.where(norms > 1e-10, norms, 1.0)
+            self._spatial_normed = self._spatial_matrix / norms
+        else:
+            self._spatial_matrix = np.zeros((0, 51), dtype=np.float32)
+            self._spatial_normed = np.zeros((0, 51), dtype=np.float32)
+
+        elapsed = time.time() - t0
+        print(f"  Computed spatial features ({self._spatial_matrix.shape[1]}-dim) in {elapsed:.1f}s")
+
+    def _spatial_search(
+        self, query_frame: np.ndarray, top_k: int = 5
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Hybrid Pearson + spatial topology search."""
+        from wheeler_memory.dynamics import (
+            evolve_and_interpret,
+            extract_spatial_features,
+        )
+        from wheeler_memory.constants import (
+            SALIENCE_MAX_ITERS_MED,
+            SALIENCE_THRESHOLD_MED,
+            SPATIAL_PEARSON_WEIGHT,
+        )
+
+        if not hasattr(self, "_spatial_matrix"):
+            self._build_spatial()
+
+        if len(self._texts) == 0:
+            return np.array([], dtype=np.intp), np.array([], dtype=np.float32)
+
+        # Pearson component
+        result = evolve_and_interpret(
+            query_frame,
+            max_iters=SALIENCE_MAX_ITERS_MED,
+            stability_threshold=SALIENCE_THRESHOLD_MED,
+        )
+        q_flat = result["attractor"].flatten().astype(np.float32)
+        q_mean = q_flat.mean()
+        q_std = q_flat.std()
+
+        if q_std < 1e-10:
+            return np.array([], dtype=np.intp), np.array([], dtype=np.float32)
+
+        q_centered = q_flat - q_mean
+        centered = self._matrix - self._att_means[:, None]
+        dots = centered @ q_centered
+        valid = self._att_stds > 1e-10
+        pearson_sims = np.where(valid, dots / (4096 * self._att_stds * q_std), 0.0)
+
+        # Spatial component
+        q_spatial = extract_spatial_features(result["attractor"])
+        q_norm = np.linalg.norm(q_spatial)
+        if q_norm > 1e-10:
+            q_normed = q_spatial / q_norm
+        else:
+            q_normed = q_spatial
+        spatial_sims = self._spatial_normed @ q_normed
+
+        # Combine
+        w = SPATIAL_PEARSON_WEIGHT
+        combined = w * pearson_sims + (1 - w) * spatial_sims
+
+        k = min(top_k, len(combined))
+        top_idx = np.argpartition(combined, -k)[-k:]
+        top_idx = top_idx[np.argsort(combined[top_idx])[::-1]]
+        return top_idx, combined
+
 
 # ---------------------------------------------------------------------------
 # Dataset loader
@@ -397,6 +477,109 @@ def score_semantic(
             hits = []
         top_sim = max((h.get("similarity", 0.0) for h in hits), default=0.0)
         scores.append(top_sim)
+    return int(scores.index(max(scores))), scores
+
+
+def score_spatial(
+    question: str,
+    choices: list[str],
+    recall_k: int = 5,
+    cache: "AttractorCache | None" = None,
+    precomputed_frames: list | None = None,
+) -> tuple[int, list[float]]:
+    """Score choices by hybrid Pearson + spatial topology similarity.
+
+    Like score_semantic but uses _spatial_search() which blends Pearson
+    correlation with spatial cluster topology features (island positions,
+    sizes, boundary length).
+    """
+    if precomputed_frames is not None:
+        frames = precomputed_frames
+    else:
+        from wheeler_memory.hashing import hash_to_frame
+        frames = [hash_to_frame(f"{question} {c}") for c in choices]
+
+    scores = []
+    for frame in frames:
+        if cache is not None:
+            top_idx, sims = cache._spatial_search(frame, top_k=recall_k)
+            top_sim = float(sims[top_idx[0]]) if len(top_idx) > 0 else 0.0
+        else:
+            top_sim = 0.0
+        scores.append(top_sim)
+    return int(scores.index(max(scores))), scores
+
+
+def score_reverse_lookup(
+    question: str,
+    choices: list[str],
+    recall_k: int = 10,
+    cache: "AttractorCache | None" = None,
+    encoder: str = "hippo-word",
+) -> tuple[int, list[float]]:
+    """Score by encoding each choice alone, recalling related facts,
+    then checking which recalled facts best match the question.
+
+    The human test-taking strategy: "What do I know about this answer?"
+    then compare recalled knowledge to the question.
+    """
+    if cache is None:
+        return 0, [0.0] * len(choices)
+
+    from wheeler_memory.dynamics import evolve_and_interpret
+    from wheeler_memory.constants import (
+        SALIENCE_MAX_ITERS_MED,
+        SALIENCE_THRESHOLD_MED,
+    )
+
+    frame_fn, _ = _get_encoder_fns(encoder)
+
+    # Encode the question once and evolve to attractor
+    q_frame = frame_fn(question)
+    q_result = evolve_and_interpret(
+        q_frame,
+        max_iters=SALIENCE_MAX_ITERS_MED,
+        stability_threshold=SALIENCE_THRESHOLD_MED,
+    )
+    q_flat = q_result["attractor"].flatten().astype(np.float32)
+    q_mean = q_flat.mean()
+    q_std = q_flat.std()
+    if q_std < 1e-10:
+        return 0, [0.0] * len(choices)
+    q_centered = q_flat - q_mean
+
+    # Also get question-only similarity as baseline to subtract
+    q_hits = cache.search(q_frame, top_k=1)
+    q_baseline = q_hits[0]["similarity"] if q_hits else 0.0
+
+    scores = []
+    for choice in choices:
+        # Strategy 1: encode choice alone, recall related facts
+        c_frame = frame_fn(choice)
+        top_idx, _ = cache._pearson_search(c_frame, top_k=recall_k)
+
+        # Strategy 2: encode question+choice, get direct similarity
+        qc_frame = frame_fn(f"{question} {choice}")
+        qc_hits = cache.search(qc_frame, top_k=1)
+        qc_sim = qc_hits[0]["similarity"] if qc_hits else 0.0
+        # Differential: how much does adding this choice boost similarity?
+        diff_score = qc_sim - q_baseline
+
+        # Strategy 1 score: best match of recalled facts to question
+        reverse_score = 0.0
+        if len(top_idx) > 0:
+            recalled = cache._matrix[top_idx]
+            recalled_stds = cache._att_stds[top_idx]
+            recalled_means = cache._att_means[top_idx]
+            valid = recalled_stds > 1e-10
+            centered = recalled - recalled_means[:, None]
+            dots = centered @ q_centered
+            sims = np.where(valid, dots / (4096 * recalled_stds * q_std), 0.0)
+            reverse_score = float(sims.max()) if len(sims) > 0 else 0.0
+
+        # Combine: differential + reverse-lookup
+        scores.append(diff_score + 0.5 * reverse_score)
+
     return int(scores.index(max(scores))), scores
 
 
@@ -1120,7 +1303,7 @@ def run_benchmark(
     # Build attractor cache once for the entire benchmark run
     cache = (
         AttractorCache(data_dir)
-        if mode in ("semantic", "recall-text", "multi-choice", "cortex", "ternary-retrieval")
+        if mode in ("semantic", "recall-text", "multi-choice", "cortex", "ternary-retrieval", "reverse-lookup", "spatial")
         else None
     )
 
@@ -1154,7 +1337,7 @@ def run_benchmark(
         # Pre-encode all question+choice pairs in one batch (semantic mode only)
         precomputed = None
         if (
-            mode in ("semantic", "ternary", "ternary-retrieval")
+            mode in ("semantic", "ternary", "ternary-retrieval", "spatial")
             and use_embed
             and subject_items
         ):
@@ -1192,6 +1375,17 @@ def run_benchmark(
                 pred_idx, confidence = score_multi_choice(
                     question, choices, recall_k, cache, debug=_dbg, encoder=encoder
                 )
+            elif mode == "reverse-lookup":
+                pred_idx, scores = score_reverse_lookup(
+                    question, choices, recall_k, cache, encoder=encoder
+                )
+                confidence = max(scores)
+            elif mode == "spatial":
+                frames = precomputed[idx] if precomputed is not None else None
+                pred_idx, scores = score_spatial(
+                    question, choices, recall_k, cache, frames
+                )
+                confidence = max(scores)
             elif mode == "cortex":
                 pred_idx, confidence = score_cortex(
                     question,
@@ -1365,6 +1559,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "ternary-retrieval",
             "ternary-ensemble",
             "multi-choice",
+            "reverse-lookup",
+            "spatial",
         ],
         default="semantic",
         help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), 'learn' (store dev+val → consolidate → test), 'recall-text' (extract answer letter from recalled facts), 'cortex' (full cortex pipeline), 'ternary' (net +1/-1 cell count), 'ternary-retrieval' (ternary overlap with retrieved attractors). Default: semantic.",

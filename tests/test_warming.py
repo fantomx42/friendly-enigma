@@ -1,4 +1,5 @@
 """Integration tests for associative warming."""
+
 import json
 import sys
 from datetime import datetime, timedelta, timezone
@@ -162,16 +163,18 @@ class TestCoRecallAssociations:
             store_test_memory(text, tmp_path)
 
         chunk_dir = tmp_path / "chunks" / "general"
-        edges_before = sum(
-            len(v) for v in load_associations(chunk_dir).get("edges", {}).values()
-        ) // 2
+        edges_before = (
+            sum(len(v) for v in load_associations(chunk_dir).get("edges", {}).values())
+            // 2
+        )
 
         # Recall should form co-recall edges
         results = recall_memory("memory association", top_k=3, data_dir=tmp_path)
 
-        edges_after = sum(
-            len(v) for v in load_associations(chunk_dir).get("edges", {}).values()
-        ) // 2
+        edges_after = (
+            sum(len(v) for v in load_associations(chunk_dir).get("edges", {}).values())
+            // 2
+        )
 
         assert len(results) > 0
         assert edges_after >= edges_before

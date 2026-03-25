@@ -72,7 +72,9 @@ def store_test_memory(text: str, data_dir: Path, chunk: str = "general") -> str:
     frame = hash_to_frame(text)
     result = evolve_and_interpret(frame)
     brick = MemoryBrick.from_evolution_result(result)
-    return store_memory(text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False)
+    return store_memory(
+        text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False
+    )
 
 
 def age_memory(data_dir: Path, chunk: str, hex_key: str, days: float) -> None:
@@ -118,15 +120,19 @@ def main():
 
         # Coldest first — the oldest (60 days) should be first
         if len(scored) >= 2:
-            check("sorted coldest-first",
-                  scored[0]["temperature"] <= scored[-1]["temperature"],
-                  f"first={scored[0]['temperature']:.6f}, last={scored[-1]['temperature']:.6f}")
+            check(
+                "sorted coldest-first",
+                scored[0]["temperature"] <= scored[-1]["temperature"],
+                f"first={scored[0]['temperature']:.6f}, last={scored[-1]['temperature']:.6f}",
+            )
 
         # The 60-day-old should be the coldest
         sixty_day_key = keys[4]
-        check("60-day memory is coldest",
-              scored[0]["hex_key"] == sixty_day_key,
-              f"coldest is {scored[0]['hex_key'][:8]}..., expected {sixty_day_key[:8]}...")
+        check(
+            "60-day memory is coldest",
+            scored[0]["hex_key"] == sixty_day_key,
+            f"coldest is {scored[0]['hex_key'][:8]}..., expected {sixty_day_key[:8]}...",
+        )
 
         # ==================================================================
         # Test 2: fade_cold_memories
@@ -135,10 +141,14 @@ def main():
 
         # The 30-day-old (base=0.3) should have temp ≈ 0.3 * 2^(-30/7) ≈ 0.0053
         thirty_key = keys[3]
-        thirty_temp = next(m["temperature"] for m in scored if m["hex_key"] == thirty_key)
-        check("30-day memory temp < TIER_FADING",
-              thirty_temp < TIER_FADING,
-              f"temp={thirty_temp:.6f}")
+        thirty_temp = next(
+            m["temperature"] for m in scored if m["hex_key"] == thirty_key
+        )
+        check(
+            "30-day memory temp < TIER_FADING",
+            thirty_temp < TIER_FADING,
+            f"temp={thirty_temp:.6f}",
+        )
 
         brick_path = tmp / "chunks" / "general" / "bricks" / f"{thirty_key}.npz"
         check("brick exists before fade", brick_path.exists())
@@ -156,7 +166,9 @@ def main():
         check("index entry survives fade", thirty_key in index)
 
         # Memory should still be recallable (attractor exists)
-        results = recall_memory("eviction test memory thirty days", top_k=5, data_dir=tmp, chunk="general")
+        results = recall_memory(
+            "eviction test memory thirty days", top_k=5, data_dir=tmp, chunk="general"
+        )
         found_keys = [r["hex_key"] for r in results]
         check("faded memory still recallable", thirty_key in found_keys)
 
@@ -174,9 +186,11 @@ def main():
         sixty_key = keys[4]
         scored = score_memories(tmp)
         sixty_temp = next(m["temperature"] for m in scored if m["hex_key"] == sixty_key)
-        check("60-day memory temp < TIER_DEAD",
-              sixty_temp < TIER_DEAD,
-              f"temp={sixty_temp:.6f}")
+        check(
+            "60-day memory temp < TIER_DEAD",
+            sixty_temp < TIER_DEAD,
+            f"temp={sixty_temp:.6f}",
+        )
 
         evicted = evict_dead_memories(tmp)
         check("evict returned entries", len(evicted) > 0, f"got {len(evicted)}")
@@ -191,7 +205,9 @@ def main():
         check("index entry removed", sixty_key not in index)
 
         # Not recallable
-        results = recall_memory("eviction test memory sixty days", top_k=5, data_dir=tmp, chunk="general")
+        results = recall_memory(
+            "eviction test memory sixty days", top_k=5, data_dir=tmp, chunk="general"
+        )
         found_keys = [r["hex_key"] for r in results]
         check("evicted memory not recallable", sixty_key not in found_keys)
 
@@ -213,8 +229,11 @@ def main():
 
             # Verify edges exist
             n1_before = get_neighbors(chunk_dir4, k1)
-            check("k1 has neighbors before eviction", len(n1_before) >= 1,
-                  f"got {len(n1_before)}")
+            check(
+                "k1 has neighbors before eviction",
+                len(n1_before) >= 1,
+                f"got {len(n1_before)}",
+            )
 
             # Age k3 to make it dead, then evict
             age_memory(tmp4, "general", k3, 60)
@@ -222,16 +241,22 @@ def main():
 
             # k3's edges should be gone
             n3_after = get_neighbors(chunk_dir4, k3)
-            check("evicted memory has no neighbors", len(n3_after) == 0,
-                  f"got {len(n3_after)}")
+            check(
+                "evicted memory has no neighbors",
+                len(n3_after) == 0,
+                f"got {len(n3_after)}",
+            )
 
             # k1 should no longer reference k3
             n1_after = get_neighbors(chunk_dir4, k1)
             check("k1 no longer references evicted k3", k3 not in n1_after)
 
             # k1 and k2 edge should still exist
-            check("k1-k2 edge preserved", k2 in n1_after,
-                  f"k1 neighbors: {list(n1_after.keys())}")
+            check(
+                "k1-k2 edge preserved",
+                k2 in n1_after,
+                f"k1 neighbors: {list(n1_after.keys())}",
+            )
         finally:
             shutil.rmtree(tmp4, ignore_errors=True)
 
@@ -266,7 +291,12 @@ def main():
             k = store_test_memory("hot memory survives eviction", tmp6, chunk="general")
             # Recall it 10 times to make it hot
             for _ in range(10):
-                recall_memory("hot memory survives eviction", top_k=1, data_dir=tmp6, chunk="general")
+                recall_memory(
+                    "hot memory survives eviction",
+                    top_k=1,
+                    data_dir=tmp6,
+                    chunk="general",
+                )
 
             # Age it moderately
             age_memory(tmp6, "general", k, 5)
@@ -275,13 +305,17 @@ def main():
             # The hit_count=10 keeps temperature warm even after 5 days.
             scored = score_memories(tmp6)
             mem = next((m for m in scored if m["hex_key"] == k), None)
-            check("recalled memory is warm or hot",
-                  mem is not None and mem["temperature"] >= 0.3,
-                  f"temp={mem['temperature']:.4f}" if mem else "not found")
+            check(
+                "recalled memory is warm or hot",
+                mem is not None and mem["temperature"] >= 0.3,
+                f"temp={mem['temperature']:.4f}" if mem else "not found",
+            )
 
             # Try to evict — should not touch warm/hot
             evicted = evict_dead_memories(tmp6)
-            check("hot memory not evicted", k in _load_index(tmp6 / "chunks" / "general"))
+            check(
+                "hot memory not evicted", k in _load_index(tmp6 / "chunks" / "general")
+            )
         finally:
             shutil.rmtree(tmp6, ignore_errors=True)
 
@@ -302,7 +336,10 @@ def main():
             evicted = evict_dead_memories(tmp7)
             check("new memory not faded", k not in [m["hex_key"] for m in faded])
             check("new memory not evicted", k not in [m["hex_key"] for m in evicted])
-            check("new memory still in index", k in _load_index(tmp7 / "chunks" / "general"))
+            check(
+                "new memory still in index",
+                k in _load_index(tmp7 / "chunks" / "general"),
+            )
         finally:
             shutil.rmtree(tmp7, ignore_errors=True)
 
@@ -323,8 +360,10 @@ def main():
             check("dry_run report has items", total_items > 0, f"got {total_items}")
 
             # But nothing should be deleted
-            check("memory still in index after dry_run",
-                  k in _load_index(tmp8 / "chunks" / "general"))
+            check(
+                "memory still in index after dry_run",
+                k in _load_index(tmp8 / "chunks" / "general"),
+            )
 
             att = tmp8 / "chunks" / "general" / "attractors" / f"{k}.npy"
             check("attractor still exists after dry_run", att.exists())
@@ -341,7 +380,9 @@ def main():
             # Store 8 memories with varying ages
             cap_keys = []
             for i in range(8):
-                k = store_test_memory(f"capacity test memory {i}", tmp9, chunk="general")
+                k = store_test_memory(
+                    f"capacity test memory {i}", tmp9, chunk="general"
+                )
                 # Age them progressively: 2, 4, 6, 8, 10, 12, 14, 16 days
                 age_memory(tmp9, "general", k, (i + 1) * 2)
                 cap_keys.append(k)
@@ -352,12 +393,18 @@ def main():
             with mock.patch("wheeler_memory.eviction.MAX_ATTRACTORS", 5):
                 evicted = evict_for_capacity(tmp9)
 
-            check("some memories evicted for capacity", len(evicted) > 0,
-                  f"evicted {len(evicted)}")
+            check(
+                "some memories evicted for capacity",
+                len(evicted) > 0,
+                f"evicted {len(evicted)}",
+            )
 
             remaining = score_memories(tmp9)
-            check("remaining count reduced", len(remaining) < 8,
-                  f"remaining={len(remaining)}")
+            check(
+                "remaining count reduced",
+                len(remaining) < 8,
+                f"remaining={len(remaining)}",
+            )
 
             # The evicted should be the coldest (oldest)
             evicted_keys = {m["hex_key"] for m in evicted}
@@ -369,13 +416,13 @@ def main():
         # ==================================================================
         # Summary
         # ==================================================================
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  EVICTION TEST RESULTS")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"  Passed: {passes}")
         print(f"  Failed: {fails}")
         print(f"  Overall: {'PASS' if fails == 0 else 'FAIL'}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

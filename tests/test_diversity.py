@@ -3,6 +3,7 @@
 Tests that Wheeler Memory attractors are genuinely distinct across diverse inputs —
 the core correctness guarantee.
 """
+
 import numpy as np
 import pytest
 from scipy.stats import pearsonr
@@ -50,7 +51,9 @@ class TestAttractorDiversity:
         attractors = []
         for text in TEST_INPUTS:
             frame = hash_to_frame(text)
-            result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+            result = evolve_and_interpret(
+                frame, max_iters=1000, stability_threshold=1e-4
+            )
             attractors.append(result["attractor"].flatten())
 
         n = len(attractors)
@@ -87,7 +90,9 @@ class TestAttractorDiversity:
         states = []
         for text in TEST_INPUTS:
             frame = hash_to_frame(text)
-            result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+            result = evolve_and_interpret(
+                frame, max_iters=1000, stability_threshold=1e-4
+            )
             states.append(result["state"])
 
         chaotic_count = sum(1 for s in states if s == "CHAOTIC")

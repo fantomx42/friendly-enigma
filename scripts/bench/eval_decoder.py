@@ -49,7 +49,6 @@ TEST_CASES = [
         "expected_depth": "deep",
         "description": "Quantum superposition is directly in curated science entries",
     },
-
     # SHALLOW: related but not directly stored
     {
         "query": "What is the transformer architecture?",
@@ -66,7 +65,6 @@ TEST_CASES = [
         "expected_depth": "shallow",
         "description": "Not directly stored, but ML concepts nearby",
     },
-
     # MISSING: no attractor at all
     {
         "query": "What is the best recipe for sourdough bread?",
@@ -169,7 +167,9 @@ def run_evaluation(
 
     results = []
     for case in cases:
-        result = evaluate_case(case, data_dir=data_dir, confidence_floor=confidence_floor)
+        result = evaluate_case(
+            case, data_dir=data_dir, confidence_floor=confidence_floor
+        )
 
         # Optionally decode via small model
         if decode:
@@ -192,8 +192,10 @@ def run_evaluation(
         results.append(result)
 
     # Print results table
-    print(f"{'Depth':<10} {'Confidence':>10} {'Top Sim':>8} {'Avg Sim':>8} {'Hits':>5} {'Query'}")
-    print(f"{'─'*10} {'─'*10} {'─'*8} {'─'*8} {'─'*5} {'─'*50}")
+    print(
+        f"{'Depth':<10} {'Confidence':>10} {'Top Sim':>8} {'Avg Sim':>8} {'Hits':>5} {'Query'}"
+    )
+    print(f"{'─' * 10} {'─' * 10} {'─' * 8} {'─' * 8} {'─' * 5} {'─' * 50}")
     for r in results:
         conf_str = f"{r['confidence']:.2f}" + ("*" if r["uncertain"] else " ")
         print(
@@ -214,10 +216,18 @@ def run_evaluation(
         for r in tier_results:
             print(f"\n  Query: {r['query']}")
             print(f"  Top hit: {r['top_hit']}")
-            print(f"  Confidence: {r['confidence']:.3f} ({'uncertain' if r['uncertain'] else 'confident'})")
-            print(f"  Top sim: {r['top_similarity']:.3f}, Avg sim: {r['avg_similarity']:.3f}")
+            print(
+                f"  Confidence: {r['confidence']:.3f} ({'uncertain' if r['uncertain'] else 'confident'})"
+            )
+            print(
+                f"  Top sim: {r['top_similarity']:.3f}, Avg sim: {r['avg_similarity']:.3f}"
+            )
             if show_features and r["top_grid_entropy"] is not None:
-                rdelta_s = f"rdelta={r['top_reconstruction_delta']}" if r["top_reconstruction_delta"] is not None else "rdelta=n/a"
+                rdelta_s = (
+                    f"rdelta={r['top_reconstruction_delta']}"
+                    if r["top_reconstruction_delta"] is not None
+                    else "rdelta=n/a"
+                )
                 print(
                     f"  Features: H={r['top_grid_entropy']:.2f}  "
                     f"clust={r['top_cluster_count']}  "
@@ -262,7 +272,9 @@ def run_evaluation(
             continue
         avg_conf = sum(r["confidence"] for r in tier_results) / len(tier_results)
         avg_top = sum(r["top_similarity"] for r in tier_results) / len(tier_results)
-        uncertain_pct = sum(1 for r in tier_results if r["uncertain"]) / len(tier_results) * 100
+        uncertain_pct = (
+            sum(1 for r in tier_results if r["uncertain"]) / len(tier_results) * 100
+        )
         tier_avg_sim[tier] = avg_top
         print(
             f"  {tier:<10}: avg_confidence={avg_conf:.3f}  avg_top_sim={avg_top:.3f}  "
@@ -288,22 +300,40 @@ def run_evaluation(
             "projection is the bottleneck. Fixing the decoder won't help."
         )
     elif ds_verdict == "MARGINAL" or sm_verdict == "MARGINAL":
-        print("\n  ⚡  Marginal separation — projection may be limiting recall quality.")
+        print(
+            "\n  ⚡  Marginal separation — projection may be limiting recall quality."
+        )
     else:
-        print("\n  ✓  Tiers are well-separated. Decoder instrumentation should be meaningful.")
+        print(
+            "\n  ✓  Tiers are well-separated. Decoder instrumentation should be meaningful."
+        )
 
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate Wheeler-primary decoder quality")
+    parser = argparse.ArgumentParser(
+        description="Evaluate Wheeler-primary decoder quality"
+    )
     parser.add_argument("--data-dir", default=None, help="Wheeler data directory")
-    parser.add_argument("--decode", action="store_true", help="Also run small model decoder")
-    parser.add_argument("--features", action="store_true", help="Print per-hit structural features")
-    parser.add_argument("--corpus", default=None, help="JSONL file of test cases (query/expected_depth/description)")
-    parser.add_argument("--model", default="qwen2.5:1.5b", help="Decoder model (default: qwen2.5:1.5b)")
+    parser.add_argument(
+        "--decode", action="store_true", help="Also run small model decoder"
+    )
+    parser.add_argument(
+        "--features", action="store_true", help="Print per-hit structural features"
+    )
+    parser.add_argument(
+        "--corpus",
+        default=None,
+        help="JSONL file of test cases (query/expected_depth/description)",
+    )
+    parser.add_argument(
+        "--model", default="qwen2.5:1.5b", help="Decoder model (default: qwen2.5:1.5b)"
+    )
     parser.add_argument("--ollama", default="http://localhost:11434", help="Ollama URL")
-    parser.add_argument("--confidence-floor", type=float, default=0.18, help="Confidence floor")
+    parser.add_argument(
+        "--confidence-floor", type=float, default=0.18, help="Confidence floor"
+    )
     args = parser.parse_args()
 
     test_cases = None
@@ -317,7 +347,10 @@ def main():
         for i, case in enumerate(test_cases):
             for key in ("query", "expected_depth", "description"):
                 if key not in case:
-                    print(f"ERROR: corpus line {i+1} missing key '{key}'", file=sys.stderr)
+                    print(
+                        f"ERROR: corpus line {i + 1} missing key '{key}'",
+                        file=sys.stderr,
+                    )
                     raise SystemExit(1)
         print(f"Loaded {len(test_cases)} test cases from {corpus_path}")
 

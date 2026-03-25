@@ -44,16 +44,19 @@ def test_build_theory():
         assert isinstance(theory, Theory), f"Expected Theory, got {type(theory)}"
         print(f"  Active frames: {len(theory.active_frames)}")
         for f in theory.active_frames:
-            print(f"    '{f.text}': temp={f.temperature:.3f}, "
-                  f"basin_width={f.basin_width:.4f}, confidence={f.confidence:.4f}")
+            print(
+                f"    '{f.text}': temp={f.temperature:.3f}, "
+                f"basin_width={f.basin_width:.4f}, confidence={f.confidence:.4f}"
+            )
 
         assert len(theory.active_frames) > 0, "No active frames in theory"
 
         # Check context budget
         budget_sum = sum(theory.context_budget.values())
         print(f"  Context budget sum: {budget_sum:.4f}")
-        assert abs(budget_sum - 1.0) < 0.01 or budget_sum == 0.0, \
+        assert abs(budget_sum - 1.0) < 0.01 or budget_sum == 0.0, (
             f"Context budget should sum to ~1.0, got {budget_sum:.4f}"
+        )
 
         print("  PASS: Theory built successfully")
     finally:
@@ -86,8 +89,9 @@ def test_theory_to_prompt():
 
         assert len(prompt) > 0, "Prompt should not be empty"
         assert "expressing a theory" in prompt, "Prompt should contain theory framing"
-        assert "context budget" not in prompt.lower() or "context" in prompt.lower(), \
+        assert "context budget" not in prompt.lower() or "context" in prompt.lower(), (
             "Prompt should reference context allocation"
+        )
 
         print("  PASS: Prompt generated successfully")
     finally:

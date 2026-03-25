@@ -62,9 +62,9 @@ def _get_frame_matrix() -> np.ndarray:
     global _frame_matrix
     if _frame_matrix is None:
         rng = np.random.Generator(np.random.PCG64(FRAME_PROJECTION_SEED))
-        _frame_matrix = rng.standard_normal(
-            (EMBED_DIM, FRAME_CELLS)
-        ).astype(np.float32) / np.sqrt(FRAME_CELLS)
+        _frame_matrix = rng.standard_normal((EMBED_DIM, FRAME_CELLS)).astype(
+            np.float32
+        ) / np.sqrt(FRAME_CELLS)
     return _frame_matrix
 
 
@@ -86,18 +86,16 @@ def _extract_ngrams(text: str) -> dict[int, float]:
 
     # Character 3-grams
     for i in range(len(text) - 2):
-        bucket = _ngram_hash(text[i:i + 3])
+        bucket = _ngram_hash(text[i : i + 3])
         counts[bucket] = counts.get(bucket, 0) + 1
 
     # Character 4-grams
     for i in range(len(text) - 3):
-        bucket = _ngram_hash(text[i:i + 4])
+        bucket = _ngram_hash(text[i : i + 4])
         counts[bucket] = counts.get(bucket, 0) + 1
 
     # Sublinear weighting to prevent common n-grams from dominating
-    return {
-        bucket: np.log1p(count) for bucket, count in counts.items()
-    }
+    return {bucket: np.log1p(count) for bucket, count in counts.items()}
 
 
 def _text_to_vector(text: str) -> np.ndarray:
@@ -161,6 +159,5 @@ def hippocampus_to_frame_batch(
     frames_flat = np.tanh(frames_flat * 3.0)
 
     return [
-        frames_flat[i].reshape(size, size).astype(np.float32)
-        for i in range(len(texts))
+        frames_flat[i].reshape(size, size).astype(np.float32) for i in range(len(texts))
     ]

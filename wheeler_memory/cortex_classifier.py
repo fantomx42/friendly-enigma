@@ -35,11 +35,11 @@ class ClassifierWeights:
     b3: np.ndarray
 
 
-def init_weights(input_dim: int = 21, seed: int = 42) -> ClassifierWeights:
+def init_weights(input_dim: int = 24, seed: int = 42) -> ClassifierWeights:
     """Initialize network weights with Xavier initialization.
 
     Args:
-        input_dim: Number of input features (default 21: K + 4 + 7)
+        input_dim: Number of input features (default 24: K + 4 + 7 + 3)
         seed: Random seed for reproducibility
 
     Returns:
@@ -153,6 +153,7 @@ def classify(
     choice_sims: np.ndarray,
     scm_layers: np.ndarray,
     weights: ClassifierWeights,
+    coevo_layers: np.ndarray | None = None,
 ) -> tuple[int, float]:
     """Classify a question to one of 4 answer choices.
 
@@ -161,17 +162,20 @@ def classify(
         choice_sims: (4,) Pearson similarities of each choice to query attractor
         scm_layers: (7,) SCM sub-scores [T, S, E, I, P, NW, ERF]
         weights: ClassifierWeights
+        coevo_layers: (3,) optional coevolution layer features
 
     Returns:
         Tuple of (predicted_choice_index, confidence)
         - predicted_choice_index: int in [0, 1, 2, 3]
         - confidence: float in [0, 1], the max softmax probability
     """
-    # Concatenate features: K + 4 + 7 = K + 11
-    features = np.concatenate([settlement, choice_sims, scm_layers])
+    # Concatenate features: K + 4 + 7 = K + 11, optionally + 3 = K + 14
+    x = np.concatenate([settlement, choice_sims, scm_layers]).astype(np.float32)
+    if coevo_layers is not None:
+        x = np.concatenate([x, coevo_layers]).astype(np.float32)
 
     # Forward pass
-    probs = forward(features, weights)
+    probs = forward(x, weights)
 
     # Predict argmax and get confidence
     idx = int(np.argmax(probs))

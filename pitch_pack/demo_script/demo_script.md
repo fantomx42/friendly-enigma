@@ -378,13 +378,13 @@ Before starting the demo, ensure:
 **Goal**: Show the CA evolution visually and explain convergence.
 
 #### Step 4.1: Show Evolution GIF
-- Open `/home/tristan/wheeler memory/docs/assets/diagrams/evolution.gif` in an image viewer or browser.
+- Open `/home/tristan/projects/wheeler-memory/docs/assets/diagrams/evolution.gif` in an image viewer or browser.
 - **Talking Point**: "This is a cellular automaton evolving over time. You see chaos at the start (random initial state). As the rules apply, order emerges. Peaks push outward, valleys pull inward, slopes flow uphill. In ~100 ticks, it converges to a stable pattern. That pattern is the memory."
 
 **Timing: 1 minute**
 
 #### Step 4.2: Show Reconstruction Demo
-- Open `/home/tristan/wheeler memory/docs/assets/reports/reconstruction_demo.png` in an image viewer.
+- Open `/home/tristan/projects/wheeler-memory/docs/assets/reports/reconstruction_demo.png` in an image viewer.
 - **Talking Point**: "This shows three reconstructions of the same stored pattern, blended with different query contexts (α=0.3). Same memory, three different reconstructions. The left might be the stored pattern. The middle blends with one query. The right blends with another. Context colors recall."
 
 **Timing: 45 seconds**

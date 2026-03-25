@@ -99,14 +99,20 @@ def apple_test(
     log.append(f"  Found {len(gaps)} gap points")
 
     if not gaps:
-        log.append("No gaps found — all basins are contiguous. Synthesizing from centroid.")
+        log.append(
+            "No gaps found — all basins are contiguous. Synthesizing from centroid."
+        )
         # Fallback: blend all attractors as centroid
         all_atts = list(attractors.values())
         centroid = np.mean(all_atts, axis=0).astype(np.float32)
         centroid = np.clip(centroid, -1, 1)
-        gaps = [{"point": centroid, "neighbors": (list(attractors.keys())[0],
-                                                   list(attractors.keys())[-1]),
-                 "blend_alpha": 0.5}]
+        gaps = [
+            {
+                "point": centroid,
+                "neighbors": (list(attractors.keys())[0], list(attractors.keys())[-1]),
+                "blend_alpha": 0.5,
+            }
+        ]
 
     # Step 3: Synthesize from largest gap (first gap point as proxy)
     gap = gaps[0]
@@ -114,8 +120,10 @@ def apple_test(
     neighbor_atts = [attractors[k] for k in neighbor_keys if k in attractors]
     synth = synthesize_from_gap(gap["point"], neighbor_atts)
     candidate = synth["candidate"]
-    log.append(f"Synthesized candidate from gap (state: {synth['state']}, "
-               f"confidence: {synth['confidence']:.3f})")
+    log.append(
+        f"Synthesized candidate from gap (state: {synth['state']}, "
+        f"confidence: {synth['confidence']:.3f})"
+    )
 
     # Step 4: Expose to holdout
     log.append(f"Exposing holdout '{holdout}' to CA dynamics...")
@@ -146,20 +154,27 @@ def apple_test(
 
     if corr_with_candidate > 0.7:
         verdict = "convergence"
-        log.append(f"CONVERGENCE: holdout correlates {corr_with_candidate:.3f} with candidate")
+        log.append(
+            f"CONVERGENCE: holdout correlates {corr_with_candidate:.3f} with candidate"
+        )
     elif max_neighbor_corr > 0.9:
         dissolved_text = next(
-            (item for item in training_items
-             if hash_to_frame.__module__ and True),  # always true, just get item
+            (
+                item for item in training_items if hash_to_frame.__module__ and True
+            ),  # always true, just get item
             None,
         )
         verdict = "dissolution"
-        log.append(f"DISSOLUTION: holdout fell to existing attractor {dissolved_to[:12]}... "
-                   f"(corr={max_neighbor_corr:.3f})")
+        log.append(
+            f"DISSOLUTION: holdout fell to existing attractor {dissolved_to[:12]}... "
+            f"(corr={max_neighbor_corr:.3f})"
+        )
     else:
         verdict = "hallucination"
-        log.append(f"HALLUCINATION: holdout drifted (candidate corr={corr_with_candidate:.3f}, "
-                   f"max neighbor corr={max_neighbor_corr:.3f})")
+        log.append(
+            f"HALLUCINATION: holdout drifted (candidate corr={corr_with_candidate:.3f}, "
+            f"max neighbor corr={max_neighbor_corr:.3f})"
+        )
 
     # Cleanup temp dir
     if cleanup:
@@ -190,27 +205,51 @@ def run_apple_battery() -> dict:
     """
     domains = {
         "fruits": {
-            "items": ["apple", "orange", "banana", "grape", "mango",
-                       "strawberry", "pear", "peach"],
+            "items": [
+                "apple",
+                "orange",
+                "banana",
+                "grape",
+                "mango",
+                "strawberry",
+                "pear",
+                "peach",
+            ],
             "holdout": "apple",
         },
         "languages": {
-            "items": ["python", "javascript", "rust", "go", "java",
-                       "c", "ruby", "haskell"],
+            "items": [
+                "python",
+                "javascript",
+                "rust",
+                "go",
+                "java",
+                "c",
+                "ruby",
+                "haskell",
+            ],
             "holdout": "rust",
         },
         "emotions": {
-            "items": ["joy", "anger", "sadness", "fear", "surprise",
-                       "disgust", "love", "hope"],
+            "items": [
+                "joy",
+                "anger",
+                "sadness",
+                "fear",
+                "surprise",
+                "disgust",
+                "love",
+                "hope",
+            ],
             "holdout": "fear",
         },
     }
 
     results = {}
     for domain_name, config in domains.items():
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Apple Test: {domain_name} (holdout: {config['holdout']})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         result = apple_test(config["items"], config["holdout"])
         results[domain_name] = {
             "verdict": result["verdict"],
