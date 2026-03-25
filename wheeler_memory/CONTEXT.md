@@ -11,8 +11,8 @@ This is the main Python package. All modules are imported through `__init__.py`.
 - **word_encoder.py** — Word-level random indexing with learned co-occurrence vectors (SVD on PMI). Trains from stored corpus. Blended with hippocampus via `WORD_HIPPO_BLEND` in constants.py.
 
 ### CA Engine (Frame -> Attractor)
-- **dynamics.py** — 3-state CA evolution. Local max -> +1, local min -> -1, slopes flow uphill. Von Neumann (4-neighbor) topology. Dispatches to GPU when available.
-- **gpu_dynamics.py** — HIP/CUDA kernel loader. Calls compiled `.so` in `gpu/`.
+- **dynamics.py** — 3-state CA evolution. Local max -> +1, local min -> -1, slopes flow uphill. Von Neumann (4-neighbor) topology. Dispatches to GPU when available. v0.3.0 added `evolve_with_params()` for per-call push/slope injection (corpus vs experiential regimes).
+- **gpu_dynamics.py** — HIP/CUDA kernel loader. Calls compiled `.so` in `gpu/`. v0.3.0: `gpu_evolve_single()` accepts optional `push_strength`/`slope_strength` kwargs for v2 kernel.
 - **oscillation.py** — Detects oscillating CA states that never converge.
 - **rotation.py** — Rotation retry to escape bad attractor basins. **SACRED.**
 
@@ -30,7 +30,7 @@ This is the main Python package. All modules are imported through `__init__.py`.
 ### Memory Lifecycle
 - **temperature.py** — Access frequency + time decay (7-day half-life). Tiers: hot/warm/cold/fading/dead.
 - **warming.py** — 2-hop spreading activation. Fast-decay warmth primes associated memories.
-- **consolidation.py** — Sleep consolidation. Prunes redundant keyframes from bricks.
+- **consolidation.py** — Sleep consolidation. 3 phases: (1) brick pruning, (2) experiential→corpus re-projection, (3) SCM annealing (10% hardening decay per sleep).
 - **eviction.py** — 3-phase graceful degradation when over capacity.
 - **attention.py** — Salience-driven variable tick rates (low/med/high CA budget).
 
@@ -40,8 +40,13 @@ This is the main Python package. All modules are imported through `__init__.py`.
 - **generation.py** — IT-from-BIT generative engine. Trajectory resonance.
 - **language_wheeler.py** — Language-level Wheeler encoding.
 
+### Three-Grid Interference (v0.3.0)
+- **scm_grid.py** — SCM (Structural Coherence Map): persistent 64x64 float32 grid in [-1,1] + uint32 hardening counts. Trust topology — where interference is permitted. `load_or_create()`, `update(mask, direction)`, `gap_mask()`, `anneal()`, `stats()`. Persisted as `scm_grid.npy` + `scm_hardening.npy` with atomic save. Only the self-consistency loop writes to it.
+- **experiential.py** — Episodic memory encoding. `ExperientialMeta` dataclass bundles temporal context (timestamp, preceding query hex, SCM snapshot hash). Stored under `chunks/{domain}/experiential/`. Loose CA dynamics (push=0.35, slope=0.70).
+- **interference.py** — Three-grid interference engine. `compute_interference(corpus, experiential, scm)` → pointwise `C * E * (1 - |S|)`. Four states: GROUNDED, ABSORBED, UNCONSOLIDATED, CONTESTED. `self_consistency_check()` re-encodes text → re-evolves → Pearson against original → writes to SCM. `interference_score()` for ranked retrieval.
+
 ### Other
-- **constants.py** — ALL tunable parameters. **Only file modified during autoresearch.** See `program.md`.
+- **constants.py** — ALL tunable parameters. **Only file modified during autoresearch.** See `program.md`. v0.3.0 added 12 new constants: `CORPUS_MAX_PUSH`, `CORPUS_SLOPE_FLOW`, `EXPERIENTIAL_MAX_PUSH`, `EXPERIENTIAL_SLOPE_FLOW`, `EXPERIENTIAL_HALF_LIFE_DAYS`, `EXPERIENTIAL_HIT_SATURATION`, `SCM_LEARNING_RATE`, `SCM_HARDENING_FLOOR`, `SCM_GAP_THRESHOLD`, `SCM_ANNEAL_RATE`, `INTERFERENCE_PEAK_THRESHOLD`.
 - **reconstruction.py** — Reconstructive recall (Darman). Blend stored attractor with query, re-evolve.
 - **polarity.py** — Dual-polarity encoding (antipodal CA states).
 - **trajectory.py** / **trajectory_cache.py** — Trajectory similarity for hybrid retrieval.

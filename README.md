@@ -104,6 +104,29 @@ Text ---> Hippocampus Encoder (native: character n-gram random indexing)
                     v
           Attractor (64x64 stable pattern)
 
+THREE-GRID INTERFERENCE ARCHITECTURE (v0.3.0)
+----------------------------------------------
+Answer(i,j) = Corpus(i,j) * Experiential(i,j) * (1 - |SCM(i,j)|)
+
+Grid 1: CORPUS (Cold)           Grid 2: EXPERIENTIAL (Hot)
+  - Crystallized knowledge         - Episodic memory
+  - Tight attractors (push=0.57)   - Loose attractors (push=0.35)
+  - Barely decays                  - Aggressive decay (2-day half-life)
+  - All existing memories          - Temporal context bundled
+                    \                 /
+                     v               v
+            Grid 3: SCM (Structural Coherence Map)
+              - 64x64 persistent trust topology
+              - WHERE interference is permitted
+              - Hardening: early updates have outsized influence
+              - Only written by self-consistency feedback loop
+
+Four Interference States:
+  GROUNDED       Corpus peak + Experiential peak + SCM open
+  ABSORBED       Corpus peak + no Experiential   + SCM open
+  UNCONSOLIDATED No Corpus   + Experiential peak + SCM open
+  CONTESTED      Corpus peak + Experiential peak + SCM closed
+
 CORTEX SYSTEM (Semantic Scoring & Topology)
 -------------------------------------------
 Stored Attractors ---> L1 Graph: Semantic topology (Hippocampus native encoder)
@@ -132,18 +155,36 @@ Query ---> Same encoding pipeline ---> Query attractor
           context, re-evolve through CA -> reconstructed memory
                     |
                     v
+          [Optional] Interference recall: three-grid scoring with SCM gating
+                    |
+                    v
           Language Wheeler renders CA state as text
+
+SELF-CONSISTENCY FEEDBACK LOOP
+------------------------------
+Decoder output ---> Re-encode ---> Re-evolve under corpus rules
+        |                                    |
+        v                                    v
+  Compare to original               Pearson correlation
+  corpus attractor                         |
+        |                                    v
+        +--- consistent ---> SCM opens gaps (trust increases)
+        +--- inconsistent -> SCM closes gaps (trust decreases)
+        +--- hardening accumulates: LR / (1 + hardening_count)
 
 MMLU BENCHMARK MODES
 --------------------
---mode cortex       : Cortex L3 classifier scoring (default, no LLM)
---mode semantic     : Pure CA attractor Pearson correlation
---mode recall-text  : Reconstruction + text decode
---mode decode       : Small model decoder for rendering
---mode learn        : Full cycle (learn → consolidate → test)
+--mode cortex              : Cortex L3 classifier scoring (default, no LLM)
+--mode semantic            : Pure CA attractor Pearson correlation
+--mode recall-text         : Reconstruction + text decode
+--mode decode              : Small model decoder for rendering
+--mode learn               : Full cycle (learn → consolidate → test)
+--mode learn-interference  : Learn + experiential storage + SCM sculpting
 ```
 
 The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slopes flow uphill. Convergence takes ~3ms on CPU. The Hippocampus encoder uses character 3-grams and 4-grams with random indexing — lexical similarity produces similar frames; true semantic similarity emerges from attractor dynamics and Cortex layers. Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
+
+The three-grid interference system transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
 
 ---
 
@@ -238,7 +279,9 @@ python scripts/tools/prepare_corpus.py
 | Command | Description |
 |---------|-------------|
 | `wheeler-store "text"` | Store a memory (add `--embed` for MiniLM semantic encoder) |
+| `wheeler-store "text" --experiential` | Store as episodic memory (loose attractors, temporal context) |
 | `wheeler-recall "text"` | Find similar memories (add `--embed` for MiniLM semantic encoder) |
+| `wheeler-recall "text" --interference` | Recall with three-grid interference scoring + SCM gating |
 | `wheeler-forget --text "text"` | Delete a specific memory |
 | `wheeler-temps` | View all memories with temperature/freshness |
 | `wheeler-sleep` | Archive cold memories to save space |
@@ -270,6 +313,7 @@ python scripts/tools/prepare_corpus.py
 | `wheeler-bench` | Quality score benchmark for CA dynamics tuning |
 | `wheeler-bench-gpu` | Benchmark GPU vs CPU evolution speed |
 | `wheeler-generate` | Generative text engine (IT from BIT mode) |
+| `wheeler-scm` | Inspect SCM trust topology (openness, heatmap, reset) |
 
 ### Benchmark
 
@@ -279,6 +323,7 @@ python scripts/tools/prepare_corpus.py
 | `wheeler-mmlu --all` | Run all 57 MMLU subjects |
 | `wheeler-mmlu --mode cortex` | Cortex L3 classifier scoring (default) |
 | `wheeler-mmlu --mode learn` | Learn dev+val → consolidate → test on test split |
+| `wheeler-mmlu --mode learn-interference` | Learn + experiential storage + SCM sculpting |
 | `wheeler-mmlu --mode decode --model qwen2.5:1.5b` | Decoder mode (requires Ollama) |
 | `wheeler-mmlu --classifier-weights cortex_classifier.npz` | Use trained L3 classifier |
 | `wheeler-mmlu --list-subjects` | Print all 57 available subjects |
@@ -350,6 +395,10 @@ wheeler_memory/          Core library
     storage.py           Store/recall with chunked Pearson search
     reconstruction.py    Reconstructive recall (Darman philosophy)
     cache.py             JSON file-based caching layer
+  THREE-GRID INTERFERENCE
+    scm_grid.py          SCM persistent 64x64 trust topology with hardening
+    experiential.py      Episodic memory encoding with temporal context
+    interference.py      Three-grid interference engine + self-consistency loop
   AGENTS & RENDERING
     decoder.py           Language Wheeler decoder (text rendering)
     language_wheeler.py  Language Wheeler component (CA state → text)

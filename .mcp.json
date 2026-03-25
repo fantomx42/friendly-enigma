@@ -7,6 +7,37 @@
         "OLLAMA_HOST": "http://localhost:11434",
         "DEFAULT_MODEL": "qwen3:14b"
       }
+    },
+    "optuna": {
+      "command": "uvx",
+      "args": ["optuna-mcp", "--storage", "sqlite:////home/tristan/projects/wheeler-memory/.optuna/optuna.db"]
+    },
+    "chroma": {
+      "command": "uvx",
+      "args": [
+        "chroma-mcp",
+        "--client-type", "persistent",
+        "--data-dir", "/home/tristan/projects/wheeler-memory/.chroma"
+      ]
+    },
+    "neo4j": {
+      "command": "uvx",
+      "args": ["mcp-neo4j-cypher"],
+      "env": {
+        "NEO4J_URI": "bolt://localhost:7687",
+        "NEO4J_USERNAME": "neo4j",
+        "NEO4J_PASSWORD": "wheeler-memory"
+      }
+    },
+    "hebbian-mind": {
+      "command": "uv",
+      "args": [
+        "--directory", "/home/tristan/projects/hebbian-mind-enterprise",
+        "run", "python", "-m", "hebbian_mind.server"
+      ],
+      "env": {
+        "HEBBIAN_MIND_BASE_DIR": "/home/tristan/projects/wheeler-memory/.hebbian_data"
+      }
     }
   }
 }

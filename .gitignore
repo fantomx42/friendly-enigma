@@ -27,3 +27,8 @@ node_modules/
 package-lock.json
 package.json
 .aider*
+
+# MCP server data
+.optuna/
+.chroma/
+.hebbian_data/

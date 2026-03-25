@@ -21,6 +21,16 @@ learn
     3. Run sleep consolidation to reinforce and prune.
     4. Rebuild the attractor cache and test on the test split.
 
+learn-interference
+    Three-grid interference learning cycle (It from Bit):
+    1. Store dev+validation Q&A as EXPERIENTIAL memories (loose CA rules).
+    2. Run self-consistency loop on each to sculpt the SCM trust topology.
+       (No external reward — convergence IS ground truth.)
+    3. Sleep consolidate: experiential→corpus projection + SCM annealing.
+    4. Test on the test split using standard semantic mode.
+    The SCM learns WHERE the system's own interference is reliable,
+    routing around weak spots without human feedback.
+
 recall-text
     Recall top-K facts, extract answer by letter regex or text matching from context.
 
@@ -1235,6 +1245,123 @@ def run_learning_pass(subjects: list[str], data_dir=None, encoder: str = "hippoc
     return stored, result
 
 
+def run_interference_learning_pass(
+    subjects: list[str], data_dir=None, encoder: str = "hippocampus"
+):
+    """Three-grid interference learning: experiential store + self-consistency + consolidation.
+
+    1. Store dev+validation Q&A as experiential memories (loose CA rules).
+    2. Run self-consistency check on each stored text to sculpt SCM.
+    3. Sleep consolidate (experiential→corpus projection + SCM annealing).
+
+    No external reward signal — the system judges itself by basin convergence.
+    Returns (n_stored, n_consistent, n_inconsistent, consolidation_result).
+    """
+    from wheeler_memory.constants import (
+        CORPUS_MAX_PUSH,
+        CORPUS_SLOPE_FLOW,
+        EXPERIENTIAL_MAX_PUSH,
+        EXPERIENTIAL_SLOPE_FLOW,
+    )
+    from wheeler_memory.dynamics import evolve_with_params
+    from wheeler_memory.brick import MemoryBrick
+    from wheeler_memory.storage import store_memory
+    from wheeler_memory.experiential import ExperientialMeta
+    from wheeler_memory.scm_grid import SCMGrid
+    from wheeler_memory.interference import self_consistency_check
+    from wheeler_memory.consolidation import sleep_consolidate
+    from wheeler_memory.eviction import evict_for_capacity
+
+    d = Path(data_dir) if data_dir else Path.home() / ".wheeler_memory"
+
+    all_texts = []
+    choices_letters = ["A", "B", "C", "D"]
+
+    for subject in subjects:
+        for split in ["dev", "validation"]:
+            items = list(load_mmlu([subject], split=split))
+            for _, question, choices, answer_idx in items:
+                correct_letter = choices_letters[answer_idx]
+                correct_text = choices[answer_idx]
+                all_texts.append(f"Q: {question} A: {correct_letter}. {correct_text}")
+
+    if not all_texts:
+        return 0, 0, 0, None
+
+    _, batch_fn = _get_encoder_fns(encoder)
+    print(f"\n  [learn-interference] Encoding {len(all_texts)} Q&A pairs ({encoder})...")
+    frames = batch_fn(all_texts)
+
+    # Phase 1: Store as experiential memories under loose CA rules
+    stored = 0
+    corpus_attractors = {}  # text → corpus attractor (for self-consistency)
+    prev_key = ""
+
+    print(f"  [learn-interference] Phase 1: Storing as experiential memories...")
+    for text, frame in zip(all_texts, frames):
+        # Evolve under experiential rules (loose)
+        result = evolve_with_params(
+            frame.copy(), EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
+        )
+        if result["state"] != "CONVERGED":
+            continue
+
+        brick = MemoryBrick.from_evolution_result(result)
+        meta = ExperientialMeta(preceding_query_hex=prev_key[:16])
+        key = store_memory(
+            text, result, brick, data_dir=str(d), chunk="science",
+            grid="experiential", experiential_meta=meta, auto_evict=False,
+        )
+        prev_key = key
+        stored += 1
+
+        # Also evolve under corpus rules for self-consistency check
+        corpus_result = evolve_with_params(
+            frame.copy(), CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW
+        )
+        if corpus_result["state"] == "CONVERGED":
+            corpus_attractors[text] = corpus_result["attractor"]
+
+    print(f"  [learn-interference] Stored {stored} experiential memories.")
+
+    # Phase 2: Run self-consistency loop to sculpt SCM
+    scm = SCMGrid.load_or_create(str(d))
+    n_consistent = 0
+    n_inconsistent = 0
+
+    print(f"  [learn-interference] Phase 2: Self-consistency loop ({len(corpus_attractors)} checks)...")
+    for text, corpus_att in corpus_attractors.items():
+        cr = self_consistency_check(
+            text, corpus_att, None, scm, encoder=encoder
+        )
+        if cr.consistent:
+            n_consistent += 1
+        else:
+            n_inconsistent += 1
+
+    scm.save()
+    print(
+        f"  [learn-interference] SCM sculpted: {n_consistent} consistent, "
+        f"{n_inconsistent} inconsistent, openness={scm.openness():.1%}"
+    )
+
+    # Phase 3: Sleep consolidate (experiential→corpus + SCM annealing)
+    print(f"  [learn-interference] Phase 3: Sleep consolidation...")
+    evict_for_capacity(d)
+    cons_result = sleep_consolidate(str(d), chunk="science")
+    n_consolidated = len(cons_result.memories_consolidated)
+    projections = getattr(cons_result, "experiential_projections", [])
+    n_projected = len([p for p in projections if p.get("action") != "skipped"])
+    scm_annealed = getattr(cons_result, "scm_annealed", 0)
+    print(
+        f"  [learn-interference] Consolidation: {n_consolidated} bricks pruned, "
+        f"{n_projected} experiential→corpus projections, "
+        f"{scm_annealed} SCM cells annealed"
+    )
+
+    return stored, n_consistent, n_inconsistent, cons_result
+
+
 # ---------------------------------------------------------------------------
 # Benchmark runner
 # ---------------------------------------------------------------------------
@@ -1265,9 +1392,18 @@ def run_benchmark(
 
     embed_label = "embed" if use_embed else "hash"
     is_learn_mode = mode == "learn"
+    is_interference_learn = mode == "learn-interference"
     print(f"\n{'=' * 70}")
     print(f"  WHEELER MMLU BENCHMARK")
-    if is_learn_mode:
+    if is_interference_learn:
+        print(
+            f"  Mode: LEARN-INTERFERENCE   Subjects: {len(subjects)}   Test split: {split}"
+        )
+        print(f"  Phase 1: store dev+val as experiential (loose CA)")
+        print(f"  Phase 2: self-consistency loop → sculpt SCM")
+        print(f"  Phase 3: sleep consolidation (exp→corpus + SCM anneal)")
+        print(f"  Phase 4: semantic test on {split} split")
+    elif is_learn_mode:
         print(
             f"  Mode: LEARN → SEMANTIC   Subjects: {len(subjects)}   Test split: {split}"
         )
@@ -1283,8 +1419,16 @@ def run_benchmark(
         print(f"  Error Classification: ON (post-hoc hallucination discrimination)")
     print(f"{'=' * 70}")
 
+    # Learn-interference mode: experiential store + self-consistency + consolidate → test
+    if is_interference_learn:
+        n_stored, n_con, n_incon, cons = run_interference_learning_pass(
+            subjects, data_dir, encoder=encoder
+        )
+        print(f"\n  Rebuilding attractor cache after interference learning pass...")
+        mode = "semantic"
+
     # Learn mode: store dev+validation facts, consolidate, then test on test split
-    if is_learn_mode:
+    elif is_learn_mode:
         n_stored, cons = run_learning_pass(subjects, data_dir, encoder=encoder)
         # Rebuild attractor cache with newly stored memories
         print(f"\n  Rebuilding attractor cache after learning pass...")
@@ -1553,6 +1697,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "semantic",
             "decode",
             "learn",
+            "learn-interference",
             "recall-text",
             "cortex",
             "ternary",
@@ -1563,7 +1708,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "spatial",
         ],
         default="semantic",
-        help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), 'learn' (store dev+val → consolidate → test), 'recall-text' (extract answer letter from recalled facts), 'cortex' (full cortex pipeline), 'ternary' (net +1/-1 cell count), 'ternary-retrieval' (ternary overlap with retrieved attractors). Default: semantic.",
+        help="Scoring mode: 'semantic' (Wheeler-native), 'decode' (small model), 'learn' (store dev+val → consolidate → test), 'learn-interference' (three-grid: experiential store + SCM sculpting + consolidate → test), 'recall-text' (extract answer letter from recalled facts), 'cortex' (full cortex pipeline), 'ternary' (net +1/-1 cell count), 'ternary-retrieval' (ternary overlap with retrieved attractors). Default: semantic.",
     )
     p.add_argument(
         "--split",
