@@ -194,6 +194,25 @@ _TOOLS: list[dict] = [
 # ── Tool execution ────────────────────────────────────────────────────────────
 
 
+def _attractors_from_hits(
+    hits: list[dict], data_dir: Path | None
+) -> list:
+    """Load attractor arrays from recall hits for classify_output."""
+    import numpy as np
+
+    d = Path(data_dir) if data_dir else Path.home() / ".wheeler_memory"
+    attractors = []
+    for h in hits:
+        chunk = h.get("chunk")
+        hex_key = h.get("hex_key")
+        if not chunk or not hex_key:
+            continue
+        p = d / "chunks" / chunk / "attractors" / f"{hex_key}.npy"
+        if p.exists():
+            attractors.append(np.load(p))
+    return attractors
+
+
 def _exec_store_memory(
     text: str, data_dir: Path | None, use_embedding: bool = False
 ) -> str:
@@ -603,10 +622,12 @@ class WheelerAgent:
         self.use_embedding = use_embedding
         self.encoder = encoder
         self._history: list[dict] = []
+        self._last_recall_hits: list[dict] = []
 
     def reset(self) -> None:
         """Clear conversation history."""
         self._history = []
+        self._last_recall_hits = []
 
     # ── Auto-memory helpers ───────────────────────────────────────────────────
 
@@ -694,7 +715,8 @@ class WheelerAgent:
         # ── Auto-recall: inject relevant memories into system context ─────────
         system_content = _SYSTEM_PROMPT
         if self.auto_recall:
-            ctx, _ = self._build_recall_context(user_message)
+            ctx, recall_hits = self._build_recall_context(user_message)
+            self._last_recall_hits = recall_hits
             if ctx:
                 system_content = _SYSTEM_PROMPT + "\n\n" + ctx
                 if self.verbose:
@@ -718,7 +740,7 @@ class WheelerAgent:
                 content = msg.get("content", "")
                 self._history.append({"role": "assistant", "content": content})
                 messages.append({"role": "assistant", "content": content})
-                classification = classify_output(content, [])
+                classification = classify_output(content, _attractors_from_hits(self._last_recall_hits, self.data_dir))
                 if self.verbose:
                     print(f"[hallucination-discrimination] {classification}")
                 # ── Auto-store: persist the reply as a new memory ─────────────
@@ -772,7 +794,7 @@ class WheelerAgent:
         )
         content = resp.get("message", {}).get("content", "")
         self._history.append({"role": "assistant", "content": content})
-        classification = classify_output(content, [])
+        classification = classify_output(content, _attractors_from_hits(self._last_recall_hits, self.data_dir))
         if self.verbose:
             print(f"[hallucination-discrimination] {classification}")
         if self.auto_store and content.strip():
@@ -803,6 +825,7 @@ class WheelerAgent:
         if self.auto_recall:
             try:
                 ctx, hits = self._build_recall_context(user_message)
+                self._last_recall_hits = hits
                 if ctx and hits:
                     yield {
                         "type": "recall_context",
@@ -869,7 +892,7 @@ class WheelerAgent:
                 full_response = accumulated
                 self._history.append({"role": "assistant", "content": full_response})
                 messages.append({"role": "assistant", "content": full_response})
-                classification = classify_output(token_only, [])
+                classification = classify_output(token_only, _attractors_from_hits(self._last_recall_hits, self.data_dir))
                 yield {
                     "type": "hallucination_discrimination",
                     "classification": classification,
@@ -933,7 +956,7 @@ class WheelerAgent:
             return
         content = resp.get("message", {}).get("content", "")
         self._history.append({"role": "assistant", "content": content})
-        classification = classify_output(content, [])
+        classification = classify_output(content, _attractors_from_hits(self._last_recall_hits, self.data_dir))
         yield {"type": "hallucination_discrimination", "classification": classification}
         if self.auto_store and content.strip():
             if self._auto_store_reply(content):

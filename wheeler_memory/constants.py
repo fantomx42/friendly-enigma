@@ -30,6 +30,7 @@ WARMING (spreading activation)
 # ---------------------------------------------------------------------------
 MAX_PUSH_STRENGTH = 0.57  # Local max/min pull toward ±1
 SLOPE_FLOW_STRENGTH = 0.55  # Gradient descent rate for slope cells
+STABILITY_WINDOW = 3  # Consecutive sub-threshold ticks to declare convergence
 
 # ---------------------------------------------------------------------------
 # Attention / salience (variable tick rates)

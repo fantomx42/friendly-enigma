@@ -33,6 +33,26 @@ from typing import Iterator
 from .storage import recall_memory
 from .warming import _load_associations
 from .theories.metrics import classify_output
+from .agent import _attractors_from_hits
+
+
+def _query_seed_correlation(text: str) -> float | None:
+    """Pearson(seed, attractor) for the query — measures how far it traveled."""
+    try:
+        import numpy as np
+        from scipy.stats import pearsonr
+
+        from .dynamics import evolve_and_interpret
+        from .rotation import _get_frame_fn
+
+        frame_fn = _get_frame_fn(True, encoder="blended")
+        seed = frame_fn(text)
+        result = evolve_and_interpret(seed)
+        attractor = result["attractor"]
+        r, _ = pearsonr(seed.flatten(), attractor.flatten())
+        return round(float(r), 3)
+    except Exception:
+        return None
 
 
 # ── System prompt: the small model is a renderer, not a thinker ───────────────
@@ -71,12 +91,67 @@ class DecoderState:
     uncertain: bool = True
     interference_state: str = ""  # GROUNDED/ABSORBED/UNCONSOLIDATED/CONTESTED
     scm_openness: float = 1.0  # fraction of SCM cells below gap threshold
+    pairwise_distances: list[tuple[int, int, float]] = field(default_factory=list)
+    landscape: str = ""  # TIGHT/SPREAD/ISOLATED/EMPTY
+    query_seed_corr: float | None = None  # Pearson(seed, attractor)
+
+
+def _compute_pairwise_distances(
+    results: list[dict],
+    data_dir: Path | None,
+) -> list[tuple[int, int, float]]:
+    """Compute pairwise Pearson correlation between top-K attractor arrays."""
+    import numpy as np
+    from scipy.stats import pearsonr
+
+    if data_dir is None:
+        from .storage import _get_data_dir
+
+        data_dir = _get_data_dir(None)
+
+    # Load attractor arrays from disk
+    attractors: list[np.ndarray | None] = []
+    for h in results:
+        hex_key = h.get("hex_key", "")
+        chunk = h.get("chunk", "general")
+        path = data_dir / "chunks" / chunk / "attractors" / f"{hex_key}.npy"
+        if path.exists():
+            attractors.append(np.load(path, mmap_mode="r"))
+        else:
+            attractors.append(None)
+
+    # Pairwise Pearson (1-indexed for display)
+    pairs: list[tuple[int, int, float]] = []
+    for i in range(len(attractors)):
+        for j in range(i + 1, len(attractors)):
+            if attractors[i] is not None and attractors[j] is not None:
+                r, _ = pearsonr(attractors[i].flatten(), attractors[j].flatten())
+                pairs.append((i + 1, j + 1, round(float(r), 3)))
+    return pairs
+
+
+def _landscape_label(pairs: list[tuple[int, int, float]], n_results: int) -> str:
+    """Derive landscape label from pairwise attractor distances."""
+    if n_results == 0:
+        return "EMPTY"
+    if not pairs:
+        return "ISOLATED"
+    mean_abs_r = sum(abs(r) for _, _, r in pairs) / len(pairs)
+    if mean_abs_r > 0.4:
+        return "TIGHT"
+    if mean_abs_r > 0.1:
+        return "SPREAD"
+    return "ISOLATED"
 
 
 def extract_state(
     query: str,
     recall_results: list[dict],
     confidence_floor: float = CONFIDENCE_FLOOR,
+    interference_state: str = "",
+    scm_openness: float = 1.0,
+    data_dir: "Path | None" = None,
+    query_seed_corr: float | None = None,
 ) -> DecoderState:
     """Extract structured state from recall_memory() results.
 
@@ -89,6 +164,14 @@ def extract_state(
         text, similarity, temperature, temperature_tier, state, chunk, etc.
     confidence_floor : float
         Below this mean similarity, the state is marked uncertain.
+    interference_state : str
+        Dominant interference state from three-grid recall (e.g. GROUNDED).
+    scm_openness : float
+        Fraction of SCM cells below the gap threshold.
+    data_dir : Path | None
+        Wheeler data directory (for loading attractor arrays).
+    query_seed_corr : float | None
+        Pearson(query seed frame, query attractor) — how far the query traveled.
 
     Returns
     -------
@@ -96,7 +179,7 @@ def extract_state(
         Structured state ready for formatting.
     """
     if not recall_results:
-        return DecoderState(query=query)
+        return DecoderState(query=query, landscape="EMPTY")
 
     similarities = [h.get("similarity", 0.0) for h in recall_results]
     confidence = max(similarities) if similarities else 0.0
@@ -113,12 +196,21 @@ def extract_state(
             ):
                 co_activated.append((a["text"][:60], b["text"][:60]))
 
+    # Pairwise attractor distances and landscape label
+    pairs = _compute_pairwise_distances(recall_results, data_dir)
+    landscape = _landscape_label(pairs, len(recall_results))
+
     return DecoderState(
         query=query,
         attractors=recall_results,
         confidence=confidence,
         co_activated=co_activated,
         uncertain=confidence < confidence_floor,
+        interference_state=interference_state,
+        scm_openness=scm_openness,
+        pairwise_distances=pairs,
+        landscape=landscape,
+        query_seed_corr=query_seed_corr,
     )
 
 
@@ -139,12 +231,21 @@ def format_state(state: DecoderState) -> str:
     """Serialize DecoderState into structured text for the small model.
 
     The output is a deterministic, parseable prompt that gives the model
-    everything it needs to produce a grounded response.
+    everything it needs to produce a grounded response.  Beyond ranked text,
+    the format exposes attractor-space topology: energy (basin depth), cluster
+    structure (pos/neg islands + boundary), interference fractions per memory,
+    and pairwise distances between recalled attractors.
     """
-    lines = [
-        f"QUERY: {state.query}",
-        f"CONFIDENCE: {_confidence_label(state.confidence)}",
-    ]
+    # ── Header: query + landscape context ──────────────────────────────────
+    query_line = f"QUERY: {state.query}"
+    if state.query_seed_corr is not None:
+        query_line += f"  (seed_corr={state.query_seed_corr})"
+    lines = [query_line]
+
+    conf_land = f"CONFIDENCE: {_confidence_label(state.confidence)}"
+    if state.landscape:
+        conf_land += f"  LANDSCAPE: {state.landscape}"
+    lines.append(conf_land)
 
     if state.interference_state:
         lines.append(
@@ -154,11 +255,12 @@ def format_state(state: DecoderState) -> str:
 
     lines.append("")
 
+    # ── Per-memory attractor features ──────────────────────────────────────
     if state.attractors:
-        lines.append("ACTIVE MEMORIES (ranked by relevance):")
+        lines.append("ACTIVE MEMORIES:")
         lines.append(
-            "  # H=entropy clust=clusters live=active "
-            "spd=convergence-speed(F/M/S) rdelta=reconstruction-drift"
+            "  # E=energy H=entropy +c/-c=clusters bnd=boundary "
+            "live=alive spd=speed rdelta=drift"
         )
         for i, att in enumerate(state.attractors, 1):
             sim = att.get("similarity", 0.0)
@@ -166,43 +268,86 @@ def format_state(state: DecoderState) -> str:
             text = att.get("text", "")
             ca_state = att.get("state", "UNKNOWN")
             ticks = att.get("convergence_ticks", "?")
-            entropy = att.get("grid_entropy")
-            clusters = att.get("cluster_count")
-            alive = att.get("alive_fraction")
 
-            # Convergence speed label (only meaningful for CONVERGED attractors)
+            # Convergence speed label
             if ca_state == "CONVERGED" and isinstance(ticks, int):
                 spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
             else:
                 spd = "?"
 
-            # Structural features string
-            struct = ""
-            if entropy is not None:
-                clust_s = str(clusters) if clusters is not None else "?"
-                alive_s = f"{alive:.2f}" if alive is not None else "?"
-                struct = f", H={entropy:.2f}, clust={clust_s}, live={alive_s}"
+            # Core metrics line
+            parts = [
+                f"sim={sim:.2f}",
+                f"temp={tier}",
+                f"CA={ca_state}/{ticks}/{spd}",
+            ]
 
-            # Reconstruction delta (only present when reconstruct=True was used)
+            # Energy (basin depth)
+            energy = att.get("energy")
+            if energy is not None:
+                parts.append(f"E={energy:.4f}")
+
+            # Structural features
+            entropy = att.get("grid_entropy")
+            if entropy is not None:
+                parts.append(f"H={entropy:.2f}")
+
+            pos_c = att.get("cluster_count")
+            neg_c = att.get("neg_cluster_count")
+            if pos_c is not None:
+                neg_s = str(neg_c) if neg_c is not None else "?"
+                parts.append(f"+c={pos_c}/-c={neg_s}")
+
+            boundary = att.get("boundary_length")
+            if boundary is not None:
+                parts.append(f"bnd={boundary}")
+
+            alive = att.get("alive_fraction")
+            if alive is not None:
+                parts.append(f"live={alive:.2f}")
+
+            # Reconstruction delta
             corr_stored = att.get("correlation_with_stored")
             if corr_stored is not None:
-                struct += f", rdelta={1.0 - corr_stored:.2f}"
+                parts.append(f"rdelta={1.0 - corr_stored:.2f}")
 
-            lines.append(
-                f"  {i}. [sim={sim:.2f}, temp={tier}, "
-                f'CA={ca_state}/{ticks}/{spd}{struct}] "{text}"'
-            )
+            lines.append(f'  {i}. [{" ".join(parts)}]')
+
+            # Interference fractions sub-line (only from interference pipeline)
+            g = att.get("grounded_frac")
+            if g is not None:
+                a_frac = att.get("absorbed_frac", 0)
+                u = att.get("unconsolidated_frac", 0)
+                x = att.get("contested_frac", 0)
+                lines.append(f"     ifr=[G={g} A={a_frac} U={u} X={x}]")
+
+            lines.append(f'     "{text}"')
+
         lines.append("")
     else:
         lines.append("ACTIVE MEMORIES: none found")
         lines.append("")
 
+    # ── Basin structure: pairwise attractor distances ──────────────────────
+    if state.pairwise_distances:
+        pair_strs = [
+            f"{i}<>{j}: r={r}" for i, j, r in state.pairwise_distances
+        ]
+        lines.append("BASIN STRUCTURE:")
+        # Show up to 10 pairs per line, wrap if needed
+        lines.append(f"  {' '.join(pair_strs[:10])}")
+        if len(pair_strs) > 10:
+            lines.append(f"  {' '.join(pair_strs[10:])}")
+        lines.append("")
+
+    # ── Co-activation ──────────────────────────────────────────────────────
     if state.co_activated:
-        lines.append("CO-ACTIVATION (memories that fired together):")
+        lines.append("CO-ACTIVATION:")
         for a_text, b_text in state.co_activated:
             lines.append(f'  "{a_text}" <-> "{b_text}"')
         lines.append("")
 
+    # ── Instruction ────────────────────────────────────────────────────────
     if state.uncertain:
         lines.append(
             "NOTE: Confidence is low. Acknowledge uncertainty in your response. "
@@ -323,6 +468,7 @@ class WheelerPrimaryAgent:
         reconstruct: bool = True,
         reconstruct_alpha: float = 0.3,
         verbose: bool = False,
+        use_interference: bool = False,
     ) -> None:
         self.model = model
         self.ollama_url = ollama_url
@@ -332,25 +478,51 @@ class WheelerPrimaryAgent:
         self.reconstruct = reconstruct
         self.reconstruct_alpha = reconstruct_alpha
         self.verbose = verbose
+        self.use_interference = use_interference
 
     def run(self, user_message: str) -> str:
         """Full pipeline: encode → recall → extract state → decode.
 
         Returns the small model's response grounded in Wheeler state.
         """
-        # 1. Recall from Wheeler (embedding-based)
-        hits = recall_memory(
-            user_message,
-            top_k=self.recall_k,
-            data_dir=self.data_dir,
-            use_embedding=True,
-            encoder="blended",
-            reconstruct=self.reconstruct,
-            reconstruct_alpha=self.reconstruct_alpha,
-        )
+        interference_state = ""
+        scm_openness = 1.0
+
+        if self.use_interference:
+            from .interference import recall_with_interference
+
+            hits, interference_state, scm_openness = recall_with_interference(
+                user_message,
+                top_k=self.recall_k,
+                data_dir=self.data_dir,
+                encoder="blended",
+                use_embedding=True,
+            )
+        else:
+            # 1. Recall from Wheeler (embedding-based)
+            hits = recall_memory(
+                user_message,
+                top_k=self.recall_k,
+                data_dir=self.data_dir,
+                use_embedding=True,
+                encoder="blended",
+                reconstruct=self.reconstruct,
+                reconstruct_alpha=self.reconstruct_alpha,
+            )
+
+        # Compute query seed correlation (how far the query traveled in CA space)
+        query_seed_corr = _query_seed_correlation(user_message)
 
         # 2. Extract structured state
-        state = extract_state(user_message, hits, self.confidence_floor)
+        state = extract_state(
+            user_message,
+            hits,
+            self.confidence_floor,
+            interference_state=interference_state,
+            scm_openness=scm_openness,
+            data_dir=self.data_dir,
+            query_seed_corr=query_seed_corr,
+        )
 
         if self.verbose:
             print(
@@ -372,7 +544,7 @@ class WheelerPrimaryAgent:
         ]
         resp = _ollama_generate(messages, self.model, self.ollama_url)
         content = resp.get("message", {}).get("content", "")
-        classification = classify_output(content, [])
+        classification = classify_output(content, _attractors_from_hits(hits, self.data_dir))
         if self.verbose:
             print(f"[hallucination-discrimination] {classification}", file=sys.stderr)
         return content
@@ -399,11 +571,19 @@ class WheelerPrimaryAgent:
         yield {"type": "recall", "hits": hits}
 
         # 2. Extract state
-        state = extract_state(user_message, hits, self.confidence_floor)
+        query_seed_corr = _query_seed_correlation(user_message)
+        state = extract_state(
+            user_message,
+            hits,
+            self.confidence_floor,
+            data_dir=self.data_dir,
+            query_seed_corr=query_seed_corr,
+        )
         yield {
             "type": "state",
             "confidence": state.confidence,
             "uncertain": state.uncertain,
+            "landscape": state.landscape,
         }
 
         # 3. Decode via streaming

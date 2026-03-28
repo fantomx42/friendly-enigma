@@ -35,6 +35,7 @@ wheeler-bench = "scripts.bench_quality:main"
 wheeler-generate = "scripts.wheeler_generate:main"
 wheeler-mmlu = "scripts.wheeler_mmlu:main"
 wheeler-scm = "scripts.wheeler_scm:main"
+wheeler-simlex = "scripts.wheeler_simlex:main"
 
 [project.urls]
 Homepage = "https://github.com/fantomx42/wheeler-memory"

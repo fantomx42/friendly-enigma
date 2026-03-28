@@ -25,9 +25,10 @@ def get_cell_roles(frame: np.ndarray) -> np.ndarray:
         (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
     )
 
+    is_flat = is_max & is_min
     roles = np.zeros(frame.shape, dtype=np.int8)
-    roles[is_max] = 1
-    roles[is_min] = -1
+    roles[is_max & ~is_flat] = 1
+    roles[is_min & ~is_flat] = -1
     return roles
 
 

@@ -2,7 +2,11 @@
 
 import numpy as np
 import pytest
-from wheeler_memory.dynamics import apply_ca_dynamics, evolve_and_interpret
+from wheeler_memory.dynamics import (
+    apply_ca_dynamics,
+    evolve_and_interpret,
+    evolve_with_params,
+)
 from wheeler_memory.hashing import hash_to_frame
 
 
@@ -136,3 +140,102 @@ class TestEvolveAndInterpret:
             frame.copy(), max_iters=100, stability_threshold=1e-4
         )
         assert np.array_equal(result["history"][0], frame)
+
+
+class TestConvergenceMetadata:
+    """Tests for enriched convergence metadata in evolve_and_interpret."""
+
+    def test_converged_metadata_has_features(self):
+        """CONVERGED result metadata includes grid features."""
+        frame = hash_to_frame("metadata test")
+        result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+        assert result["state"] == "CONVERGED"
+        md = result["metadata"]
+        assert "grid_entropy" in md
+        assert "cluster_count" in md
+        assert "alive_fraction" in md
+        assert "convergence_speed" in md
+        assert "final_delta" in md
+
+    def test_converged_speed_label(self):
+        """Speed label reflects tick count: F<=50, M<=150, S>150."""
+        frame = hash_to_frame("speed test")
+        result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+        assert result["state"] == "CONVERGED"
+        ticks = result["convergence_ticks"]
+        expected = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+        assert result["metadata"]["convergence_speed"] == expected
+
+    def test_converged_entropy_is_positive(self):
+        """Grid entropy should be positive for non-trivial frames."""
+        frame = hash_to_frame("entropy test")
+        result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+        assert result["metadata"]["grid_entropy"] > 0.0
+
+    def test_converged_alive_fraction_in_range(self):
+        """Alive fraction should be in [0, 1]."""
+        frame = hash_to_frame("alive test")
+        result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+        alive = result["metadata"]["alive_fraction"]
+        assert 0.0 <= alive <= 1.0
+
+    def test_converged_final_delta_small(self):
+        """Final delta should be below stability threshold for CONVERGED."""
+        frame = hash_to_frame("delta test")
+        thresh = 1e-4
+        result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=thresh)
+        assert result["state"] == "CONVERGED"
+        assert result["metadata"]["final_delta"] < thresh
+
+    def test_chaotic_metadata_has_features(self):
+        """CHAOTIC result metadata also includes grid features."""
+        # Force chaotic by using very tight threshold with few iters
+        frame = hash_to_frame("chaotic test")
+        result = evolve_and_interpret(frame, max_iters=5, stability_threshold=1e-12)
+        assert result["state"] == "CHAOTIC"
+        md = result["metadata"]
+        assert "grid_entropy" in md
+        assert "cluster_count" in md
+        assert "alive_fraction" in md
+        assert md["convergence_speed"] == "?"
+
+    def test_evolve_with_params_metadata(self):
+        """evolve_with_params also returns enriched metadata."""
+        frame = hash_to_frame("params metadata test")
+        result = evolve_with_params(
+            frame, push_strength=0.57, slope_strength=0.55,
+            max_iters=1000, stability_threshold=1e-4,
+        )
+        md = result["metadata"]
+        assert "grid_entropy" in md
+        assert "cluster_count" in md
+        assert "convergence_speed" in md
+
+
+class TestStabilityWindow:
+    """Tests for multi-tick stability window."""
+
+    def test_converged_ticks_at_least_stability_window(self):
+        """CONVERGED ticks must be >= STABILITY_WINDOW (need N consecutive sub-threshold)."""
+        from wheeler_memory.constants import STABILITY_WINDOW
+
+        frame = hash_to_frame("stability window test")
+        result = evolve_and_interpret(frame, max_iters=1000, stability_threshold=1e-4)
+        assert result["state"] == "CONVERGED"
+        assert result["convergence_ticks"] >= STABILITY_WINDOW
+
+    def test_insufficient_iters_for_window_is_chaotic(self):
+        """With max_iters < STABILITY_WINDOW, CPU path cannot satisfy window."""
+        from unittest.mock import patch
+
+        from wheeler_memory.constants import STABILITY_WINDOW
+
+        # Patch GPU away so we test the CPU path's stability window
+        with patch("wheeler_memory.dynamics._GPU_READY", False):
+            frame = hash_to_frame("insufficient iters test")
+            result = evolve_and_interpret(
+                frame,
+                max_iters=STABILITY_WINDOW - 1,
+                stability_threshold=1.0,  # trivially easy threshold
+            )
+            assert result["state"] == "CHAOTIC"

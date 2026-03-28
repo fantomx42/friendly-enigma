@@ -63,11 +63,14 @@ def _load_corpus(data_dir: Path) -> tuple[list[str], list[np.ndarray]]:
             continue
         index = json.loads(index_path.read_text())
         for hex_key, meta in index.items():
-            # Skip non-converged and special memory types
+            # Skip non-converged, special memory types, and experiential entries
+            # (experiential uses different CA dynamics and attractor structure)
             if meta.get("state") != "CONVERGED":
                 continue
             mtype = meta.get("metadata", {}).get("memory_type")
             if mtype in ("polar", "avoidance"):
+                continue
+            if meta.get("metadata", {}).get("grid") == "experiential":
                 continue
             att_path = chunk_dir / "attractors" / f"{hex_key}.npy"
             if not att_path.exists():

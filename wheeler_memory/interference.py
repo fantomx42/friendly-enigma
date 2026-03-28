@@ -133,7 +133,7 @@ def interference_score(
     stored_corpus_att: np.ndarray,
     stored_experiential_att: np.ndarray | None,
     scm_grid: np.ndarray,
-) -> tuple[float, str]:
+) -> tuple[float, str, InterferenceResult]:
     """Compute interference-based similarity score between query and stored memory.
 
     Returns (score, dominant_state) where score combines corpus and experiential
@@ -167,7 +167,104 @@ def interference_score(
         scm_grid,
     )
 
-    return score, ir.dominant_state
+    return score, ir.dominant_state, ir
+
+
+def recall_with_interference(
+    text: str,
+    top_k: int = 5,
+    data_dir: "str | Path | None" = None,
+    *,
+    chunk: str | None = None,
+    encoder: str | None = None,
+    use_embedding: bool = False,
+) -> tuple[list[dict], str, float]:
+    """Recall memories through the three-grid interference pipeline.
+
+    Wraps the sacred ``recall_memory()`` with three-grid re-ranking:
+    1. Corpus recall via Pearson correlation (existing pipeline).
+    2. For each corpus hit, look up its experiential counterpart.
+    3. Re-score using ``interference_score()`` (corpus + experiential gated by SCM).
+
+    Returns
+    -------
+    (results, dominant_state, scm_openness) where results are dicts
+    in the same format as ``recall_memory()`` with added keys
+    ``interference_score`` and ``interference_state``.
+    """
+    from .chunking import get_chunk_dir, list_existing_chunks, select_recall_chunks
+    from .scm_grid import SCMGrid
+    from .storage import _get_data_dir, recall_memory
+
+    d = _get_data_dir(data_dir)
+    scm = SCMGrid.load_or_create(d)
+
+    # Step 1: corpus recall (sacred, unchanged)
+    corpus_results = recall_memory(
+        text,
+        top_k=top_k * 2,  # over-fetch so re-ranking has room
+        data_dir=data_dir,
+        chunk=chunk,
+        encoder=encoder,
+        use_embedding=use_embedding,
+    )
+
+    if not corpus_results:
+        return [], SILENT, scm.openness()
+
+    # Step 2: build query attractors for interference scoring
+    from .dynamics import evolve_and_interpret, evolve_with_params
+    from .rotation import _get_frame_fn
+
+    frame_fn = _get_frame_fn(use_embedding, encoder=encoder)
+    query_frame = frame_fn(text)
+
+    q_corpus = evolve_and_interpret(query_frame)["attractor"]
+    q_experiential = evolve_with_params(
+        query_frame, EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
+    )["attractor"]
+
+    # Step 3: re-score each corpus hit through interference
+    scored = []
+    for hit in corpus_results:
+        hex_key = hit.get("hex_key", "")
+        hit_chunk = hit.get("chunk", "general")
+        chunk_dir = d / "chunks" / hit_chunk
+
+        # Load corpus attractor
+        corpus_path = chunk_dir / "attractors" / f"{hex_key}.npy"
+        if not corpus_path.exists():
+            scored.append((hit.get("similarity", 0.0), ABSORBED, hit))
+            continue
+        stored_corpus = np.load(corpus_path)
+
+        # Look up experiential counterpart (may not exist)
+        exp_path = chunk_dir / "experiential" / f"{hex_key}.npy"
+        stored_exp = np.load(exp_path) if exp_path.exists() else None
+
+        score, state, ir = interference_score(
+            q_corpus, q_experiential, stored_corpus, stored_exp, scm.grid
+        )
+        hit["interference_score"] = round(score, 4)
+        hit["interference_state"] = state
+        hit["grounded_frac"] = round(ir.grounded_fraction, 3)
+        hit["absorbed_frac"] = round(ir.absorbed_fraction, 3)
+        hit["unconsolidated_frac"] = round(ir.unconsolidated_fraction, 3)
+        hit["contested_frac"] = round(ir.contested_fraction, 3)
+        hit["signal_strength"] = round(ir.signal_strength, 3)
+        scored.append((score, state, hit))
+
+    # Step 4: re-rank by interference score, take top_k
+    scored.sort(key=lambda x: -x[0])
+    results = [item[2] for item in scored[:top_k]]
+
+    # Dominant state across top results
+    state_counts: dict[str, int] = {}
+    for _, st, _ in scored[:top_k]:
+        state_counts[st] = state_counts.get(st, 0) + 1
+    dominant = max(state_counts, key=state_counts.get) if state_counts else SILENT
+
+    return results, dominant, scm.openness()
 
 
 @dataclass

@@ -67,11 +67,11 @@ class TestSnapToTernary:
         assert np.all(t_zero == 0)
 
     def test_topological_flat_frame(self):
-        """A perfectly flat frame: all cells are both max and min.
-        get_cell_roles assigns +1 then -1 (last write wins) — values stay valid."""
+        """A perfectly flat frame: all cells are both max and min (is_flat).
+        Flat cells must be classified as 0 (slope), matching GPU kernel logic."""
         frame = np.full((64, 64), 0.3, dtype=np.float32)
         t = snap_to_ternary(frame, mode="topological")
-        assert set(np.unique(t)).issubset({-1, 0, 1})
+        assert np.all(t == 0)
 
     def test_invalid_mode_raises(self):
         frame = self._make_frame()

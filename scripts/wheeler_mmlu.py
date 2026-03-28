@@ -874,7 +874,7 @@ def score_cortex(
             graph.adjacency,
             graph.cluster_labels,
             settlement["settled"],
-            settlement["settled"],  # prev = initial for first pass
+            np.array(all_sims),  # prev = pre-settlement initial opinions
             float(choice_sims.max()) if len(choice_sims) > 0 else 0.0,
             coevo_convergence=coevo_conv,
             coevo_spread=coevo_spr,

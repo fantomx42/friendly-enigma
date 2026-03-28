@@ -13,6 +13,7 @@ from .constants import (
     SALIENCE_MAX_ITERS_MED,
     SALIENCE_THRESHOLD_MED,
     SLOPE_FLOW_STRENGTH,
+    STABILITY_WINDOW,
 )
 from .oscillation import detect_oscillation
 
@@ -102,6 +103,24 @@ except ImportError:
     _gpu_evolve = None
 
 
+def _enrich_metadata(result: dict) -> None:
+    """Add structural features to an evolution result's metadata in-place.
+
+    Works for both GPU and CPU paths — merges grid features and
+    convergence speed into the existing metadata dict.
+    """
+    md = result.get("metadata", {})
+    feats = compute_attractor_features(result["attractor"])
+    md.update(feats)
+    ticks = result.get("convergence_ticks", 0)
+    if result.get("state") == "CONVERGED":
+        md["convergence_speed"] = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+    else:
+        md["convergence_speed"] = "?"
+    md.setdefault("final_delta", 0.0)
+    result["metadata"] = md
+
+
 def evolve_and_interpret(
     frame: np.ndarray,
     max_iters: int = SALIENCE_MAX_ITERS_MED,
@@ -127,49 +146,73 @@ def evolve_and_interpret(
             # 2-frame history so MemoryBrick.save() (np.stack) doesn't crash.
             if not result["history"]:
                 result["history"] = [frame.copy(), result["attractor"].copy()]
+            _enrich_metadata(result)
             return result
         except Exception as e:
             logging.warning("GPU evolution failed, falling back to CPU: %s", e)
 
     history = [frame.copy()]
+    stable_count = 0
+    delta = 0.0
 
     for i in range(max_iters):
         frame_old = frame
         frame = apply_ca_dynamics(frame)
-        delta = np.abs(frame - frame_old).mean()
+        delta = float(np.abs(frame - frame_old).mean())
 
         history.append(frame.copy())
 
         if delta < stability_threshold:
-            return {
-                "state": "CONVERGED",
-                "attractor": frame,
-                "convergence_ticks": i + 1,
-                "history": history,
-                "metadata": {},
-            }
+            stable_count += 1
+            if stable_count >= STABILITY_WINDOW:
+                ticks = i + 1
+                feats = compute_attractor_features(frame)
+                spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+                return {
+                    "state": "CONVERGED",
+                    "attractor": frame,
+                    "convergence_ticks": ticks,
+                    "history": history,
+                    "metadata": {
+                        **feats,
+                        "convergence_speed": spd,
+                        "final_delta": round(delta, 6),
+                    },
+                }
+        else:
+            stable_count = 0
 
         if i > 50 and i % 10 == 0:
             osc_result = detect_oscillation(history)
             if osc_result["oscillating"]:
+                ticks = i + 1
+                feats = compute_attractor_features(frame)
                 return {
                     "state": "OSCILLATING",
                     "attractor": frame,
-                    "convergence_ticks": i + 1,
+                    "convergence_ticks": ticks,
                     "history": history,
                     "metadata": {
                         "cycle_period": osc_result["period"],
                         "oscillating_cells": osc_result["oscillating_cells"],
                         "cycle_states": osc_result["cycle_states"],
+                        **feats,
+                        "convergence_speed": "?",
+                        "final_delta": round(delta, 6),
                     },
                 }
 
+    feats = compute_attractor_features(frame)
     return {
         "state": "CHAOTIC",
         "attractor": frame,
         "convergence_ticks": max_iters,
         "history": history,
-        "metadata": {},
+        "metadata": {
+            **feats,
+            "convergence_speed": "?",
+            "final_delta": round(delta, 6),
+        },
     }
 
 
@@ -199,49 +242,73 @@ def evolve_with_params(
             )
             if not result["history"]:
                 result["history"] = [frame.copy(), result["attractor"].copy()]
+            _enrich_metadata(result)
             return result
         except Exception as e:
             logging.warning("GPU evolution failed, falling back to CPU: %s", e)
 
     history = [frame.copy()]
+    stable_count = 0
+    delta = 0.0
 
     for i in range(max_iters):
         frame_old = frame
         frame = apply_ca_dynamics_parameterized(frame, push_strength, slope_strength)
-        delta = np.abs(frame - frame_old).mean()
+        delta = float(np.abs(frame - frame_old).mean())
 
         history.append(frame.copy())
 
         if delta < stability_threshold:
-            return {
-                "state": "CONVERGED",
-                "attractor": frame,
-                "convergence_ticks": i + 1,
-                "history": history,
-                "metadata": {},
-            }
+            stable_count += 1
+            if stable_count >= STABILITY_WINDOW:
+                ticks = i + 1
+                feats = compute_attractor_features(frame)
+                spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+                return {
+                    "state": "CONVERGED",
+                    "attractor": frame,
+                    "convergence_ticks": ticks,
+                    "history": history,
+                    "metadata": {
+                        **feats,
+                        "convergence_speed": spd,
+                        "final_delta": round(delta, 6),
+                    },
+                }
+        else:
+            stable_count = 0
 
         if i > 50 and i % 10 == 0:
             osc_result = detect_oscillation(history)
             if osc_result["oscillating"]:
+                ticks = i + 1
+                feats = compute_attractor_features(frame)
                 return {
                     "state": "OSCILLATING",
                     "attractor": frame,
-                    "convergence_ticks": i + 1,
+                    "convergence_ticks": ticks,
                     "history": history,
                     "metadata": {
                         "cycle_period": osc_result["period"],
                         "oscillating_cells": osc_result["oscillating_cells"],
                         "cycle_states": osc_result["cycle_states"],
+                        **feats,
+                        "convergence_speed": "?",
+                        "final_delta": round(delta, 6),
                     },
                 }
 
+    feats = compute_attractor_features(frame)
     return {
         "state": "CHAOTIC",
         "attractor": frame,
         "convergence_ticks": max_iters,
         "history": history,
-        "metadata": {},
+        "metadata": {
+            **feats,
+            "convergence_speed": "?",
+            "final_delta": round(delta, 6),
+        },
     }
 
 
@@ -281,15 +348,45 @@ def snap_to_ternary(frame: np.ndarray, mode: str | None = None) -> np.ndarray:
         raise ValueError(f"Unknown ternary snap mode: {mode!r}")
 
 
+def _count_clusters(mask: np.ndarray) -> int:
+    """Count connected components in a boolean mask (von Neumann neighbourhood)."""
+    visited = np.zeros_like(mask)
+    rows, cols = mask.shape
+    clusters = 0
+    for r in range(rows):
+        for c in range(cols):
+            if mask[r, c] and not visited[r, c]:
+                clusters += 1
+                queue = [(r, c)]
+                while queue:
+                    cr, cc = queue.pop()
+                    if visited[cr, cc]:
+                        continue
+                    visited[cr, cc] = True
+                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                        nr, nc = cr + dr, cc + dc
+                        if (
+                            0 <= nr < rows
+                            and 0 <= nc < cols
+                            and not visited[nr, nc]
+                            and mask[nr, nc]
+                        ):
+                            queue.append((nr, nc))
+    return clusters
+
+
 def compute_attractor_features(grid: np.ndarray) -> dict:
     """Structural features of a converged attractor grid.
 
     Returns
     -------
     dict with:
-        grid_entropy   : Shannon entropy (bits) over the 3-state distribution
-        cluster_count  : connected components of value==1 cells (von Neumann)
-        alive_fraction : fraction of non-zero cells
+        grid_entropy      : Shannon entropy (bits) over the 3-state distribution
+        cluster_count     : connected components of positive cells (von Neumann)
+        neg_cluster_count : connected components of negative cells
+        alive_fraction    : fraction of non-neutral cells
+        boundary_length   : positive cells adjacent to negative cells (4-neighbour)
+        energy            : mean |delta| after one CA step (basin depth)
     """
     # Discretise continuous [-1, 1] values into three buckets for statistics
     pos = grid > 0.33  # "positive" state
@@ -304,35 +401,33 @@ def compute_attractor_features(grid: np.ndarray) -> dict:
     # Alive fraction: cells not in the neutral bucket
     alive = float((pos.sum() + neg.sum()) / n)
 
-    # Connected components of "positive" cells via BFS (von Neumann neighbourhood)
-    active = pos
-    visited = np.zeros_like(active)
+    # Connected components via BFS (von Neumann neighbourhood)
+    clusters = _count_clusters(pos)
+    neg_clusters = _count_clusters(neg)
+
+    # Boundary length: positive cells with at least one negative 4-neighbour
     rows, cols = grid.shape
-    clusters = 0
+    boundary = 0
     for r in range(rows):
         for c in range(cols):
-            if active[r, c] and not visited[r, c]:
-                clusters += 1
-                queue = [(r, c)]
-                while queue:
-                    cr, cc = queue.pop()
-                    if visited[cr, cc]:
-                        continue
-                    visited[cr, cc] = True
-                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                        nr, nc = cr + dr, cc + dc
-                        if (
-                            0 <= nr < rows
-                            and 0 <= nc < cols
-                            and not visited[nr, nc]
-                            and active[nr, nc]
-                        ):
-                            queue.append((nr, nc))
+            if pos[r, c]:
+                for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nr, nc = (r + dr) % rows, (c + dc) % cols
+                    if neg[nr, nc]:
+                        boundary += 1
+                        break
+
+    # Energy: mean absolute change after one CA step (low = deep basin)
+    next_state = apply_ca_dynamics(grid)
+    e = float(np.abs(next_state - grid).mean())
 
     return {
         "grid_entropy": round(entropy, 3),
         "cluster_count": clusters,
+        "neg_cluster_count": neg_clusters,
         "alive_fraction": round(alive, 3),
+        "boundary_length": boundary,
+        "energy": round(e, 6),
     }
 
 

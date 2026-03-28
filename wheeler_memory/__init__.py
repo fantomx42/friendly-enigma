@@ -103,6 +103,13 @@ from .interference import (
     self_consistency_check,
 )
 
+# Similarity functions (basin separation)
+from .similarity import (
+    hybrid_similarity,
+    pearson_similarity,
+    spatial_cosine_similarity,
+)
+
 # Reconstructive recall
 from .reconstruction import reconstruct, reconstruct_batch
 
@@ -202,4 +209,8 @@ __all__ = [
     "GenerationResult",
     "TickResult",
     "trajectory_resonance",
+    # Similarity functions
+    "pearson_similarity",
+    "spatial_cosine_similarity",
+    "hybrid_similarity",
 ]

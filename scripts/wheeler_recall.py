@@ -96,39 +96,38 @@ def main():
 
     if args.interference:
         try:
-            from wheeler_memory.interference import compute_interference, interference_score
+            from wheeler_memory.interference import recall_with_interference
             from wheeler_memory.scm_grid import SCMGrid
-            from wheeler_memory.dynamics import evolve_with_params
-            from wheeler_memory.constants import (
-                CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW,
-                EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW,
-            )
-            from wheeler_memory.rotation import _get_frame_fn
 
-            # Standard recall first (corpus-only) to get candidates
-            results = recall_memory(
-                args.query, top_k=args.top_k * 2, data_dir=args.data_dir,
-                chunk=args.chunk, use_embedding=args.embed, encoder=args.encoder,
-                salience=sal,
+            results, dominant, openness = recall_with_interference(
+                args.query,
+                top_k=args.top_k,
+                data_dir=args.data_dir,
+                chunk=args.chunk,
+                encoder=args.encoder,
+                use_embedding=args.embed,
             )
             if not results:
                 print("No memories stored yet.")
                 return
 
             scm = SCMGrid.load_or_create(args.data_dir)
-
             print(f"SCM: {scm}")
-            print(f"{'Rank':<5} {'Score':>7} {'CorpSim':>8} {'State':<16} {'Chunk':<12} Text")
+            print(f"Dominant state: {dominant}  SCM openness: {openness:.1%}")
+            print(
+                f"{'Rank':<5} {'IScore':>7} {'CorpSim':>8} {'State':<16} {'Chunk':<12} Text"
+            )
             print("-" * 90)
-            for i, r in enumerate(results[:args.top_k], 1):
-                text_preview = r["text"][:35] + "..." if len(r["text"]) > 35 else r["text"]
+            for i, r in enumerate(results, 1):
+                text_preview = (
+                    r["text"][:35] + "..." if len(r["text"]) > 35 else r["text"]
+                )
                 chunk_name = r.get("chunk", "?")
-                # Interference state: corpus-only memories are ABSORBED
-                state = "ABSORBED"
-                score = r["similarity"] * float((1.0 - abs(scm.grid)).mean())
+                iscore = r.get("interference_score", r.get("similarity", 0.0))
+                istate = r.get("interference_state", "?")
                 print(
-                    f"{i:<5} {score:>7.4f} {r['similarity']:>8.4f} "
-                    f"{state:<16} {chunk_name:<12} {text_preview}"
+                    f"{i:<5} {iscore:>7.4f} {r['similarity']:>8.4f} "
+                    f"{istate:<16} {chunk_name:<12} {text_preview}"
                 )
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
