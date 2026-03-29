@@ -19,33 +19,10 @@ from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
-# CA dynamics (self-contained so no package install needed)
+# CA dynamics — import from the package to stay in sync with is_flat fix
 # ---------------------------------------------------------------------------
 
-
-def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
-    """Single CA iteration using 3-state logic (von Neumann neighbourhood)."""
-    n_up = np.roll(frame, 1, axis=0)
-    n_down = np.roll(frame, -1, axis=0)
-    n_left = np.roll(frame, 1, axis=1)
-    n_right = np.roll(frame, -1, axis=1)
-
-    is_max = (
-        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
-    )
-    is_min = (
-        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
-    )
-
-    neighbors = np.stack([n_up, n_down, n_left, n_right])
-    max_neighbor = np.max(neighbors, axis=0)
-
-    delta = np.zeros_like(frame)
-    delta = np.where(is_max, (1.0 - frame) * 0.35, delta)
-    delta = np.where(is_min, (-1.0 - frame) * 0.35, delta)
-    delta = np.where(~is_max & ~is_min, (max_neighbor - frame) * 0.20, delta)
-
-    return np.clip(frame + delta, -1.0, 1.0)
+from wheeler_memory.dynamics import apply_ca_dynamics
 
 
 # ---------------------------------------------------------------------------

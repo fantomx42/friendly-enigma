@@ -104,9 +104,10 @@ __global__ void ca_step_kernel(
 /* ─── Kernel 2: Convergence check + zero accumulator ─────────────────────── */
 
 __global__ void convergence_check_kernel(
-    float*       __restrict__ delta_sums,  /* [B]  */
-    int*         __restrict__ status,      /* [B]  */
-    int*         __restrict__ ticks,       /* [B]  */
+    float*       __restrict__ delta_sums,     /* [B]  */
+    int*         __restrict__ status,         /* [B]  */
+    int*         __restrict__ ticks,          /* [B]  */
+    int*         __restrict__ stable_counts,  /* [B]  */
     int grid_cells,
     int current_iter,
     float stability_threshold)
@@ -121,8 +122,13 @@ __global__ void convergence_check_kernel(
 
     float mean_delta = delta_sums[b] / (float)grid_cells;
     if (mean_delta < stability_threshold) {
-        status[b] = STATUS_CONVERGED;
-        ticks[b]  = current_iter + 1;
+        stable_counts[b]++;
+        if (stable_counts[b] >= 3) {  /* STABILITY_WINDOW */
+            status[b] = STATUS_CONVERGED;
+            ticks[b]  = current_iter + 1;
+        }
+    } else {
+        stable_counts[b] = 0;
     }
 
     delta_sums[b] = 0.0f;
@@ -314,8 +320,8 @@ size_t ca_query_vram(int batch_size, int grid_w)
     size_t meta_bytes  = B * sizeof(int);
     size_t osc_bytes   = B * OSC_PERIODS * sizeof(int);
 
-    /* 2 grid planes (ping-pong) + ring + delta + status + ticks + osc_counts */
-    return 2 * grid_bytes + ring_bytes + delta_bytes + 2 * meta_bytes + osc_bytes;
+    /* 2 grid planes (ping-pong) + ring + delta + status + ticks + osc + stable_counts */
+    return 2 * grid_bytes + ring_bytes + delta_bytes + 3 * meta_bytes + osc_bytes;
 }
 
 
@@ -358,14 +364,15 @@ int ca_evolve_batch_v2(
     size_t meta_bytes  = B * sizeof(int);
     size_t osc_bytes   = B * OSC_PERIODS * sizeof(int);
 
-    float*  d_grid_A    = nullptr;  /* ping */
-    float*  d_grid_B    = nullptr;  /* pong */
-    int8_t* d_role_ring = nullptr;
-    float*  d_delta     = nullptr;
-    int*    d_status    = nullptr;
-    int*    d_ticks     = nullptr;
-    int*    d_osc       = nullptr;
-    int     retval      = 0;
+    float*  d_grid_A       = nullptr;  /* ping */
+    float*  d_grid_B       = nullptr;  /* pong */
+    int8_t* d_role_ring    = nullptr;
+    float*  d_delta        = nullptr;
+    int*    d_status       = nullptr;
+    int*    d_ticks        = nullptr;
+    int*    d_osc          = nullptr;
+    int*    d_stable_counts = nullptr;  /* convergence stability window */
+    int     retval         = 0;
 
     /* Declare all variables before first goto-capable HIP_CHECK */
     dim3 block_2d(16, 16);   /* 256 threads per block */
@@ -387,6 +394,7 @@ int ca_evolve_batch_v2(
     HIP_CHECK(hipMalloc(&d_status,    meta_bytes));
     HIP_CHECK(hipMalloc(&d_ticks,     meta_bytes));
     HIP_CHECK(hipMalloc(&d_osc,       osc_bytes));
+    HIP_CHECK(hipMalloc(&d_stable_counts, meta_bytes));
 
     /* Copy input frames to grid A */
     HIP_CHECK(hipMemcpy(d_grid_A, frames_in, grid_bytes, hipMemcpyHostToDevice));
@@ -395,6 +403,7 @@ int ca_evolve_batch_v2(
     HIP_CHECK(hipMemset(d_role_ring, 0, ring_bytes));
     HIP_CHECK(hipMemset(d_delta,     0, delta_bytes));
     HIP_CHECK(hipMemset(d_osc,       0, osc_bytes));
+    HIP_CHECK(hipMemset(d_stable_counts, 0, meta_bytes));
 
     /* Set all status to RUNNING, ticks to max_iters (CHAOTIC default) */
     for (int i = 0; i < batch_size; i++) {
@@ -419,10 +428,10 @@ int ca_evolve_batch_v2(
             src, dst, d_delta, d_status, grid_w, grid_cells,
             push_strength, slope_strength);
 
-        /* Kernel 2: Convergence check */
+        /* Kernel 2: Convergence check (requires STABILITY_WINDOW=3 ticks) */
         hipLaunchKernelGGL(convergence_check_kernel,
             dim3(conv_blocks), dim3(conv_threads), 0, 0,
-            d_delta, d_status, d_ticks,
+            d_delta, d_status, d_ticks, d_stable_counts,
             grid_cells, iter, stability_threshold);
 
         /* Kernel 3: Role compute + ring write (from iter >= OSC_START) */
@@ -493,6 +502,7 @@ cleanup:
     if (d_status)    (void)hipFree(d_status);
     if (d_ticks)     (void)hipFree(d_ticks);
     if (d_osc)       (void)hipFree(d_osc);
+    if (d_stable_counts) (void)hipFree(d_stable_counts);
 
     return retval;
 }

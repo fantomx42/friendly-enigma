@@ -235,29 +235,41 @@ def _exec_recall_memory(
     data_dir: Path | None,
     use_embedding: bool = False,
     encoder: str | None = None,
+    use_interference: bool = False,
 ) -> str:
-    hits = recall_memory(
-        query,
-        top_k=top_k,
-        data_dir=data_dir,
-        use_embedding=use_embedding,
-        encoder=encoder,
-    )
+    if use_interference:
+        from .interference import recall_with_interference
+
+        hits, dominant_state, scm_openness = recall_with_interference(
+            query,
+            top_k=top_k,
+            data_dir=data_dir,
+            use_embedding=use_embedding,
+            encoder=encoder,
+        )
+    else:
+        hits = recall_memory(
+            query,
+            top_k=top_k,
+            data_dir=data_dir,
+            use_embedding=use_embedding,
+            encoder=encoder,
+        )
     if not hits:
         return json.dumps({"results": [], "message": "No memories found."})
-    return json.dumps(
-        {
-            "results": [
-                {
-                    "text": h["text"],
-                    "similarity": round(h["similarity"], 4),
-                    "state": h.get("state", "?"),
-                    "temperature": round(h.get("temperature", 0.0), 3),
-                }
-                for h in hits
-            ]
+    result_list = []
+    for h in hits:
+        entry = {
+            "text": h["text"],
+            "similarity": round(h["similarity"], 4),
+            "state": h.get("state", "?"),
+            "temperature": round(h.get("temperature", 0.0), 3),
         }
-    )
+        if use_interference:
+            entry["interference_score"] = h.get("interference_score", 0.0)
+            entry["interference_state"] = h.get("interference_state", "")
+        result_list.append(entry)
+    return json.dumps({"results": result_list})
 
 
 def _exec_list_memories(limit: int, data_dir: Path | None) -> str:
@@ -409,6 +421,7 @@ def _dispatch_tool(
     data_dir: Path | None,
     use_embedding: bool = False,
     encoder: str | None = None,
+    use_interference: bool = False,
 ) -> str:
     """Execute a tool call and return its JSON string result."""
     try:
@@ -416,7 +429,12 @@ def _dispatch_tool(
             return _exec_store_memory(args["text"], data_dir, use_embedding)
         if name == "recall_memory":
             return _exec_recall_memory(
-                args["query"], args.get("top_k", 5), data_dir, use_embedding, encoder
+                args["query"],
+                args.get("top_k", 5),
+                data_dir,
+                use_embedding,
+                encoder,
+                use_interference,
             )
         if name == "list_memories":
             return _exec_list_memories(args.get("limit", 20), data_dir)
@@ -608,6 +626,7 @@ class WheelerAgent:
         verbose: bool = False,
         use_embedding: bool = False,
         encoder: str = "blended",
+        use_interference: bool = False,
     ) -> None:
         self.model = model
         self.ollama_url = ollama_url
@@ -621,6 +640,7 @@ class WheelerAgent:
         self.verbose = verbose
         self.use_embedding = use_embedding
         self.encoder = encoder
+        self.use_interference = use_interference
         self._history: list[dict] = []
         self._last_recall_hits: list[dict] = []
 
@@ -639,15 +659,26 @@ class WheelerAgent:
         Each hit includes its temperature_tier for confidence grouping.
         """
         try:
-            hits = recall_memory(
-                query,
-                top_k=self.auto_recall_k,
-                data_dir=self.data_dir,
-                reconstruct=self.reconstruct,
-                reconstruct_alpha=self.reconstruct_alpha,
-                encoder=self.encoder if not self.use_embedding else None,
-                use_embedding=self.use_embedding,
-            )
+            if self.use_interference:
+                from .interference import recall_with_interference
+
+                hits, _dom_state, _scm_open = recall_with_interference(
+                    query,
+                    top_k=self.auto_recall_k,
+                    data_dir=self.data_dir,
+                    encoder=self.encoder if not self.use_embedding else None,
+                    use_embedding=self.use_embedding,
+                )
+            else:
+                hits = recall_memory(
+                    query,
+                    top_k=self.auto_recall_k,
+                    data_dir=self.data_dir,
+                    reconstruct=self.reconstruct,
+                    reconstruct_alpha=self.reconstruct_alpha,
+                    encoder=self.encoder if not self.use_embedding else None,
+                    use_embedding=self.use_embedding,
+                )
         except Exception:
             return None, []
         if not hits:
@@ -766,7 +797,12 @@ class WheelerAgent:
                     print(f"[tool] {name}({json.dumps(args)})")
 
                 result_str = _dispatch_tool(
-                    name, args, self.data_dir, self.use_embedding, self.encoder
+                    name,
+                    args,
+                    self.data_dir,
+                    self.use_embedding,
+                    self.encoder,
+                    self.use_interference,
                 )
 
                 if self.verbose:
@@ -920,7 +956,12 @@ class WheelerAgent:
                 yield {"type": "tool_call", "name": name, "args": args}
 
                 result_str = _dispatch_tool(
-                    name, args, self.data_dir, self.use_embedding, self.encoder
+                    name,
+                    args,
+                    self.data_dir,
+                    self.use_embedding,
+                    self.encoder,
+                    self.use_interference,
                 )
                 try:
                     result_obj = json.loads(result_str)

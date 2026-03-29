@@ -558,16 +558,30 @@ class WheelerPrimaryAgent:
           {"type": "token", "content": str}
           {"type": "done", "content": str}
         """
-        # 1. Recall
-        hits = recall_memory(
-            user_message,
-            top_k=self.recall_k,
-            data_dir=self.data_dir,
-            use_embedding=True,
-            encoder="blended",
-            reconstruct=self.reconstruct,
-            reconstruct_alpha=self.reconstruct_alpha,
-        )
+        # 1. Recall (interference-aware, mirroring run())
+        interference_state = ""
+        scm_openness = 1.0
+
+        if self.use_interference:
+            from .interference import recall_with_interference
+
+            hits, interference_state, scm_openness = recall_with_interference(
+                user_message,
+                top_k=self.recall_k,
+                data_dir=self.data_dir,
+                encoder="blended",
+                use_embedding=True,
+            )
+        else:
+            hits = recall_memory(
+                user_message,
+                top_k=self.recall_k,
+                data_dir=self.data_dir,
+                use_embedding=True,
+                encoder="blended",
+                reconstruct=self.reconstruct,
+                reconstruct_alpha=self.reconstruct_alpha,
+            )
         yield {"type": "recall", "hits": hits}
 
         # 2. Extract state
@@ -576,6 +590,8 @@ class WheelerPrimaryAgent:
             user_message,
             hits,
             self.confidence_floor,
+            interference_state=interference_state,
+            scm_openness=scm_openness,
             data_dir=self.data_dir,
             query_seed_corr=query_seed_corr,
         )

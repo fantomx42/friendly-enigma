@@ -236,24 +236,47 @@ class WheelerHandler(BaseHTTPRequestHandler):
                 self.send_error_json("text required")
                 return
             top_k = int(body.get("top_k", 10))
+            use_interference = bool(body.get("interference", False))
             try:
-                results = recall_memory(text, top_k=top_k, data_dir=DEFAULT_DATA_DIR)
-                self.send_json(
-                    [
-                        {
-                            "key": m["hex_key"],
-                            "chunk": m["chunk"],
-                            "temperature": m["temperature"],
-                            "tier": m["temperature_tier"],
-                            "text": m["text"],
-                            "state": m["state"],
-                            "ticks": m["convergence_ticks"],
-                            "similarity": m["similarity"],
-                            "timestamp": m["timestamp"],
-                        }
-                        for m in results
-                    ]
-                )
+                if use_interference:
+                    from wheeler_memory.interference import recall_with_interference
+
+                    results, dom_state, scm_open = recall_with_interference(
+                        text, top_k=top_k, data_dir=DEFAULT_DATA_DIR
+                    )
+                else:
+                    results = recall_memory(
+                        text, top_k=top_k, data_dir=DEFAULT_DATA_DIR
+                    )
+                    dom_state = ""
+                    scm_open = 1.0
+                response_list = []
+                for m in results:
+                    entry = {
+                        "key": m["hex_key"],
+                        "chunk": m["chunk"],
+                        "temperature": m["temperature"],
+                        "tier": m["temperature_tier"],
+                        "text": m["text"],
+                        "state": m["state"],
+                        "ticks": m["convergence_ticks"],
+                        "similarity": m["similarity"],
+                        "timestamp": m["timestamp"],
+                    }
+                    if use_interference:
+                        entry["interference_score"] = m.get(
+                            "interference_score", 0.0
+                        )
+                        entry["interference_state"] = m.get(
+                            "interference_state", ""
+                        )
+                        entry["signal_strength"] = m.get("signal_strength", 0.0)
+                    response_list.append(entry)
+                payload = {"results": response_list}
+                if use_interference:
+                    payload["dominant_state"] = dom_state
+                    payload["scm_openness"] = round(scm_open, 3)
+                self.send_json(payload)
             except Exception as e:
                 self.send_error_json(str(e), 500)
             return

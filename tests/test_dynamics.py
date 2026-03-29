@@ -239,3 +239,67 @@ class TestStabilityWindow:
                 stability_threshold=1.0,  # trivially easy threshold
             )
             assert result["state"] == "CHAOTIC"
+
+
+class TestZeroDominantConvergence:
+    """Tests for correct convergence on 0-dominant grids (percentile fix)."""
+
+    def test_zero_dominant_not_premature_convergence(self):
+        """95% zero grid with boundary pattern must not converge prematurely.
+
+        The boundary cells need time to evolve. With the old mean-delta check,
+        the silent zero majority would drag the mean below threshold too early.
+        With percentile-based delta, convergence waits for boundary cells.
+        """
+        from unittest.mock import patch
+
+        from wheeler_memory.constants import STABILITY_WINDOW
+
+        frame = np.zeros((64, 64), dtype=np.float32)
+        # Plant a non-trivial boundary pattern: a gradient block in one corner
+        frame[0:4, 0:4] = np.linspace(-0.8, 0.8, 16).reshape(4, 4)
+        frame[60:64, 60:64] = np.linspace(0.3, -0.5, 16).reshape(4, 4)
+
+        with patch("wheeler_memory.dynamics._GPU_READY", False):
+            result = evolve_and_interpret(
+                frame, max_iters=500, stability_threshold=1e-4
+            )
+
+        # Must converge (not exhaust budget)
+        assert result["state"] == "CONVERGED"
+        # Must take more than STABILITY_WINDOW ticks (boundary needs real evolution)
+        assert result["convergence_ticks"] > STABILITY_WINDOW
+        # The attractor should differ from the initial frame in the boundary region
+        att = result["attractor"]
+        boundary_change = np.abs(att[0:4, 0:4] - frame[0:4, 0:4]).max()
+        assert boundary_change > 0.01, "Boundary cells should have evolved"
+
+    def test_percentile_catches_active_boundary(self):
+        """Small non-zero region in zero field: attractor must show real structure.
+
+        This tests that evolution doesn't terminate so early that the small
+        active region hasn't had time to form a meaningful attractor pattern.
+        """
+        from unittest.mock import patch
+
+        frame = np.zeros((64, 64), dtype=np.float32)
+        # Single 4x4 hot spot with mixed values
+        frame[30:34, 30:34] = np.array(
+            [
+                [0.9, -0.7, 0.5, -0.3],
+                [-0.6, 0.8, -0.4, 0.2],
+                [0.7, -0.5, 0.6, -0.8],
+                [-0.2, 0.4, -0.9, 0.1],
+            ],
+            dtype=np.float32,
+        )
+
+        with patch("wheeler_memory.dynamics._GPU_READY", False):
+            result = evolve_and_interpret(
+                frame, max_iters=500, stability_threshold=1e-4
+            )
+
+        att = result["attractor"]
+        # The hot spot should have evolved into a structured attractor
+        hotspot = att[28:36, 28:36]  # Slightly wider — activity spreads
+        assert np.abs(hotspot).max() > 0.1, "Hot spot region should retain structure"

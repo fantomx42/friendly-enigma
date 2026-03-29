@@ -490,6 +490,36 @@ def score_semantic(
     return int(scores.index(max(scores))), scores
 
 
+def score_semantic_interference(
+    question: str,
+    choices: list[str],
+    recall_k: int = 5,
+    data_dir: "Path | None" = None,
+) -> tuple[int, list[float]]:
+    """Score choices using three-grid interference recall.
+
+    Unlike score_semantic (which uses the fast in-memory AttractorCache),
+    this calls recall_with_interference() per choice — significantly slower
+    but uses the full corpus + experiential + SCM gating pipeline.
+
+    Returns (predicted_index, [score_A, score_B, score_C, score_D]).
+    """
+    from wheeler_memory.interference import recall_with_interference
+
+    scores = []
+    for choice in choices:
+        query = f"{question} {choice}"
+        hits, _dom, _scm = recall_with_interference(
+            query, top_k=recall_k, data_dir=data_dir
+        )
+        top_sim = max(
+            (h.get("interference_score", h.get("similarity", 0.0)) for h in hits),
+            default=0.0,
+        )
+        scores.append(top_sim)
+    return int(scores.index(max(scores))), scores
+
+
 def score_spatial(
     question: str,
     choices: list[str],
@@ -1382,6 +1412,7 @@ def run_benchmark(
     classifier_weights_path: str | None = None,
     encoder: str = "hippocampus",
     classify_errors: bool = False,
+    use_interference: bool = False,
 ) -> dict:
     results = {}  # subject → {correct, total, accuracy}
     all_rows = []  # for TSV output
@@ -1491,7 +1522,12 @@ def run_benchmark(
         for idx, (subject, question, choices, answer_idx) in enumerate(subject_items):
             t0 = time.time()
 
-            if mode == "semantic":
+            if mode == "semantic" and use_interference:
+                pred_idx, scores = score_semantic_interference(
+                    question, choices, recall_k, data_dir
+                )
+                confidence = max(scores)
+            elif mode == "semantic":
                 frames = precomputed[idx] if precomputed is not None else None
                 pred_idx, scores = score_semantic(
                     question, choices, recall_k, cache, frames
@@ -1777,6 +1813,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Post-hoc: classify wrong answers as SYNTHESIS/NOVEL/HALLUCINATION and report summary.",
     )
+    p.add_argument(
+        "--interference",
+        action="store_true",
+        help="Use three-grid interference recall (slower, uses corpus + experiential + SCM gating).",
+    )
     return p.parse_args(argv)
 
 
@@ -1826,6 +1867,7 @@ def main(argv: list[str] | None = None) -> None:
         classifier_weights_path=args.classifier_weights,
         encoder=args.encoder,
         classify_errors=args.classify_errors,
+        use_interference=args.interference,
     )
 
 

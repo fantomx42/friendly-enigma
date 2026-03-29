@@ -207,3 +207,67 @@ class TestInterferenceResult:
         """STATE_CODES and CODE_NAMES are inverse mappings."""
         for name, code in InterferenceResult.STATE_CODES.items():
             assert InterferenceResult.CODE_NAMES[code] == name
+
+
+# ── Agent recall wiring tests ────────────────────────────────────────────────
+
+
+class TestAgentRecallInterference:
+    """Tests that _exec_recall_memory dispatches to interference when asked."""
+
+    def test_exec_recall_with_interference_flag(self):
+        """_exec_recall_memory(use_interference=True) should include interference keys."""
+        import json
+        from unittest.mock import patch
+
+        from wheeler_memory.agent import _exec_recall_memory
+
+        mock_hits = [
+            {
+                "text": "test memory",
+                "similarity": 0.9,
+                "state": "CONVERGED",
+                "temperature": 0.5,
+                "hex_key": "abc123",
+                "chunk": "general",
+                "interference_score": 0.85,
+                "interference_state": "GROUNDED",
+            }
+        ]
+        with patch(
+            "wheeler_memory.interference.recall_with_interference",
+            return_value=(mock_hits, "GROUNDED", 0.8),
+        ) as mock_fn:
+            result = _exec_recall_memory(
+                "test query", top_k=5, data_dir=None, use_interference=True
+            )
+
+        parsed = json.loads(result)
+        assert len(parsed["results"]) == 1
+        assert parsed["results"][0]["interference_score"] == 0.85
+        assert parsed["results"][0]["interference_state"] == "GROUNDED"
+
+    def test_exec_recall_without_interference_default(self):
+        """Default _exec_recall_memory should not include interference keys."""
+        import json
+        from unittest.mock import patch
+
+        from wheeler_memory.agent import _exec_recall_memory
+
+        mock_hits = [
+            {
+                "text": "test memory",
+                "similarity": 0.9,
+                "state": "CONVERGED",
+                "temperature": 0.5,
+            }
+        ]
+        with patch(
+            "wheeler_memory.agent.recall_memory", return_value=mock_hits
+        ):
+            result = _exec_recall_memory(
+                "test query", top_k=5, data_dir=None, use_interference=False
+            )
+
+        parsed = json.loads(result)
+        assert "interference_score" not in parsed["results"][0]

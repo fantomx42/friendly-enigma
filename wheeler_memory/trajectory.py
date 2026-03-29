@@ -17,7 +17,12 @@ from pathlib import Path
 
 import numpy as np
 
-from .constants import SALIENCE_MAX_ITERS_MED, SALIENCE_THRESHOLD_MED
+from .constants import (
+    CONVERGENCE_PERCENTILE,
+    SALIENCE_MAX_ITERS_MED,
+    SALIENCE_THRESHOLD_MED,
+    STABILITY_WINDOW,
+)
 from .dynamics import apply_ca_dynamics
 from .oscillation import get_cell_roles
 
@@ -79,7 +84,7 @@ def compute_signature(
     Args:
         seed_frame: (64, 64) initial frame.
         max_iters: Maximum CA iterations.
-        stability_threshold: Mean abs delta below which we declare convergence.
+        stability_threshold: p99 abs delta below which we declare convergence.
 
     Returns:
         TrajectorySignature with downsampled curves and metadata.
@@ -91,11 +96,13 @@ def compute_signature(
     role_raw: list[float] = []
     state = "CHAOTIC"
     ticks = 0
+    stable_count = 0
 
     for i in range(max_iters):
         frame_old = frame
         frame = apply_ca_dynamics(frame)
-        delta = float(np.abs(frame - frame_old).mean())
+        abs_deltas = np.abs(frame - frame_old)
+        delta = float(np.percentile(abs_deltas, CONVERGENCE_PERCENTILE))
         energy_raw.append(delta)
 
         # Role stats: fraction of slope cells (neither max nor min)
@@ -106,8 +113,12 @@ def compute_signature(
         ticks = i + 1
 
         if delta < stability_threshold:
-            state = "CONVERGED"
-            break
+            stable_count += 1
+            if stable_count >= STABILITY_WINDOW:
+                state = "CONVERGED"
+                break
+        else:
+            stable_count = 0
 
         # Simple oscillation check: if we're past 50 ticks and delta
         # is bouncing in a narrow band, call it oscillating

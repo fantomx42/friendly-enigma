@@ -52,6 +52,7 @@ __global__ void ca_evolve_kernel(
     __shared__ int    sdone;
     __shared__ int    sfinal_state;
     __shared__ int    sfinal_ticks;
+    __shared__ int    sstable_count;
 
     int b         = (int)blockIdx.x;
     int tid       = (int)threadIdx.x;
@@ -59,9 +60,10 @@ __global__ void ca_evolve_kernel(
 
     /* Init control variables */
     if (tid == 0) {
-        sdone        = 0;
-        sfinal_state = 2;          /* CHAOTIC default */
-        sfinal_ticks = max_iters;
+        sdone         = 0;
+        sfinal_state  = 2;          /* CHAOTIC default */
+        sfinal_ticks  = max_iters;
+        sstable_count = 0;
     }
 
     /* Load initial frame into shared memory */
@@ -169,13 +171,18 @@ __global__ void ca_evolve_kernel(
             sframe[base_cell + j] = snext[base_cell + j];
         __syncthreads();   /* new sframe + global ring writes visible to all */
 
-        /* ── Phase 5: Convergence check ──────────────────────────────────── */
+        /* ── Phase 5: Convergence check (requires STABILITY_WINDOW=3 ticks) */
         if (tid == 0) {
             float mean_delta = sdelta[0] / (float)GRID_SIZE;
             if (mean_delta < STABILITY_THRESHOLD) {
-                sdone        = 1;
-                sfinal_state = 0;       /* CONVERGED */
-                sfinal_ticks = iter + 1;
+                sstable_count++;
+                if (sstable_count >= 3) {
+                    sdone        = 1;
+                    sfinal_state = 0;       /* CONVERGED */
+                    sfinal_ticks = iter + 1;
+                }
+            } else {
+                sstable_count = 0;
             }
         }
         __syncthreads();

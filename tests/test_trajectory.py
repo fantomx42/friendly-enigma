@@ -204,12 +204,15 @@ class TestComputeSignature:
         assert -1.0 <= sig.seed_attractor_corr <= 1.0
 
     def test_compute_signature_constant_frame_converges_quickly(self):
-        """Constant frame (all zeros) converges in very few ticks."""
+        """Constant frame (all zeros) converges in STABILITY_WINDOW ticks."""
+        from wheeler_memory.constants import STABILITY_WINDOW
+
         frame = np.zeros((64, 64), dtype=np.float32)
         sig = compute_signature(frame, max_iters=50)
         assert sig.state == "CONVERGED"
-        # Uniform frame is a fixed point; should converge in 1 tick
-        assert sig.convergence_ticks == 1
+        # Uniform frame is a fixed point; needs STABILITY_WINDOW consecutive
+        # sub-threshold ticks to declare convergence
+        assert sig.convergence_ticks == STABILITY_WINDOW
 
     def test_compute_signature_curves_are_float32(self):
         """energy_curve and role_curve are float32."""

@@ -439,6 +439,52 @@ class TestWheelerPrimaryAgentRun:
         assert kwargs.get("use_embedding") is True
 
 
+class TestRunStreamInterference:
+    """Tests that run_stream() mirrors run()'s interference wiring."""
+
+    @patch("wheeler_memory.decoder._ollama_generate_stream")
+    @patch("wheeler_memory.interference.recall_with_interference")
+    def test_run_stream_uses_interference_when_enabled(
+        self, mock_interference, mock_stream
+    ):
+        """run_stream() should call recall_with_interference when use_interference=True."""
+        mock_interference.return_value = (
+            [_make_hit("grounded memory", similarity=0.9)],
+            "GROUNDED",
+            0.8,
+        )
+        mock_stream.return_value = iter(
+            [{"message": {"content": "response"}, "done": True}]
+        )
+
+        agent = WheelerPrimaryAgent(model="test-model", use_interference=True)
+        events = list(agent.run_stream("test query"))
+
+        mock_interference.assert_called_once()
+        # Verify recall event was emitted with hits
+        recall_events = [e for e in events if e["type"] == "recall"]
+        assert len(recall_events) == 1
+        assert len(recall_events[0]["hits"]) == 1
+
+        # Verify state event captured interference info
+        state_events = [e for e in events if e["type"] == "state"]
+        assert len(state_events) == 1
+
+    @patch("wheeler_memory.decoder._ollama_generate_stream")
+    @patch("wheeler_memory.decoder.recall_memory")
+    def test_run_stream_default_no_interference(self, mock_recall, mock_stream):
+        """run_stream() should call recall_memory when use_interference=False."""
+        mock_recall.return_value = [_make_hit("plain memory", similarity=0.7)]
+        mock_stream.return_value = iter(
+            [{"message": {"content": "response"}, "done": True}]
+        )
+
+        agent = WheelerPrimaryAgent(model="test-model", use_interference=False)
+        events = list(agent.run_stream("test query"))
+
+        mock_recall.assert_called_once()
+
+
 class TestDecoderNoToolLoop:
     @patch("wheeler_memory.decoder._ollama_generate")
     @patch("wheeler_memory.decoder.recall_memory")

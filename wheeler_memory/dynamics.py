@@ -9,6 +9,7 @@ import logging
 import numpy as np
 
 from .constants import (
+    CONVERGENCE_PERCENTILE,
     MAX_PUSH_STRENGTH,
     SALIENCE_MAX_ITERS_MED,
     SALIENCE_THRESHOLD_MED,
@@ -158,7 +159,8 @@ def evolve_and_interpret(
     for i in range(max_iters):
         frame_old = frame
         frame = apply_ca_dynamics(frame)
-        delta = float(np.abs(frame - frame_old).mean())
+        abs_deltas = np.abs(frame - frame_old)
+        delta = float(np.percentile(abs_deltas, CONVERGENCE_PERCENTILE))
 
         history.append(frame.copy())
 
@@ -254,7 +256,8 @@ def evolve_with_params(
     for i in range(max_iters):
         frame_old = frame
         frame = apply_ca_dynamics_parameterized(frame, push_strength, slope_strength)
-        delta = float(np.abs(frame - frame_old).mean())
+        abs_deltas = np.abs(frame - frame_old)
+        delta = float(np.percentile(abs_deltas, CONVERGENCE_PERCENTILE))
 
         history.append(frame.copy())
 
