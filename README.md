@@ -12,7 +12,7 @@
 
 Wheeler Memory is a **learning architecture**, not a language model. It encodes text through a native Hippocampus encoder into a 64x64 cellular automaton (CA) grid, evolves it through 3-state dynamics until convergence (~40-50 ticks), and stores the resulting pattern. A Cortex system with three tiers (L1 Graph topology, L2 Settlement CA, L3 Native Classifier) handles semantic scoring and reconstruction.
 
-Similar concepts produce similar attractors. Query evolution followed by Pearson correlation against stored attractors enables recall. The Language Wheeler component renders CA states as natural language without independent reasoning.
+Similar concepts produce similar attractors. Query evolution followed by three-grid interference scoring (corpus + experiential + SCM trust gating) enables recall. The Language Wheeler component renders CA states as natural language without independent reasoning.
 
 | Component | Role |
 |-----------|------|
@@ -44,7 +44,7 @@ wheeler-store "self-attention computes relationships between all positions"
 wheeler-recall "how does attention work in transformers"
 ```
 
-Add `--embed` to use the MiniLM sentence-transformer encoder instead of the native Hippocampus encoder.
+Recall uses three-grid interference scoring by default (corpus + experiential + SCM gating). Add `--no-interference` for Pearson-only mode. Add `--embed` to use the MiniLM sentence-transformer encoder instead of the native Hippocampus encoder.
 
 ### Pre-train from a corpus
 
@@ -104,7 +104,7 @@ Text ---> Hippocampus Encoder (native: character n-gram random indexing)
                     v
           Attractor (64x64 stable pattern)
 
-THREE-GRID INTERFERENCE ARCHITECTURE (v0.3.0)
+THREE-GRID INTERFERENCE ARCHITECTURE (v0.3.1 — default recall path)
 ----------------------------------------------
 Answer(i,j) = Corpus(i,j) * Experiential(i,j) * (1 - |SCM(i,j)|)
 
@@ -145,17 +145,21 @@ QUERY & RECALL
 Query ---> Same encoding pipeline ---> Query attractor
                     |
                     v
-          Cortex L1 scoring via Pearson correlation
+          Pearson correlation pre-filter (top-2K candidates)
                     |
                     v
-          Top-K hits ranked by native classifier
+          Three-grid interference re-scoring (default since v0.3.1):
+            - Corpus Pearson similarity
+            - Experiential Pearson similarity
+            - SCM openness gating
+            - Degrades to pure Pearson when no experiential data exists
+                    |
+                    v
+          Top-K hits ranked by interference score
                     |
                     v
           [Optional] Reconstructive recall: blend stored attractor with query
           context, re-evolve through CA -> reconstructed memory
-                    |
-                    v
-          [Optional] Interference recall: three-grid scoring with SCM gating
                     |
                     v
           Language Wheeler renders CA state as text
@@ -182,9 +186,9 @@ MMLU BENCHMARK MODES
 --mode learn-interference  : Learn + experiential storage + SCM sculpting
 ```
 
-The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slopes flow uphill. Convergence takes ~3ms on CPU. The Hippocampus encoder uses character 3-grams and 4-grams with random indexing — lexical similarity produces similar frames; true semantic similarity emerges from attractor dynamics and Cortex layers. Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
+The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slopes flow uphill. Convergence takes ~3ms on CPU. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). The Hippocampus encoder uses character 3-grams and 4-grams with random indexing — lexical similarity produces similar frames; true semantic similarity emerges from attractor dynamics and Cortex layers. Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
 
-The three-grid interference system transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
+The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
 
 ---
 
@@ -280,8 +284,8 @@ python scripts/tools/prepare_corpus.py
 |---------|-------------|
 | `wheeler-store "text"` | Store a memory (add `--embed` for MiniLM semantic encoder) |
 | `wheeler-store "text" --experiential` | Store as episodic memory (loose attractors, temporal context) |
-| `wheeler-recall "text"` | Find similar memories (add `--embed` for MiniLM semantic encoder) |
-| `wheeler-recall "text" --interference` | Recall with three-grid interference scoring + SCM gating |
+| `wheeler-recall "text"` | Find similar memories (three-grid interference scoring by default) |
+| `wheeler-recall "text" --no-interference` | Pearson-only recall (skip experiential + SCM gating) |
 | `wheeler-forget --text "text"` | Delete a specific memory |
 | `wheeler-temps` | View all memories with temperature/freshness |
 | `wheeler-sleep` | Archive cold memories to save space |
@@ -436,7 +440,7 @@ scripts/                 CLI entry points
   train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
   wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
 
-tests/                   pytest suite (21 test modules, 230+ tests)
+tests/                   pytest suite (686+ tests across 34 modules)
   test_cortex.py         Cortex system unit tests
   test_hallucination.py  Hallucination classification tests
   test_generation.py     Trajectory resonance tests
