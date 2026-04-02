@@ -86,15 +86,15 @@ def main():
         help="Apply polar decay: increment decay_count on any polarity link that fires, decaying its weight",
     )
     parser.add_argument(
-        "--interference",
+        "--no-interference",
         action="store_true",
-        help="Use three-grid interference recall (corpus + experiential + SCM gating)",
+        help="Disable three-grid interference; use Pearson-only recall",
     )
     args = parser.parse_args()
 
     sal = salience_from_label(args.salience) if args.salience else None
 
-    if args.interference:
+    if not args.no_interference:
         try:
             from wheeler_memory.interference import recall_with_interference
             from wheeler_memory.scm_grid import SCMGrid

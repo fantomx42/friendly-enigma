@@ -385,12 +385,14 @@ class TestInterferenceScoreReturn:
 
 class TestWheelerPrimaryAgentRun:
     @patch("wheeler_memory.decoder._ollama_generate")
-    @patch("wheeler_memory.decoder.recall_memory")
+    @patch("wheeler_memory.interference.recall_with_interference")
     def test_full_pipeline(self, mock_recall, mock_ollama):
         """Agent calls recall → extract → format → ollama → returns text."""
-        mock_recall.return_value = [
-            _make_hit("stored knowledge", similarity=0.8),
-        ]
+        mock_recall.return_value = (
+            [_make_hit("stored knowledge", similarity=0.8)],
+            "GROUNDED",
+            0.8,
+        )
         mock_ollama.return_value = {
             "message": {"content": "Based on memory: stored knowledge."}
         }
@@ -409,12 +411,14 @@ class TestWheelerPrimaryAgentRun:
         assert "language renderer" in messages[0]["content"]
 
     @patch("wheeler_memory.decoder._ollama_generate")
-    @patch("wheeler_memory.decoder.recall_memory")
+    @patch("wheeler_memory.interference.recall_with_interference")
     def test_uncertain_state_propagated(self, mock_recall, mock_ollama):
         """When recall returns low similarity, uncertainty is signaled."""
-        mock_recall.return_value = [
-            _make_hit("vague", similarity=0.1),
-        ]
+        mock_recall.return_value = (
+            [_make_hit("vague", similarity=0.1)],
+            "ABSORBED",
+            0.8,
+        )
         mock_ollama.return_value = {"message": {"content": "I'm not sure about this."}}
 
         agent = WheelerPrimaryAgent(confidence_floor=0.5)
@@ -426,10 +430,10 @@ class TestWheelerPrimaryAgentRun:
         assert "Confidence is low" in user_prompt
 
     @patch("wheeler_memory.decoder._ollama_generate")
-    @patch("wheeler_memory.decoder.recall_memory")
+    @patch("wheeler_memory.interference.recall_with_interference")
     def test_embedding_recall_always_used(self, mock_recall, mock_ollama):
-        """Verify use_embedding=True is always passed to recall."""
-        mock_recall.return_value = []
+        """Verify use_embedding=True is always passed to interference recall."""
+        mock_recall.return_value = ([], "", 1.0)
         mock_ollama.return_value = {"message": {"content": ""}}
 
         agent = WheelerPrimaryAgent()

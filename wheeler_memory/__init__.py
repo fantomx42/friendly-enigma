@@ -100,6 +100,7 @@ from .interference import (
     InterferenceResult,
     compute_interference,
     interference_score,
+    recall_with_interference,
     self_consistency_check,
 )
 
@@ -186,6 +187,8 @@ __all__ = [
     "embed_to_frame_batch",
     # SCM grid
     "SCMGrid",
+    # Three-grid interference recall
+    "recall_with_interference",
     # Reconstructive recall
     "reconstruct",
     "reconstruct_batch",

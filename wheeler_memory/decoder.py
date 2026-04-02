@@ -468,7 +468,7 @@ class WheelerPrimaryAgent:
         reconstruct: bool = True,
         reconstruct_alpha: float = 0.3,
         verbose: bool = False,
-        use_interference: bool = False,
+        use_interference: bool = True,
     ) -> None:
         self.model = model
         self.ollama_url = ollama_url

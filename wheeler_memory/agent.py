@@ -626,7 +626,7 @@ class WheelerAgent:
         verbose: bool = False,
         use_embedding: bool = False,
         encoder: str = "blended",
-        use_interference: bool = False,
+        use_interference: bool = True,
     ) -> None:
         self.model = model
         self.ollama_url = ollama_url

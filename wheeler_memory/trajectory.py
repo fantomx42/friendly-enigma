@@ -18,7 +18,9 @@ from pathlib import Path
 import numpy as np
 
 from .constants import (
+    ALIVE_THRESHOLD,
     CONVERGENCE_PERCENTILE,
+    MIN_ALIVE_FRACTION,
     SALIENCE_MAX_ITERS_MED,
     SALIENCE_THRESHOLD_MED,
     STABILITY_WINDOW,
@@ -113,10 +115,14 @@ def compute_signature(
         ticks = i + 1
 
         if delta < stability_threshold:
-            stable_count += 1
-            if stable_count >= STABILITY_WINDOW:
-                state = "CONVERGED"
-                break
+            alive = float(np.mean(np.abs(frame) > ALIVE_THRESHOLD))
+            if alive < MIN_ALIVE_FRACTION:
+                stable_count = 0
+            else:
+                stable_count += 1
+                if stable_count >= STABILITY_WINDOW:
+                    state = "CONVERGED"
+                    break
         else:
             stable_count = 0
 
@@ -127,6 +133,12 @@ def compute_signature(
             if max(recent) - min(recent) < stability_threshold * 10:
                 state = "OSCILLATING"
                 break
+
+    # Check for degenerate attractor after loop exhaustion
+    if state == "CHAOTIC":
+        alive_frac = float(np.mean(np.abs(frame) > ALIVE_THRESHOLD))
+        if alive_frac < MIN_ALIVE_FRACTION:
+            state = "DEGENERATE"
 
     # Final role distribution: [max_frac, min_frac, slope_frac]
     final_roles = get_cell_roles(frame)

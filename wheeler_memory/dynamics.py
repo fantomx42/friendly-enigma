@@ -9,8 +9,10 @@ import logging
 import numpy as np
 
 from .constants import (
+    ALIVE_THRESHOLD,
     CONVERGENCE_PERCENTILE,
     MAX_PUSH_STRENGTH,
+    MIN_ALIVE_FRACTION,
     SALIENCE_MAX_ITERS_MED,
     SALIENCE_THRESHOLD_MED,
     SLOPE_FLOW_STRENGTH,
@@ -165,22 +167,29 @@ def evolve_and_interpret(
         history.append(frame.copy())
 
         if delta < stability_threshold:
-            stable_count += 1
-            if stable_count >= STABILITY_WINDOW:
-                ticks = i + 1
-                feats = compute_attractor_features(frame)
-                spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
-                return {
-                    "state": "CONVERGED",
-                    "attractor": frame,
-                    "convergence_ticks": ticks,
-                    "history": history,
-                    "metadata": {
-                        **feats,
-                        "convergence_speed": spd,
-                        "final_delta": round(delta, 6),
-                    },
-                }
+            # Gate: reject convergence if the attractor is 0-dominant.
+            # On a 4096-cell grid, p99 can be 0 when <1% of cells are active,
+            # causing false CONVERGED in STABILITY_WINDOW ticks.
+            alive = float(np.mean(np.abs(frame) > ALIVE_THRESHOLD))
+            if alive < MIN_ALIVE_FRACTION:
+                stable_count = 0
+            else:
+                stable_count += 1
+                if stable_count >= STABILITY_WINDOW:
+                    ticks = i + 1
+                    feats = compute_attractor_features(frame)
+                    spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+                    return {
+                        "state": "CONVERGED",
+                        "attractor": frame,
+                        "convergence_ticks": ticks,
+                        "history": history,
+                        "metadata": {
+                            **feats,
+                            "convergence_speed": spd,
+                            "final_delta": round(delta, 6),
+                        },
+                    }
         else:
             stable_count = 0
 
@@ -205,8 +214,10 @@ def evolve_and_interpret(
                 }
 
     feats = compute_attractor_features(frame)
+    final_alive = feats.get("alive_fraction", 1.0)
+    final_state = "DEGENERATE" if final_alive < MIN_ALIVE_FRACTION else "CHAOTIC"
     return {
-        "state": "CHAOTIC",
+        "state": final_state,
         "attractor": frame,
         "convergence_ticks": max_iters,
         "history": history,
@@ -262,22 +273,26 @@ def evolve_with_params(
         history.append(frame.copy())
 
         if delta < stability_threshold:
-            stable_count += 1
-            if stable_count >= STABILITY_WINDOW:
-                ticks = i + 1
-                feats = compute_attractor_features(frame)
-                spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
-                return {
-                    "state": "CONVERGED",
-                    "attractor": frame,
-                    "convergence_ticks": ticks,
-                    "history": history,
-                    "metadata": {
-                        **feats,
-                        "convergence_speed": spd,
-                        "final_delta": round(delta, 6),
-                    },
-                }
+            alive = float(np.mean(np.abs(frame) > ALIVE_THRESHOLD))
+            if alive < MIN_ALIVE_FRACTION:
+                stable_count = 0
+            else:
+                stable_count += 1
+                if stable_count >= STABILITY_WINDOW:
+                    ticks = i + 1
+                    feats = compute_attractor_features(frame)
+                    spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+                    return {
+                        "state": "CONVERGED",
+                        "attractor": frame,
+                        "convergence_ticks": ticks,
+                        "history": history,
+                        "metadata": {
+                            **feats,
+                            "convergence_speed": spd,
+                            "final_delta": round(delta, 6),
+                        },
+                    }
         else:
             stable_count = 0
 
@@ -302,8 +317,10 @@ def evolve_with_params(
                 }
 
     feats = compute_attractor_features(frame)
+    final_alive = feats.get("alive_fraction", 1.0)
+    final_state = "DEGENERATE" if final_alive < MIN_ALIVE_FRACTION else "CHAOTIC"
     return {
-        "state": "CHAOTIC",
+        "state": final_state,
         "attractor": frame,
         "convergence_ticks": max_iters,
         "history": history,
