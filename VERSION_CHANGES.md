@@ -1,5 +1,15 @@
 # Version Changes
 
+## v0.3.1 — 2026-04-01
+
+Activates the three-grid interference architecture as the default recall path and fixes a convergence bug that let 0-dominant attractors poison downstream scoring.
+
+- **0-dominant convergence fix:** Added `alive_fraction` gate (`MIN_ALIVE_FRACTION=0.05`, `ALIVE_THRESHOLD=0.33`) to all convergence checks in `dynamics.py` and `trajectory.py`. Frames with <5% alive cells (|value| > 0.33) are rejected from convergence — they get DEGENERATE state instead of false CONVERGED. Fixes the p99 blind spot where zero-majority grids had zero delta across 99% of cells.
+- **Interference as default recall:** `WheelerAgent` and `WheelerPrimaryAgent` now default to `use_interference=True`. `recall_with_interference()` is the live recall path — corpus Pearson recall + experiential re-scoring + SCM gating. Old Pearson-only path is the automatic fallback when no experiential counterpart exists (score = `c_sim * mean_openness`, with fresh SCM openness = 1.0, identical to pure Pearson).
+- **Public API:** `recall_with_interference` added to `wheeler_memory.__init__.__all__`
+- **CLI:** `wheeler-recall` defaults to interference mode; `--no-interference` disables it
+- **SimLex-999 baseline (post-fix):** All native encoders rho ~ 0 (no semantic signal). Embedding encoder rho = +0.43 (proves CA pipeline preserves similarity when fed meaningful vectors).
+
 ## v0.3.0 — 2026-03-24
 
 Three-Grid Interference Architecture — transforms Wheeler from content-addressed store into a system with emergent epistemic states.
@@ -14,7 +24,7 @@ Three-Grid Interference Architecture — transforms Wheeler from content-address
 - **Experiential→corpus consolidation** — during sleep, cool experiential memories re-evolve under corpus rules and crystallize into permanent knowledge
 - **CLI additions:** `wheeler-scm` (inspect/reset SCM), `--experiential` flag on `wheeler-store`, `--interference` flag on `wheeler-recall`, `--mode learn-interference` on `wheeler-mmlu`
 - **Decoder integration** — `format_state()` now includes interference state labels and SCM openness in structured prompt
-- **Backward compatible** — all existing attractors default to corpus (ABSORBED state), SCM starts as zeros (fully permissive), `recall_memory()` defaults to corpus-only path
+- **Backward compatible** — all existing attractors default to corpus (ABSORBED state), SCM starts as zeros (fully permissive). As of v0.3.1, `recall_with_interference()` is the default recall path
 - 12 new constants in `constants.py` for the three-grid system
 
 ## v0.2.0 — 2026-03-20

@@ -13,6 +13,7 @@ Encode  ─── SHA-256 hash (default, exact match)
 3-State CA Evolution ──── rotation retry (0°/90°/180°/270°)
     ├── CONVERGED      → store attractor + brick
     ├── OSCILLATING    → epistemic uncertainty detected
+    ├── DEGENERATE     → 0-dominant attractor (<5% alive cells)
     └── CHAOTIC        → input needs rephrasing
     ↓
 Attractor: saved as .npy in chunk/attractors/

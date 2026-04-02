@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.3.1 (2026-04-01)
+
+### Bug Fixes
+- **Fixed 0-dominant convergence bug**: Frames with <5% alive cells no longer falsely declare CONVERGED. Added `alive_fraction` gate to all three convergence loops (`evolve_and_interpret`, `evolve_with_params`, trajectory). New DEGENERATE state for 0-dominant attractors.
+- Updated decoder tests to mock interference path (matching new default)
+
+### Changes
+- **Three-grid interference is now the default recall path**: Flipped `use_interference` default from `False` to `True` in `WheelerAgent` and `WheelerPrimaryAgent`. Gracefully degrades to Pearson-only when no experiential data exists.
+- `recall_with_interference` exported from public API (`wheeler_memory.__init__`)
+- CLI `wheeler-recall` defaults to interference mode (`--no-interference` for Pearson-only fallback)
+- New constants: `ALIVE_THRESHOLD` (0.33), `MIN_ALIVE_FRACTION` (0.05)
+
+## v0.3.0 (2026-03-24)
+
+### Features
+- Three-grid interference architecture (Corpus/Experiential/SCM)
+- SCM grid with hardening and annealing
+- Self-consistency feedback loop
+- Parameterized CA dynamics (`evolve_with_params`)
+- Experiential-to-corpus consolidation during sleep
+- Comprehensive test suite (+238 tests across 13 modules)
+
 ## v0.2.0 (2026-03-20)
 
 ### Organization
