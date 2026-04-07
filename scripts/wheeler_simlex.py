@@ -54,6 +54,8 @@ ALL_ENCODERS = [
     "hippocampus",
     "word",
     "hippo-word",
+    "context",
+    "context-blended",
     "blended",
     "word-blended",
     "language",

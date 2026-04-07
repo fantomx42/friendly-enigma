@@ -145,6 +145,12 @@ WORD_HIPPO_BLEND = 0.3  # word weight in hippo+word hybrid (1-this → hippocamp
 ENSEMBLE_MARGIN_THRESHOLD = 16  # hippo margin below this → defer to secondary encoder
 
 # ---------------------------------------------------------------------------
+# Context-window random indexing (distributional semantics via RI)
+# ---------------------------------------------------------------------------
+CONTEXT_RI_WINDOW = 5  # context window radius for accumulating neighbor vectors
+CONTEXT_RI_BLEND = 0.5  # blend: this * context_vec + (1-this) * hippo_ngram_vec
+
+# ---------------------------------------------------------------------------
 # Spatial similarity (topology-aware retrieval)
 # ---------------------------------------------------------------------------
 SPATIAL_PEARSON_WEIGHT = 0.5  # Pearson vs spatial blend (1.0 = pure Pearson, 0.0 = pure spatial)

@@ -87,6 +87,21 @@ def _get_frame_fn(use_embedding: bool = False, *, encoder: str | None = None):
             )
 
         return _hippo_word
+    elif encoder == "context":
+        from .word_encoder import context_to_frame
+
+        return context_to_frame
+    elif encoder == "context-blended":
+        from .word_encoder import context_to_frame
+        from .language_wheeler import language_to_frame
+        from .constants import BLEND_ALPHA
+
+        def _context_blended(text: str, size: int = 64) -> "np.ndarray":
+            c = context_to_frame(text, size)
+            l = language_to_frame(text, size)
+            return np.tanh(BLEND_ALPHA * c + (1 - BLEND_ALPHA) * l).astype(np.float32)
+
+        return _context_blended
     else:
         raise ValueError(f"Unknown encoder: {encoder!r}")
 

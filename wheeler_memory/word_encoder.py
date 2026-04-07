@@ -24,7 +24,13 @@ from typing import Any
 
 import numpy as np
 
-from .constants import WORD_PROJECTION_SEED, WORD_HASH_SPACE, BLEND_ALPHA
+from .constants import (
+    WORD_PROJECTION_SEED,
+    WORD_HASH_SPACE,
+    BLEND_ALPHA,
+    CONTEXT_RI_WINDOW,
+    CONTEXT_RI_BLEND,
+)
 from .hippocampus import EMBED_DIM, FRAME_SIZE, FRAME_CELLS, _get_frame_matrix
 
 # Cached word→384 matrix (lazy-initialized)
@@ -392,3 +398,271 @@ def _text_to_vector_learned(
         vector /= norm
 
     return vector
+
+
+# =========================================================================
+# Context-window random indexing (distributional semantics via RI)
+# =========================================================================
+
+_context_ri_vectors: np.ndarray | None = None
+_context_ri_word2idx: dict[str, int] | None = None
+_context_ri_checked: bool = False
+
+
+def _collect_texts(
+    data_dir: str | None = None, corpus_path: str | None = None
+) -> list[str]:
+    """Collect texts from stored memories and/or a JSONL corpus file.
+
+    Sources (both optional, at least one should provide data):
+      1. chunks/*/index.json — stored Wheeler memories
+      2. corpus_path — JSONL file with {"text": "..."} entries
+    """
+    if data_dir is None:
+        data_dir = str(Path.home() / ".wheeler_memory")
+
+    texts: list[str] = []
+
+    # Source 1: stored memories (same iteration as build_cooccurrence)
+    chunks_dir = Path(data_dir) / "chunks"
+    if chunks_dir.exists():
+        for chunk_dir in chunks_dir.iterdir():
+            if not chunk_dir.is_dir():
+                continue
+            index_file = chunk_dir / "index.json"
+            if not index_file.exists():
+                continue
+            try:
+                with open(index_file, "r") as f:
+                    index_data = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                continue
+            for item in index_data.values():
+                if isinstance(item, dict) and "text" in item:
+                    texts.append(item["text"])
+
+    # Source 2: JSONL corpus file
+    if corpus_path is not None:
+        corpus_file = Path(corpus_path)
+        if corpus_file.exists():
+            with open(corpus_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                        if isinstance(obj, dict) and "text" in obj:
+                            texts.append(obj["text"])
+                    except json.JSONDecodeError:
+                        continue
+
+    return texts
+
+
+def train_context_ri(
+    data_dir: str | None = None,
+    window: int = CONTEXT_RI_WINDOW,
+    corpus_path: str | None = None,
+) -> tuple[np.ndarray, list[str]]:
+    """Train word context vectors via Random Indexing with hippocampus n-gram index vectors.
+
+    For each word in the corpus, accumulates the hippocampus n-gram vectors
+    of its context-window neighbors.  Words appearing in similar contexts
+    (e.g., "dog" and "canine" both near "bark", "leash", "pet")
+    accumulate similar context vectors.
+
+    Returns (vectors, vocab) where vectors is (vocab_size, 384) and
+    vocab is a sorted list of words.
+    """
+    from .hippocampus import _text_to_vector as hippo_vector
+
+    texts = _collect_texts(data_dir, corpus_path)
+    if not texts:
+        return np.zeros((0, EMBED_DIM), dtype=np.float32), []
+
+    # Cache: word string → hippocampus 384-dim index vector
+    index_cache: dict[str, np.ndarray] = {}
+
+    def _get_index_vec(word: str) -> np.ndarray:
+        if word not in index_cache:
+            index_cache[word] = hippo_vector(word)
+        return index_cache[word]
+
+    # Accumulate context vectors
+    context_accum: dict[str, np.ndarray] = {}
+
+    for text in texts:
+        words = _tokenize(text)
+        if len(words) < 2:
+            continue
+
+        for i, target in enumerate(words):
+            start = max(0, i - window)
+            end = min(len(words), i + window + 1)
+
+            if target not in context_accum:
+                context_accum[target] = np.zeros(EMBED_DIM, dtype=np.float32)
+
+            for j in range(start, end):
+                if j != i:
+                    context_accum[target] += _get_index_vec(words[j])
+
+    # Build sorted output arrays
+    vocab = sorted(context_accum.keys())
+    vectors = np.zeros((len(vocab), EMBED_DIM), dtype=np.float32)
+
+    for idx, word in enumerate(vocab):
+        v = context_accum[word]
+        norm = np.linalg.norm(v)
+        if norm > 0:
+            vectors[idx] = v / norm
+
+    return vectors, vocab
+
+
+def save_context_ri_vectors(
+    vectors: np.ndarray, vocab: list[str], data_dir: str | None = None
+) -> None:
+    """Save learned context-RI vectors to data_dir / context_ri_vectors.npz."""
+    if data_dir is None:
+        data_dir = str(Path.home() / ".wheeler_memory")
+
+    data_path = Path(data_dir)
+    data_path.mkdir(parents=True, exist_ok=True)
+
+    npz_file = data_path / "context_ri_vectors.npz"
+    np.savez(npz_file, vectors=vectors, vocab=np.array(vocab, dtype=object))
+
+
+def load_context_ri_vectors(
+    data_dir: str | None = None,
+) -> tuple[np.ndarray, dict[str, int]] | None:
+    """Load context-RI vectors from data_dir / context_ri_vectors.npz.
+
+    Returns (vectors, word2idx_dict) or None if file doesn't exist.
+    """
+    if data_dir is None:
+        data_dir = str(Path.home() / ".wheeler_memory")
+
+    npz_file = Path(data_dir) / "context_ri_vectors.npz"
+    if not npz_file.exists():
+        return None
+
+    try:
+        data = np.load(npz_file, allow_pickle=True)
+        vectors = data["vectors"].astype(np.float32)
+        vocab = data["vocab"]
+        word2idx = {w: i for i, w in enumerate(vocab)}
+        return vectors, word2idx
+    except (KeyError, IOError, ValueError):
+        return None
+
+
+def _get_context_ri_vectors(
+    data_dir: str | None = None,
+) -> tuple[np.ndarray, dict[str, int]] | None:
+    """Lazy-load context-RI vectors, caching result even if None."""
+    global _context_ri_vectors, _context_ri_word2idx, _context_ri_checked
+
+    if _context_ri_checked:
+        if _context_ri_vectors is not None:
+            return (_context_ri_vectors, _context_ri_word2idx)
+        return None
+
+    result = load_context_ri_vectors(data_dir)
+    _context_ri_checked = True
+
+    if result is not None:
+        _context_ri_vectors, _context_ri_word2idx = result
+        return (_context_ri_vectors, _context_ri_word2idx)
+
+    return None
+
+
+def _text_to_vector_context_ri(
+    text: str,
+    vectors: np.ndarray,
+    word2idx: dict[str, int],
+    blend: float = CONTEXT_RI_BLEND,
+) -> np.ndarray:
+    """Convert text to 384-dim vector using context-RI vectors.
+
+    For each word: if a learned context vector exists, blend it with the
+    hippocampus n-gram vector.  For unseen words, use pure hippocampus.
+    """
+    from .hippocampus import _text_to_vector as hippo_vector
+
+    words = _tokenize(text)
+    if not words:
+        return np.zeros(EMBED_DIM, dtype=np.float32)
+
+    word_counts: dict[str, int] = {}
+    for w in words:
+        word_counts[w] = word_counts.get(w, 0) + 1
+
+    vector = np.zeros(EMBED_DIM, dtype=np.float32)
+
+    for word, count in word_counts.items():
+        weight = np.log1p(count)
+        hippo_vec = hippo_vector(word)
+
+        if word in word2idx:
+            ctx_vec = vectors[word2idx[word]]
+            blended = blend * ctx_vec + (1 - blend) * hippo_vec
+        else:
+            blended = hippo_vec
+
+        vector += weight * blended
+
+    norm = np.linalg.norm(vector)
+    if norm > 0:
+        vector /= norm
+
+    return vector
+
+
+def _text_to_vector_context(text: str) -> np.ndarray:
+    """Convert text to 384-dim vector via context-RI (with hippocampus fallback).
+
+    If no trained context vectors are available, falls back entirely
+    to hippocampus n-gram encoding.
+    """
+    from .hippocampus import _text_to_vector as hippo_vector
+
+    learned = _get_context_ri_vectors()
+    if learned is not None:
+        return _text_to_vector_context_ri(text, learned[0], learned[1])
+    return hippo_vector(text)
+
+
+def context_to_frame(text: str, size: int = FRAME_SIZE) -> np.ndarray:
+    """Convert text to a 64x64 CA frame via context-window random indexing.
+
+    Uses learned distributional context vectors when available,
+    blended with hippocampus n-gram vectors.  Falls back to pure
+    hippocampus if no context vectors have been trained.
+    """
+    vector = _text_to_vector_context(text)
+    proj = _get_frame_matrix()
+
+    frame_flat = vector @ proj
+    frame_flat = np.tanh(frame_flat * 3.0)
+
+    return frame_flat.reshape(size, size).astype(np.float32)
+
+
+def context_to_frame_batch(
+    texts: list[str], size: int = FRAME_SIZE
+) -> list[np.ndarray]:
+    """Batch-convert texts to CA frames via context-window random indexing."""
+    vectors = np.stack([_text_to_vector_context(t) for t in texts])
+    proj = _get_frame_matrix()
+
+    frames_flat = vectors @ proj
+    frames_flat = np.tanh(frames_flat * 3.0)
+
+    return [
+        frames_flat[i].reshape(size, size).astype(np.float32)
+        for i in range(len(texts))
+    ]
