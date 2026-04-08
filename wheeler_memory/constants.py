@@ -148,7 +148,7 @@ ENSEMBLE_MARGIN_THRESHOLD = 16  # hippo margin below this → defer to secondary
 # Context-window random indexing (distributional semantics via RI)
 # ---------------------------------------------------------------------------
 CONTEXT_RI_WINDOW = 5  # context window radius for accumulating neighbor vectors
-CONTEXT_RI_BLEND = 0.5  # blend: this * context_vec + (1-this) * hippo_ngram_vec
+CONTEXT_RI_BLEND = 0.9  # blend: this * context_vec + (1-this) * hippo_ngram_vec
 
 # ---------------------------------------------------------------------------
 # Spatial similarity (topology-aware retrieval)

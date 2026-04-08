@@ -109,57 +109,84 @@ wheeler-bench --commit $(git rev-parse --short HEAD) --changed "MAX_PUSH_STRENGT
 
 ---
 
-## Overnight Agenda — 2026-03-24
+## Overnight Agenda — 2026-04-07
 
 ### Current State
-- Best wheeler-bench score: 0.009 (CA dynamics solved)
-- MMLU semantic (hippocampus): 28.7% baseline
-- MMLU semantic (hippo-word, learned vectors from 17k-word corpus): 27.7%
-- Multi-choice mode added but encoder-limited (~27% regardless of params)
-- Word co-occurrence vector training activated in learn pass (SVD on PMI)
-- Previous overnight (2026-03-23): swept RECALL_K, RECALL_MIN_SIM, RECALL_ENCODER — all reverted
+- wheeler-bench score: 0.009 (CA dynamics solved — convergence is great)
+- SimLex-999 context-RI (raw frames, no CA): rho = +0.046 (weak positive signal)
+- SimLex-999 context-RI (evolved): rho = +0.034 (CA evolution HURTS — erodes signal)
+- SimLex-999 hippocampus: rho = -0.032 (noise, no semantic signal)
+- SimLex-999 MiniLM (external ceiling): rho = +0.446
+- Context-RI vectors trained on WikiText-103 (1.16M lines) + Wheeler memories (3,275 entries)
+- Vocab: 500,227 words, 384-dim context vectors
 
-### Tonight's Priority: Semantic mode with hippo-word blend tuning
+### Key Observation
+CA evolution destroys semantic signal. Raw context-RI frames score +0.046 but drop to +0.034
+after evolution. The aggressive dynamics (MAX_PUSH 0.57, SLOPE_FLOW 0.55 — both above safe
+range ceilings) were tuned for convergence quality, not signal preservation. The goal is to
+find dynamics that AMPLIFY semantic structure rather than eroding it.
 
-Word vectors are trained from the full main data dir (17,451 words). The hippo-word
-encoder blends hippocampus n-grams with learned word vectors weighted by `WORD_HIPPO_BLEND`.
-The optimal blend may not be 0.3 (default). Tonight sweeps the blend ratio and related params.
+### Tonight's Priority: CA dynamics that preserve/amplify distributional semantics
+
+Sweep CA dynamics parameters to maximize SimLex-999 Spearman rho for the `context` encoder.
+The quality score (`wheeler-bench`) must not regress above 0.05 (currently 0.009).
 
 **Pre-step (run ONCE before loop):**
 ```bash
 cd /home/tristan/projects/wheeler-memory && source .venv/bin/activate
-python -c "
-from wheeler_memory.word_encoder import train_word_vectors, save_word_vectors
-vectors, vocab = train_word_vectors()
-save_word_vectors(vectors, vocab)
-print(f'Trained {len(vocab)} word vectors')
-"
+# Context-RI vectors already trained — verify they exist:
+ls -la ~/.wheeler_memory/context_ri_vectors.npz
 ```
 
 **Benchmark command for each iteration:**
 ```bash
-wheeler-mmlu --subjects high_school_physics conceptual_physics college_physics --mode semantic --encoder hippo-word --split test 2>&1 | tail -5
+wheeler-simlex --encoder context --mode pearson 2>&1 | grep "Spearman rho"
+```
+
+**Guard rail — also check quality hasn't regressed:**
+```bash
+wheeler-bench 2>&1 | grep "score"
 ```
 
 **Parameters to sweep (all in constants.py):**
-1. `WORD_HIPPO_BLEND` — try 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9 (current: 0.3)
-   Rationale: Find optimal hippocampus-to-word ratio; 0.3 may be suboptimal
-2. `RECALL_K` — try 3, 5, 10, 15, 20 (current: 10)
-   Rationale: Recall count affects semantic scoring through cache search
-3. `RECALL_MIN_SIM` — try 0.0, 0.05, 0.10, 0.15 (current: 0.15)
-   Rationale: Threshold affects which attractors contribute to scoring
 
-Score to track: MMLU accuracy (%) on physics subjects via semantic mode. Target: > 30%.
+Phase 1 — Soften the CA push (iterations 1-8):
+1. `MAX_PUSH_STRENGTH` — try 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50 (current: 0.57)
+   Rationale: Weaker push preserves more of the input frame's distributional structure.
+   Lower values may allow subtle similarity patterns to survive evolution.
+
+Phase 2 — Tune mixing rate (iterations 9-14):
+2. `SLOPE_FLOW_STRENGTH` — try 0.10, 0.15, 0.20, 0.25, 0.30, 0.40 (current: 0.55)
+   Rationale: Slower mixing preserves local structure. The distributional signal is
+   encoded in the spatial pattern — aggressive mixing homogenizes it away.
+
+Phase 3 — Context-RI blend and convergence (iterations 15-22):
+3. `CONTEXT_RI_BLEND` — try 0.3, 0.4, 0.6, 0.7, 0.8, 0.9, 1.0 (current: 0.5)
+   Rationale: Higher blend = more context signal, less hippocampus n-gram noise.
+4. `SALIENCE_THRESHOLD_MED` — try 5e-3, 1e-3, 5e-4, 1e-4, 5e-5 (current: 1e-4)
+   Rationale: Looser convergence may stop evolution before it erases signal.
+
+Phase 4 — Fine-tune combinations (iterations 23+):
+5. Best MAX_PUSH × best SLOPE_FLOW × best CONTEXT_RI_BLEND combinations.
+
+### Score Tracking
+
+| Metric | Baseline | Target | Guard |
+|--------|----------|--------|-------|
+| SimLex rho (evolved) | +0.034 | > +0.10 | — |
+| SimLex rho (raw) | +0.046 | — | reference only |
+| wheeler-bench score | 0.009 | — | must stay < 0.05 |
 
 ### Model
-Local: qwen3.5:9b (code generation)
+Local: gemma4:26b or qwen3:14b (code generation)
 Orchestration: Claude opus (loop management)
 
 ### Budget
 - Max iterations: 50
-- Stop condition: MMLU semantic > 32% OR max iterations reached
+- Stop condition: SimLex rho > +0.15 OR max iterations reached
+- Revert threshold: SimLex rho worsens by > 20% from best OR wheeler-bench > 0.05
 
 ### Benchmark Command Override
 ```bash
-wheeler-mmlu --subjects high_school_physics conceptual_physics college_physics --mode semantic --encoder hippo-word --split test
+wheeler-simlex --encoder context --mode pearson
 ```
