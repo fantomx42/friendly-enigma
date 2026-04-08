@@ -5,28 +5,32 @@
 ```
 Input Text
     ↓
-SHA-256 → 64×64 seed frame (values in [-1, +1])
+Encoder (hash | hippocampus | blended | context | embedding | word)
+    ↓
+64×64 seed frame (values in [-1, +1])
     ↓
 3-State CA Evolution (iterate until convergence)
     ├→ CONVERGED   → Store attractor + brick
     ├→ OSCILLATING → Epistemic uncertainty detected
+    ├→ DEGENERATE  → 0-dominant frame (<5% alive cells), rejected
     └→ CHAOTIC     → Input needs rephrasing
+```
 
-## Semantic vs. Exact Recall
+## Encoder Taxonomy
 
-Wheeler Memory supports two modes of operation:
+Wheeler Memory supports multiple encoding strategies via `--encoder`:
 
-1. **Exact Recall (SHA-256)**:
-   - The default mode.
-   - Text is hashed to a seed frame. Changing even one character completely changes the seed (avalanche effect).
-   - *Use case*: Exact password-like retrieval, "I want *exactly* this memory."
+1. **Hash (SHA-256)** — deterministic, exact match. Same text always produces the same frame. Changing one character completely changes the seed (avalanche effect).
 
-2. **Semantic Recall (Embedding)**:
-   - Enabled via `--embed`.
-   - Text is converted to a vector using a sentence-transformer model (e.g., `all-MiniLM-L6-v2`).
-   - The 384-dimensional vector is projected onto the 64x64 grid using a fixed random matrix.
-   - *Result*: Similar meanings produce similar seed frames.
-   - *Use case*: Fuzzy search, "I want memories *like* this one."
+2. **Hippocampus** — native character n-gram random indexing. Lexically similar text produces similar frames. No pretrained models required.
+
+3. **Blended** (default) — hippocampus (0.7) + language wheeler (0.3). Combines lexical and structural signals.
+
+4. **Context-RI** — distributional semantics via context-window random indexing. Trained on WikiText-103 (500K vocab, 384-dim). First native encoder with positive semantic signal (SimLex-999 rho = +0.101).
+
+5. **Embedding** — sentence-transformer (`all-MiniLM-L6-v2`). Requires `pip install -e ".[embed]"`. Strongest semantic signal (SimLex rho = +0.446) but uses an external pretrained model.
+
+6. **Word / Word-blended** — word-level random indexing with SVD on PMI matrix.
 
 ```
 

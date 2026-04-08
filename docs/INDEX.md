@@ -11,7 +11,7 @@
 
 | Guide | Description |
 |-------|-------------|
-| [Architecture](architecture.md) | CA dynamics, temperature system, chunked storage, the math |
+| [Architecture](architecture.md) | CA dynamics, encoders, three-grid interference, cortex pipeline, chunked storage |
 | [Concepts](concepts.md) | Theoretical foundation, reconstructive recall, semantic vs exact search |
 | [Design Principles](design.md) | The Darman philosophy — why recall is reconstruction, not retrieval |
 
@@ -28,7 +28,7 @@
 | Guide | Description |
 |-------|-------------|
 | [Vision](VISION.md) | Project Ralph — full architecture vision |
-| [Future / Roadmap](future.md) | Planned features and directions |
+| [Future / Roadmap](future.md) | Active research and planned features |
 | [Contributing](../CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](../CHANGELOG.md) | Release history |
 

@@ -31,6 +31,7 @@ def store_with_rotation_retry(
     *,
     chunk: str | None = None,
     use_embedding: bool = False,
+    encoder: str | None = None,
     salience: float | None = None,
 ) -> dict:
 ```
@@ -49,14 +50,15 @@ are exhausted.
 | `save` | `True` | Write attractor + brick to disk |
 | `data_dir` | `~/.wheeler_memory` | Override the storage root |
 | `chunk` | `None` | Force a specific chunk; auto-routes if `None` |
-| `use_embedding` | `False` | Use sentence embedding instead of SHA-256 |
+| `use_embedding` | `False` | Use sentence embedding instead of SHA-256 (legacy; prefer `encoder`) |
+| `encoder` | `None` | Encoder name: `hash`, `hippocampus`, `embedding`, `blended`, `word`, `word-blended`, `context`. Overrides `use_embedding`. Default: `blended`. |
 | `salience` | `None` | Salience score `[0, 1]` or `None` for default (0.5). Controls CA budget. |
 
 **Returns** a `dict` with:
 
 | Key | Type | Description |
 |---|---|---|
-| `state` | `str` | `CONVERGED`, `OSCILLATING`, `CHAOTIC`, or `FAILED_ALL_ROTATIONS` |
+| `state` | `str` | `CONVERGED`, `OSCILLATING`, `DEGENERATE`, `CHAOTIC`, or `FAILED_ALL_ROTATIONS` |
 | `attractor` | `np.ndarray` | Final 64×64 attractor frame |
 | `convergence_ticks` | `int` | Ticks until convergence |
 | `history` | `list[np.ndarray]` | All frames from seed to attractor |
@@ -97,6 +99,7 @@ def recall_memory(
     chunk: str | None = None,
     temperature_boost: float = 0.0,
     use_embedding: bool = False,
+    encoder: str | None = None,
     reconstruct: bool = False,
     reconstruct_alpha: float = 0.3,
     salience: float | None = None,
@@ -116,7 +119,8 @@ Pearson correlation. Returns the `top_k` best matches, sorted by
 | `data_dir` | `~/.wheeler_memory` | Override the storage root |
 | `chunk` | `None` | Search only this chunk; searches all matching chunks if `None` |
 | `temperature_boost` | `0.0` | Adds `boost × temperature` to ranking score |
-| `use_embedding` | `False` | Use sentence embedding for the query frame |
+| `use_embedding` | `False` | Use sentence embedding for the query frame (legacy; prefer `encoder`) |
+| `encoder` | `None` | Encoder name: `hash`, `hippocampus`, `embedding`, `blended`, `word`, `word-blended`, `context`. Overrides `use_embedding`. |
 | `reconstruct` | `False` | Apply Darman reconstruction to each result |
 | `reconstruct_alpha` | `0.3` | Blend factor for reconstruction (0 = pure stored, 1 = pure query) |
 | `salience` | `None` | Salience score `[0, 1]` or `None` for default. Controls CA budget for query evolution and reconstruction. |
@@ -277,34 +281,57 @@ print(f"correlation with query:  {recon['correlation_with_query']:.3f}")
 
 ---
 
-## `embed_to_frame`
+## Encoders
+
+Wheeler Memory provides multiple text-to-frame encoders. All produce a 64×64 float32 frame in [-1, +1].
+
+### `embed_to_frame` (sentence-transformer)
 
 ```python
 # wheeler_memory.embedding  (requires pip install -e ".[embed]")
 def embed_to_frame(text: str, size: int = 64) -> np.ndarray:
 ```
 
-Convert `text` to a 64×64 CA frame via sentence embedding and random
-projection.
+Convert `text` to a 64×64 CA frame via sentence embedding and random projection.
 
 1. Encode text → 384-dim vector (`all-MiniLM-L6-v2`)
 2. Project 384 → 4096 via a fixed Gaussian random matrix (seed `0xDEADBEEF`)
 3. Apply `tanh(x × 3)` to map to `(−1, 1)`
 4. Reshape to `(64, 64)`
 
-Similar text produces similar frames, enabling fuzzy recall through Pearson
-correlation search. The model is lazy-loaded and cached after the first call.
-
-**Example**
-
 ```python
 from wheeler_memory.embedding import embed_to_frame, embed_available
 
 if embed_available():
     frame = embed_to_frame("The Eiffel Tower is in Paris")
-    print(frame.shape)   # (64, 64)
-    print(frame.dtype)   # float32
 ```
+
+### `hippocampus_to_frame` (native n-gram)
+
+```python
+# wheeler_memory.hippocampus
+def hippocampus_to_frame(text: str, size: int = 64) -> np.ndarray:
+```
+
+Character 3-gram and 4-gram random indexing. No pretrained models required. Lexically similar text produces similar frames. Default native encoder.
+
+### `context_to_frame` (distributional semantics)
+
+```python
+# wheeler_memory.word_encoder
+def context_to_frame(text: str, size: int = 64) -> np.ndarray:
+```
+
+Context-window random indexing encoder. Requires pre-trained vectors (via `train_context_ri()`). Trained on WikiText-103 (1.16M lines, 500K vocab, 384-dim). Blends with hippocampus via `CONTEXT_RI_BLEND` (default 0.9).
+
+### `hash_to_frame` (deterministic)
+
+```python
+# wheeler_memory.hashing
+def hash_to_frame(text: str, size: int = 64) -> np.ndarray:
+```
+
+SHA-256 hash → PCG64 RNG → uniform(-1, 1) grid. Exact match only — changing one character completely changes the frame (avalanche effect).
 
 ---
 
@@ -875,3 +902,54 @@ class DecoderState:
 ```
 
 Structured representation of Wheeler's recall state for the decoder.
+
+---
+
+## Three-Grid Interference
+
+```python
+from wheeler_memory.interference import recall_with_interference
+```
+
+### `recall_with_interference`
+
+```python
+def recall_with_interference(
+    text: str,
+    top_k: int = 5,
+    data_dir: str | Path | None = None,
+    *,
+    encoder: str | None = None,
+) -> list[dict]:
+```
+
+Default recall path since v0.3.1. Scores candidates using three-grid interference: corpus Pearson similarity × experiential similarity × SCM openness gating. Degrades gracefully to pure Pearson when no experiential data exists.
+
+Each result includes `interference_state` (`GROUNDED`, `ABSORBED`, `UNCONSOLIDATED`, or `CONTESTED`).
+
+---
+
+## Cortex
+
+```python
+from wheeler_memory.cortex import cortex_reason, build_graph
+from wheeler_memory.cortex_scm import compute_scm
+from wheeler_memory.cortex_classifier import classify, init_weights, load_weights
+```
+
+### `cortex_reason`
+
+Builds L1 graph (Pearson adjacency matrix, clusters, bridges, contradictions) and runs L2 settlement CA (opinion diffusion). Returns graph reasoning + settled opinions.
+
+### `compute_scm`
+
+Computes 7-layer SCM score: Temperature, Salience, Energy, Integration, Polarity, Net Warrant, Explanation Readiness. Returns `SCMResult` with per-layer scores and unified classification.
+
+### `classify`
+
+L3 classifier: takes settlement opinions (K=10), choice similarities (4), and SCM layers (7) → 4-class softmax probabilities. Returns `(predicted_index, confidence)`.
+
+```python
+weights = load_weights("~/.wheeler_memory/cortex_classifier.npz")
+predicted, confidence = classify(settlement, choice_sims, scm_layers, weights)
+```

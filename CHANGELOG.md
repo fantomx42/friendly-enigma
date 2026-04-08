@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- **Context-window random indexing encoder** (`word_encoder.py`): Distributional semantics via context-window co-occurrence vectors trained on WikiText-103 (1.16M lines, 500K vocab, 384-dim). Available as `--encoder context` across CLI tools.
+- **SimLex-999 benchmark** (`wheeler-simlex`): New CLI command for evaluating semantic similarity against the SimLex-999 gold standard. Supports all encoder types with Pearson/Spearman modes.
+
+### Tuning
+- **CONTEXT_RI_BLEND 0.5 → 0.9**: Higher blend weight toward context-RI vectors over hippocampus n-grams. SimLex-999 Spearman rho improved from +0.034 to +0.101.
+- **Autoresearch infrastructure**: Overnight loop scripts for autonomous parameter sweeps (see `program.md`). 50 iterations logged in `results.tsv` driving quality score from 0.013 → 0.009.
+
+### Organization
+- Moved `CORTEX_CLASSIFIER_SUMMARY.md`, `CORTEX_CLASSIFIER_FILES.txt` to `docs/reports/`
+- Moved `VERSION_CHANGES.md` to `docs/`
+- Added `.gitignore` patterns for overnight/autoresearch artifacts
+
 ## v0.3.1 (2026-04-01)
 
 ### Bug Fixes

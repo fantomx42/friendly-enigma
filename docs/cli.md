@@ -14,6 +14,8 @@ wheeler-store "fix the python debug error"
 wheeler-store --chunk hardware "solder the GPIO header"   # explicit chunk
 echo "piped input" | wheeler-store -                       # stdin
 wheeler-store --embed "fuzzy memory"                       # store with semantic embedding
+wheeler-store --encoder hippocampus "native encoding"      # explicit encoder choice
+wheeler-store --encoder context "distributional semantics" # context-RI encoder
 wheeler-store --salience high "critical insight"           # deep attractor (3000 iters, 1e-6 threshold)
 wheeler-store --salience low "background note"             # fast store (200 iters, 5e-4 threshold)
 ```
@@ -30,6 +32,7 @@ wheeler-recall "python bug"
 wheeler-recall --chunk code "debug error"   # search specific chunk
 wheeler-recall --top-k 10 "something"       # more results
 wheeler-recall --embed "debugging issues"   # fuzzy semantic search
+wheeler-recall --encoder blended "mixed approach"  # hippocampus + language wheeler blend
 wheeler-recall --salience high "important query"  # more CA patience for query evolution
 ```
 
@@ -165,3 +168,73 @@ wheeler-ui                         # launch on http://localhost:7437
 ```
 
 Opens a local browser dashboard for storing, recalling, and browsing memories. See `ui/README.md` for details.
+
+## Encoder types
+
+The `--encoder` flag (available on `wheeler-store`, `wheeler-recall`, and benchmark commands) selects the text-to-frame encoding strategy:
+
+| Encoder | Description |
+|---------|-------------|
+| `hash` | SHA-256 deterministic encoding (exact match only) |
+| `hippocampus` | Native character n-gram random indexing (no pretrained models) |
+| `embedding` | MiniLM sentence-transformer (requires `.[embed]`) |
+| `language` | Language Wheeler encoding |
+| `blended` | Hippocampus (0.7) + Language Wheeler (0.3) — **default** |
+| `word` | Word-level random indexing (SVD on PMI matrix) |
+| `word-blended` | Hippocampus + word encoder hybrid |
+| `context` | Context-window random indexing (distributional semantics, trained on WikiText-103) |
+
+Default encoder is `blended` (configurable via `DEFAULT_ENCODER` in `constants.py`).
+
+## Quality benchmark
+
+```bash
+wheeler-bench                                              # run CA quality score
+wheeler-bench --commit abc1234 --changed "MAX_PUSH_STRENGTH"  # tag with commit + param
+wheeler-bench --notes "testing sharper attractors"          # add notes
+```
+
+Outputs a composite quality score: `0.6*avg_corr + 0.2*(1-conv_ratio) + 0.1*(ticks/1000) + 0.1*(1-alive)`. Lower is better. Results appended to `results.tsv`.
+
+## MMLU benchmark
+
+```bash
+wheeler-mmlu --subjects high_school_physics --mode cortex  # single subject
+wheeler-mmlu --all --mode cortex                           # all 57 subjects
+wheeler-mmlu --all --mode learn                            # learn → consolidate → test
+wheeler-mmlu --all --mode learn-interference               # learn + experiential + SCM
+wheeler-mmlu --mode cortex --classifier-weights cortex_classifier.npz  # L3 classifier
+wheeler-mmlu --list-subjects                               # show available subjects
+wheeler-mmlu --output results.tsv                          # save results
+```
+
+Modes: `cortex` (L3 classifier scoring), `semantic` (Pearson correlation), `recall-text` (reconstruction + text decode), `decode` (small model decoder), `learn` (full cycle), `learn-interference` (learn + experiential).
+
+## SimLex-999 benchmark
+
+```bash
+wheeler-simlex --encoder context --mode pearson            # context-RI semantic similarity
+wheeler-simlex --encoder hippocampus --mode pearson        # hippocampus baseline
+wheeler-simlex --encoder embedding --mode pearson          # MiniLM ceiling
+```
+
+Evaluates semantic similarity against the SimLex-999 gold standard. Reports Spearman rho (higher is better).
+
+## SCM inspector
+
+```bash
+wheeler-scm                             # show SCM trust topology summary
+wheeler-scm --heatmap                   # visualise SCM as heatmap
+wheeler-scm --reset                     # reset SCM to zeros (fully permissive)
+```
+
+Inspect and manage the Structural Coherence Map (SCM) — the persistent 64×64 trust topology that gates three-grid interference.
+
+## Generative engine
+
+```bash
+wheeler-generate                        # IT-from-BIT generative text
+wheeler-generate --verbose              # show attractor state
+```
+
+Generates text from attractor dynamics without any language model.

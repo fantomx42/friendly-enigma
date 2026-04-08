@@ -5,8 +5,13 @@
 ```
 Input Text
     ↓
-Encode  ─── SHA-256 hash (default, exact match)
-        └── Sentence embedding (--embed, semantic match)
+Encode  ─── hash         SHA-256 deterministic (exact match)
+        ├── hippocampus   character n-gram random indexing (native, no pretrained models)
+        ├── embedding     MiniLM sentence-transformer (requires .[embed])
+        ├── blended       hippocampus(0.7) + language_wheeler(0.3) ← DEFAULT
+        ├── word          word-level random indexing (SVD on PMI matrix)
+        ├── context       context-window RI (distributional semantics, trained on WikiText-103)
+        └── word-blended  hippocampus + word encoder hybrid
     ↓
 64×64 seed frame (float32, values in [-1, +1])
     ↓
@@ -71,7 +76,7 @@ class MemoryBrick:
     evolution_history: list[np.ndarray]   # one 64×64 frame per tick
     final_attractor:   np.ndarray          # last stable state
     convergence_ticks: int                 # ticks taken to converge
-    state:             str                 # CONVERGED | OSCILLATING | CHAOTIC
+    state:             str                 # CONVERGED | OSCILLATING | DEGENERATE | CHAOTIC
     metadata:          dict                # rotation_used, wall_time_seconds, …
 ```
 
@@ -244,21 +249,24 @@ SHA-256 is used (not Python's `hash()`), so the same input always produces the s
 Each tick uses a **Von Neumann 4-neighborhood** (up/down/left/right, wrapping) with a **continuous gradient rule**:
 
 ```
-Local max  (cell ≥ all 4 neighbors): delta = (1 - cell) × 0.35   → push toward +1
-Local min  (cell ≤ all 4 neighbors): delta = (-1 - cell) × 0.35  → push toward -1
-Slope      (neither):                delta = (max_neighbor - cell) × 0.20  → flow uphill
+Local max  (cell ≥ all 4 neighbors): delta = (1 - cell) × MAX_PUSH_STRENGTH   → push toward +1
+Local min  (cell ≤ all 4 neighbors): delta = (-1 - cell) × MAX_PUSH_STRENGTH  → push toward -1
+Slope      (neither):                delta = (max_neighbor - cell) × SLOPE_FLOW_STRENGTH  → flow uphill
 ```
+
+Current tuned values: `MAX_PUSH_STRENGTH=0.57`, `SLOPE_FLOW_STRENGTH=0.55` (see `constants.py`).
 
 The result is clipped to [-1, 1]. Local peaks push toward +1, valleys toward -1, and slopes flow uphill — producing smooth convergence toward polarized patterns.
 
 ### Convergence
 
-Evolution stops when one of three conditions is met:
+Evolution stops when one of four conditions is met:
 
 | State | Condition |
 |---|---|
-| `CONVERGED` | `mean(|delta|) < 1e-4` — grid has stabilized |
+| `CONVERGED` | `percentile(|delta|, 99) < threshold` AND `alive_fraction ≥ 0.05` — grid has stabilized |
 | `OSCILLATING` | Role-space periodicity detected (period 2–10, ≥1% cells affected) |
+| `DEGENERATE` | `alive_fraction < 0.05` — frame is 0-dominant (<5% cells with \|value\| > 0.33), rejected from convergence |
 | `CHAOTIC` | Neither condition met within `max_iters` |
 
 ```python
@@ -298,23 +306,24 @@ See [GPU Acceleration](gpu.md) for benchmark numbers and setup.
 store("input text")
   │
   ├─ select_chunk(text)               keyword routing → domain chunk
-  ├─ hash_to_frame(text)              SHA-256 → PCG64 → 64×64 uniform(-1,1)
-  │    └── OR embed_to_frame(text)    SentenceTransformer → projection → tanh
+  ├─ encode_to_frame(text, encoder)   encoder dispatch (hash/hippocampus/blended/context/...)
   ├─ store_with_rotation_retry()      try 0/90/180/270° until CONVERGED
-  │    └─ evolve_and_interpret()      CA iterations → CONVERGED/OSCILLATING/CHAOTIC
+  │    └─ evolve_and_interpret()      CA iterations → CONVERGED/OSCILLATING/DEGENERATE/CHAOTIC
   ├─ MemoryBrick.from_evolution_result()  capture full history
   └─ store_memory()                   save .npy, .npz, update index.json
 
 recall("query text")
   │
   ├─ select_recall_chunks(query)      keyword routing → chunks to search
-  ├─ hash_to_frame(query)             or embed_to_frame(query) with --embed
+  ├─ encode_to_frame(query, encoder)  same encoder as store
   ├─ evolve_and_interpret(query_frame)   evolve query to attractor
-  ├─ for each stored attractor:
-  │    pearsonr(query_flat, stored_flat)   → similarity
-  │    compute_temperature(hits, last_accessed)  → temperature
-  │    effective = similarity + boost * temperature
-  ├─ sort by effective, take top_k
+  ├─ Pearson correlation pre-filter (top candidates)
+  ├─ Three-grid interference re-scoring (default since v0.3.1):
+  │    ├─ Corpus Pearson similarity
+  │    ├─ Experiential Pearson similarity
+  │    └─ SCM openness gating
+  │    (degrades to pure Pearson when no experiential data exists)
+  ├─ sort by interference score, take top_k
   ├─ [optional] reconstruct each result   blend + re-evolve
   └─ bump_access() on recalled memories   update hit_count, last_accessed
 ```
@@ -323,19 +332,111 @@ recall("query text")
 
 ```
 wheeler_memory/
-├── attention.py       Attention model: salience → CA budget (variable tick rates)
-├── dynamics.py        CA engine: apply_ca_dynamics(), evolve_and_interpret() (GPU-dispatched)
-├── hashing.py         SHA-256 text-to-frame seeding
-├── temperature.py     Wall-clock temperature computation and tier classification
-├── storage.py         Attractor storage (disk) and Pearson recall
-├── reconstruction.py  Blend + re-evolve reconstructive recall
-├── brick.py           MemoryBrick: temporal evolution history
-├── chunking.py        Domain routing (code/hardware/daily_tasks/science/meta/general)
-├── embedding.py       SentenceTransformer → random projection → 64×64 frame
-├── rotation.py        Rotation retry for non-converging seeds
-├── oscillation.py     Role-space periodicity detection
-├── hardware.py        CPU/GPU/NPU detection, device selection
-├── gpu_dynamics.py    HIP kernel interface (requires compiled libwheeler_ca.so)
-├── polarity.py        Dual-polarity encoding: polar = −experience (r = −1.0), polar decay
-└── gpu/               HIP kernel source and compiled libwheeler_ca.so
+  ENCODING
+├── hashing.py           SHA-256 deterministic text-to-frame seeding
+├── hippocampus.py       Native encoder: character n-gram random indexing
+├── embedding.py         SentenceTransformer → random projection → 64×64 frame (optional)
+├── word_encoder.py      Word-level RI + context-window RI (distributional semantics)
+├── brick.py             MemoryBrick: temporal evolution history (.npz archives)
+  CA ENGINE
+├── dynamics.py          CA engine: apply_ca_dynamics(), evolve_and_interpret() (GPU-dispatched)
+├── gpu_dynamics.py      HIP kernel interface (requires compiled libwheeler_ca.so)
+├── oscillation.py       Role-space periodicity detection
+├── rotation.py          Rotation retry for non-converging seeds
+  CORTEX SYSTEM
+├── cortex.py            L1 graph topology + L2 settlement CA orchestration
+├── cortex_scm.py        SCM scoring: 7 layers (T, S, E, I, P, NW, ERF)
+├── cortex_classifier.py L3 native semantic classifier (~11K params, numpy SGD)
+  STORAGE & RECALL
+├── storage.py           Attractor storage (disk) and Pearson recall
+├── reconstruction.py    Blend + re-evolve reconstructive recall (Darman)
+├── cache.py             JSON file-based caching layer
+├── chunking.py          Domain routing (code/hardware/daily_tasks/science/meta/general)
+├── similarity.py        Similarity metrics
+  THREE-GRID INTERFERENCE
+├── interference.py      Three-grid interference engine + self-consistency loop
+├── scm_grid.py          SCM persistent 64×64 trust topology with hardening
+├── experiential.py      Episodic memory encoding with temporal context
+  AGENTS & RENDERING
+├── agent.py             LLM agent wrapper (Wheeler context seasoning)
+├── decoder.py           Language Wheeler decoder (text rendering)
+├── language_wheeler.py  Language Wheeler component (CA state → text)
+├── generation.py        Generative engine (IT from BIT)
+  LIFECYCLE
+├── temperature.py       Wall-clock temperature computation and tier classification
+├── attention.py         Salience-weighted recall warming (variable tick rates)
+├── warming.py           Association tracking + spreading activation
+├── consolidation.py     Sleep consolidation (prune redundant keyframes)
+├── eviction.py          Three-phase graceful degradation
+  UTILITIES
+├── constants.py         All tunable parameters (centralized)
+├── crystallization.py   Corpus pre-training pipeline
+├── hardware.py          CPU/GPU/NPU detection, device selection
+├── polarity.py          Dual-polarity encoding (antipodal CA states)
+├── trajectory.py        Trajectory similarity for retrieval
+├── trajectory_cache.py  Trajectory signature caching
+  SUBPACKAGES
+├── theories/            Theory experiments (basin, resonance, synthesis, etc.)
+└── gpu/                 HIP/CUDA kernel sources + compiled libwheeler_ca.so
 ```
+
+---
+
+## 8. Three-Grid Interference (v0.3.0+)
+
+Default recall path since v0.3.1. Transforms Wheeler from a content-addressed store into a system with emergent epistemic states.
+
+### Answer equation
+
+```
+Answer(i,j) = Corpus(i,j) × Experiential(i,j) × (1 - |SCM(i,j)|)
+```
+
+### Three grids
+
+| Grid | Role | Dynamics |
+|------|------|----------|
+| **Corpus** | Crystallized knowledge | Tight attractors (push=0.57, slope=0.55), barely decays |
+| **Experiential** | Episodic memory | Loose attractors (push=0.35, slope=0.70), 2-day half-life |
+| **SCM** | Trust topology | 64×64 persistent map, hardening over time, only written by self-consistency loop |
+
+### Four epistemic states
+
+| State | Condition |
+|-------|-----------|
+| `GROUNDED` | Corpus peak + Experiential peak + SCM open |
+| `ABSORBED` | Corpus peak + no Experiential + SCM open (default for existing memories) |
+| `UNCONSOLIDATED` | No Corpus + Experiential peak + SCM open |
+| `CONTESTED` | Corpus peak + Experiential peak + SCM closed |
+
+### Self-consistency feedback loop
+
+```
+Decoder output → re-encode → re-evolve under corpus rules → Pearson vs original
+  ├── consistent   → SCM opens gaps (trust increases)
+  ├── inconsistent → SCM closes gaps (trust decreases)
+  └── hardening accumulates: LR / (1 + hardening_count)
+```
+
+---
+
+## 9. Cortex System (Semantic Scoring)
+
+Three-tier scoring pipeline — all native, no pretrained models.
+
+### L1: Graph Reasoning (`cortex.py`)
+
+Builds a Pearson correlation adjacency matrix over top-K retrieved attractors. BFS clustering identifies semantic groups. Bridges and contradictions are detected.
+
+### L2: Settlement CA (`cortex.py`)
+
+Opinion diffusion over the L1 correlation graph. Settled opinions converge via correlation-weighted averaging with inertia (0.8). Stops at convergence threshold or max steps.
+
+### L3: Classifier (`cortex_classifier.py`)
+
+Pure numpy neural network: 21 → 128(ReLU) → 64(ReLU) → 4(softmax). ~11,460 parameters. Trained with manual backprop SGD on MMLU dev+validation data.
+
+Input features (21 dimensions):
+- Settlement opinions (K=10)
+- Choice similarities (4 Pearson correlations)
+- SCM layers (7: Temperature, Salience, Energy, Integration, Polarity, Net Warrant, Explanation Readiness)

@@ -10,13 +10,14 @@
 
 ## Overview
 
-Wheeler Memory is a **learning architecture**, not a language model. It encodes text through a native Hippocampus encoder into a 64x64 cellular automaton (CA) grid, evolves it through 3-state dynamics until convergence (~40-50 ticks), and stores the resulting pattern. A Cortex system with three tiers (L1 Graph topology, L2 Settlement CA, L3 Native Classifier) handles semantic scoring and reconstruction.
+Wheeler Memory is a **learning architecture**, not a language model. It encodes text through native encoders (Hippocampus n-gram, Context-RI distributional, or blended) into a 64x64 cellular automaton (CA) grid, evolves it through 3-state dynamics until convergence (~5-14 ticks with tuned parameters), and stores the resulting pattern. A Cortex system with three tiers (L1 Graph topology, L2 Settlement CA, L3 Native Classifier) handles semantic scoring and reconstruction.
 
 Similar concepts produce similar attractors. Query evolution followed by three-grid interference scoring (corpus + experiential + SCM trust gating) enables recall. The Language Wheeler component renders CA states as natural language without independent reasoning.
 
 | Component | Role |
 |-----------|------|
 | **Hippocampus Encoder** | Native semantic embedding via character n-gram random indexing (no pretrained models) |
+| **Context-RI Encoder** | Distributional semantics via context-window random indexing (trained on WikiText-103) |
 | **CA Dynamics** | 3-state evolution to stable attractors |
 | **Cortex** | L1 semantic topology, L2 settlement stability, L3 classifier scoring |
 | **Language Wheeler** | Renders attractor state as text (decoder, not LLM) |
@@ -44,7 +45,7 @@ wheeler-store "self-attention computes relationships between all positions"
 wheeler-recall "how does attention work in transformers"
 ```
 
-Recall uses three-grid interference scoring by default (corpus + experiential + SCM gating). Add `--no-interference` for Pearson-only mode. Add `--embed` to use the MiniLM sentence-transformer encoder instead of the native Hippocampus encoder.
+Recall uses three-grid interference scoring by default (corpus + experiential + SCM gating). Add `--no-interference` for Pearson-only mode. Use `--encoder context` for distributional semantics or `--embed` for MiniLM sentence-transformer.
 
 ### Pre-train from a corpus
 
@@ -87,19 +88,18 @@ wheeler-ui  # opens http://localhost:7437
 ```
 ENCODING PIPELINE
 -----------------
-Text ---> Hippocampus Encoder (native: character n-gram random indexing)
+Text ---> Encoder (--encoder flag, default: blended)
+            ├── hippocampus  character n-gram random indexing (native)
+            ├── context      context-window RI (distributional, trained on WikiText-103)
+            ├── blended      hippocampus(0.7) + language_wheeler(0.3) ← DEFAULT
+            ├── embedding    MiniLM sentence-transformer (requires .[embed])
+            └── hash/word/word-blended
                     |
                     v
-          [Optional: MiniLM via --embed flag]
+          Random Projection (to 4096 dims) → Reshape to 64x64 grid
                     |
                     v
-          JL Random Projection (to 4096 dims)
-                    |
-                    v
-          Reshape to 64x64 grid, quantize to {-1, 0, +1}
-                    |
-                    v
-          CA Evolution (~40-50 ticks to convergence)
+          CA Evolution (~5-14 ticks to convergence, tuned dynamics)
                     |
                     v
           Attractor (64x64 stable pattern)
@@ -186,7 +186,7 @@ MMLU BENCHMARK MODES
 --mode learn-interference  : Learn + experiential storage + SCM sculpting
 ```
 
-The CA uses a 3-state rule: local peaks push toward +1, valleys toward -1, slopes flow uphill. Convergence takes ~3ms on CPU. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). The Hippocampus encoder uses character 3-grams and 4-grams with random indexing — lexical similarity produces similar frames; true semantic similarity emerges from attractor dynamics and Cortex layers. Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
+The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 (first native encoder with positive semantic signal: SimLex-999 rho = +0.101). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
 
 The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
 
@@ -213,6 +213,19 @@ Random chance for 4-choice MCQ is **25.0%**. Encoder: blended (hippocampus 0.7 +
 **Previous MiniLM semantic baseline (removed):** 27.5% — used external pretrained model (`all-MiniLM-L6-v2`), no longer the default encoder.
 
 **Next step:** Reconstruction scoring. Evolve the query → let the CA settle → read back what the attractor is saying → compare that to the choices as text. This is the path where "it from bit" becomes the scoring mechanism, not just the storage philosophy.
+
+### SimLex-999 (Semantic Similarity)
+
+SimLex-999 measures how well an encoder captures genuine semantic similarity (not just relatedness). Evaluated with `wheeler-simlex --encoder <type> --mode pearson`.
+
+| Encoder | Spearman rho | Notes |
+|---------|:------------:|-------|
+| Context-RI (evolved) | **+0.101** | Context-window random indexing, CONTEXT_RI_BLEND=0.9 |
+| Context-RI (raw frames) | +0.046 | Before CA evolution — CA dynamics partially erode signal |
+| Hippocampus | -0.032 | Character n-grams have no semantic signal (expected) |
+| MiniLM (external ceiling) | +0.446 | Pretrained sentence-transformer, reference only |
+
+The context-RI encoder is the first native (no pretrained models) encoder to show positive semantic signal. Trained on WikiText-103 (1.16M lines, 500K vocab, 384-dim vectors). CA dynamics still erode some signal — ongoing work targets dynamics that amplify rather than degrade distributional structure.
 
 ### Semantic Apple Test
 
@@ -282,7 +295,7 @@ python scripts/tools/prepare_corpus.py
 
 | Command | Description |
 |---------|-------------|
-| `wheeler-store "text"` | Store a memory (add `--embed` for MiniLM semantic encoder) |
+| `wheeler-store "text"` | Store a memory (use `--encoder` to select encoding strategy) |
 | `wheeler-store "text" --experiential` | Store as episodic memory (loose attractors, temporal context) |
 | `wheeler-recall "text"` | Find similar memories (three-grid interference scoring by default) |
 | `wheeler-recall "text" --no-interference` | Pearson-only recall (skip experiential + SCM gating) |
@@ -318,6 +331,7 @@ python scripts/tools/prepare_corpus.py
 | `wheeler-bench-gpu` | Benchmark GPU vs CPU evolution speed |
 | `wheeler-generate` | Generative text engine (IT from BIT mode) |
 | `wheeler-scm` | Inspect SCM trust topology (openness, heatmap, reset) |
+| `wheeler-simlex` | SimLex-999 semantic similarity benchmark |
 
 ### Benchmark
 
@@ -390,6 +404,7 @@ wheeler_memory/          Core library
     embedding.py         MiniLM sentence embedding + JL random projection (optional)
     hippocampus.py       Native encoder: character n-gram random indexing (default)
     hashing.py           SHA-256 deterministic encoding
+    word_encoder.py      Context-window random indexing (distributional semantics)
     brick.py             Memory brick format (.npz archives)
   CORTEX SYSTEM
     cortex.py            Cortex orchestration & L1 graph topology
@@ -440,7 +455,7 @@ scripts/                 CLI entry points
   train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
   wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
 
-tests/                   pytest suite (686+ tests across 34 modules)
+tests/                   pytest suite (757 tests across 42 modules)
   test_cortex.py         Cortex system unit tests
   test_hallucination.py  Hallucination classification tests
   test_generation.py     Trajectory resonance tests
@@ -453,14 +468,14 @@ results/                 Benchmark logs & baselines
 docs/                    Technical documentation
   VISION.md              Project Ralph — full architecture vision
   INDEX.md               Guide listing with suggested reading order
-  architecture.md        CA dynamics, temperature system, chunked storage, the math
+  architecture.md        CA dynamics, encoders, interference, cortex, chunked storage
   concepts.md            Theoretical foundation, reconstructive recall
   design.md              The Darman philosophy
   cli.md                 Every flag documented
   api.md                 Python library usage
   gpu.md                 HIP/ROCm and CUDA setup
   install.md             venv setup, platform-specific notes
-  future.md              Planned features and research directions
+  future.md              Active research and planned features
   assets/                Diagrams and media
   demos/                 Archived HTML demos (chat, dashboard, CA demo)
   reports/               Generated assessment reports
@@ -482,14 +497,14 @@ See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested readi
 |-------|-------------|
 | [Installation](docs/install.md) | venv setup, platform-specific notes, GPU acceleration, Ollama |
 | [Interactive Demo](docs/demos/demo.html) | See the CA engine in your browser (open as a file, no server) |
-| [Architecture](docs/architecture.md) | CA dynamics, temperature system, chunked storage, the math |
+| [Architecture](docs/architecture.md) | CA dynamics, encoders, three-grid interference, cortex pipeline, chunked storage |
 | [Concepts](docs/concepts.md) | Theoretical foundation, reconstructive recall, semantic vs exact search |
 | [Design Principles](docs/design.md) | The Darman philosophy |
 | [CLI Reference](docs/cli.md) | Every flag documented |
 | [API Reference](docs/api.md) | Python library usage |
 | [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup |
 | [Vision](docs/VISION.md) | Project Ralph — full architecture vision |
-| [Roadmap](docs/future.md) | Planned features and research directions |
+| [Roadmap](docs/future.md) | Active research and planned features |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
 

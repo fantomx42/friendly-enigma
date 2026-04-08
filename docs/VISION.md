@@ -13,23 +13,25 @@ Build a genuinely novel AI system that:
   • Cannot hallucinate by architecture
   • Runs entirely on local silicon
 
-CURRENT STATE
-─────────────
-  • Wheeler Memory = working CA-based memory system
-  • MMLU baseline = 27.5% (near chance, memory only)
-  • recall-text mode = planned, not yet implemented
-  • Cortex = architected, not yet implemented
-  • Next immediate task = implement recall-text scoring
-    to prove facts are stored and retrievable
+CURRENT STATE (updated 2026-04-08)
+──────────────────────────────────
+  • Wheeler Memory = working CA-based memory system (v0.3.1)
+  • Three-grid interference = default recall path (v0.3.1)
+  • Cortex L1/L2/L3 = implemented and benchmarked
+  • Context-RI encoder = distributional semantics (SimLex rho +0.101)
+  • wheeler-bench quality score = 0.009 (target achieved)
+  • MMLU = 25.9% with L3 classifier (near chance — limited by encoding)
+  • SimLex-999 = +0.101 rho (first native positive semantic signal)
+  • Next focus = CA dynamics that preserve/amplify distributional signal
 
 MMLU ROADMAP
 ────────────
-  27.5%  Wheeler alone (current)
-  ~35%   recall-text mode (next step)
-  ~50%+  Wheeler + Cortex L1+L2+SCM
-  higher L3 classifier added
-  goal   meaningful above chance
-         without any LLM
+  24.3%  zero-shot cortex (no stored knowledge)        ✓ measured
+  25.3%  cortex + learned facts (1,812 attractors)      ✓ measured
+  25.9%  cortex + L3 classifier (11K params)            ✓ measured
+  ~35%   reconstruction scoring (active research)
+  higher richer encoder + deeper cortex features
+  goal   meaningful above chance without any LLM
 
 ARCHITECTURE PRINCIPLES
 ───────────────────────
@@ -50,7 +52,8 @@ PIPELINE
                         │
                         ▼
                    [ ENCODER ]
-              sentence-transformer
+              blended (default):
+            hippocampus n-gram + context-RI
             random projection → 64×64
                    │        │
                    ▼        ▼
@@ -106,7 +109,7 @@ PIPELINE
             │  output confidence    │
             ├───────────────────────┤
             │  L3 · CLASSIFIER      │
-            │  ~100k params         │
+            │  ~11K params          │
             │  swappable per task   │
             │  trained on Wheeler   │
             │  output only          │

@@ -105,7 +105,8 @@ The goal is that **behavior comes from the engine; only phrasing comes from the 
 | Temperature & tiers | `temperature.py` — wall-clock decay formula |
 | Decay & forgetting | `temperature.py` — half-life = 7 days |
 | Polarity / aversion | `polarity.py` — polar attractors, decay count |
-| Consolidation / sleep | `warming.py` — spreading activation |
+| Spreading activation | `warming.py` — associative priming |
+| Consolidation / sleep | `consolidation.py` — prune redundant keyframes |
 | Chunking / routing | `chunking.py` — keyword-based domain routing |
 
 **Design test**: *"If I swap to a weaker model, does the system's behavior change or just its phrasing?"* If behavior changes, re-examine which side of the boundary a feature lives on.
@@ -135,12 +136,13 @@ The CA update rule, convergence detection, and attractor storage are the **load-
 CA update rule (dynamics.py)
     └── convergence detection → attractor
             └── Pearson recall (storage.py)
-                    └── temperature tracking
-                            └── reconstruction (reconstruction.py)
-                                    └── chunking / routing
-                                            └── polarity
-                                                    └── agent loop (agent.py)
-                                                            └── UI
+                    └── three-grid interference (interference.py)
+                            └── cortex scoring (cortex.py, cortex_scm.py, cortex_classifier.py)
+                                    └── temperature tracking
+                                            └── reconstruction (reconstruction.py)
+                                                    └── chunking / routing
+                                                            └── agent loop (agent.py)
+                                                                    └── UI
 ```
 
 Changes cascade downward. A change to `dynamics.py` affects every attractor ever stored — recall will produce different results for existing memories. A change to `storage.py`'s similarity function changes ranking behavior across the entire system.

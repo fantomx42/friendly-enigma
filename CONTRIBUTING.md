@@ -15,7 +15,7 @@ Python 3.11+ required. The system Python on Arch/CachyOS is externally-managed �
 ## Running Tests
 
 ```bash
-pytest                           # run all tests (~233 tests)
+pytest                           # run all tests (757 tests across 42 modules)
 pytest -m "not slow"             # skip slow tests
 pytest -m "not embed"            # skip tests requiring sentence-transformers
 pytest tests/test_dynamics.py    # run a specific test file
@@ -30,21 +30,26 @@ Test markers:
 - Python 3.11+ features are fine (type unions `X | Y`, `match`, etc.)
 - Use type hints for public function signatures
 - Docstrings on public functions (NumPy style with Parameters/Returns sections)
-- No linter is enforced, but keep code clean and consistent with existing patterns
+- Formatting: `ruff format` (auto-runs via PostToolUse hook on .py edits)
 
 ## Project Structure
 
-- `wheeler_memory/` — core library (import as `from wheeler_memory import ...`)
-- `scripts/` — CLI entry points (registered in `pyproject.toml`)
+- `wheeler_memory/` — core library (36 modules, import as `from wheeler_memory import ...`)
+  - `theories/` — theory experiments (basin, resonance, synthesis)
+  - `gpu/` — HIP/CUDA kernel sources and compiled `.so`
+- `scripts/` — CLI entry points (16 commands registered in `pyproject.toml`)
   - `bench/` — benchmarks & evaluation scripts
   - `exploration/` — standalone exploration scripts
   - `tools/` — data prep, corpus cleanup, HIP build utilities
   - `experiments/` — theory test harnesses
-- `tests/` — pytest test suite
+- `tests/` — pytest suite (42 modules, 757 tests)
 - `docs/` — documentation (Markdown)
   - `reports/` — generated assessment reports
   - `demos/` — archived HTML demos
+- `results/` — benchmark logs and MMLU baselines
 - `plans/` — research & implementation plans
+- `artifacts/` — experiment artifacts
+- `program.md` — autoresearch tuning program
 
 ## Making Changes
 

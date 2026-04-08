@@ -32,3 +32,11 @@ package.json
 .optuna/
 .chroma/
 .hebbian_data/
+
+# Autoresearch / overnight run artifacts
+overnight*.log
+overnight*.pid
+overnight_loop.py
+run_autoresearch_loop.py
+run_benchmark.sh
+run_overnight.sh

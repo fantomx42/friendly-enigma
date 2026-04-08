@@ -143,12 +143,19 @@ If `Device` shows `cpu` but you have a GPU, follow the steps in
 | `wheeler-recall` | Search for stored memories |
 | `wheeler-forget` | Delete a stored memory |
 | `wheeler-sleep` | Run sleep consolidation |
-| `wheeler-agent` | Start the LLM agent loop |
 | `wheeler-temps` | List memories with temperature tiers |
 | `wheeler-info` | Print hardware and device summary |
-| `wheeler-bench-gpu` | Run GPU vs CPU benchmark |
 | `wheeler-scrub` | Inspect a brick evolution timeline |
 | `wheeler-ui` | Launch the web dashboard |
+| `wheeler-agent` | Start the LLM agent loop (requires Ollama) |
+| `wheeler-primary` | Wheeler-primary agent — small model as decoder (requires Ollama) |
+| `wheeler-crystallize` | Crystallize a text corpus into attractor landscape |
+| `wheeler-bench` | CA quality score benchmark (autoresearch) |
+| `wheeler-bench-gpu` | GPU vs CPU benchmark |
+| `wheeler-generate` | Generative text engine (IT from BIT) |
+| `wheeler-mmlu` | MMLU benchmark (57 subjects, multiple modes) |
+| `wheeler-scm` | Inspect SCM trust topology |
+| `wheeler-simlex` | SimLex-999 semantic similarity benchmark |
 
 See [CLI Reference](cli.md) for full flag documentation.
 
