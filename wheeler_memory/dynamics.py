@@ -98,12 +98,17 @@ def apply_ca_dynamics_parameterized(
 # GPU dispatch — imported after apply_ca_dynamics is defined to avoid circular
 # import (gpu_dynamics imports apply_ca_dynamics from this module).
 try:
-    from .gpu_dynamics import gpu_available, gpu_evolve_single as _gpu_evolve
+    from .gpu_dynamics import (
+        gpu_available,
+        gpu_evolve_batch as _gpu_evolve_batch,
+        gpu_evolve_single as _gpu_evolve,
+    )
 
     _GPU_READY = gpu_available()
 except ImportError:
     _GPU_READY = False
     _gpu_evolve = None
+    _gpu_evolve_batch = None
 
 
 def _enrich_metadata(result: dict) -> None:
@@ -227,6 +232,43 @@ def evolve_and_interpret(
             "final_delta": round(delta, 6),
         },
     }
+
+
+def evolve_batch(
+    frames: list[np.ndarray],
+    max_iters: int = SALIENCE_MAX_ITERS_MED,
+    stability_threshold: float = SALIENCE_THRESHOLD_MED,
+) -> list[dict]:
+    """Evolve multiple frames, using GPU batch dispatch when available.
+
+    On GPU this is dramatically faster than serial evolve_and_interpret()
+    calls (71x at batch=1000 on RX 9070 XT). Falls back to serial CPU
+    loop when GPU is not available.
+
+    Returns list of dicts with same keys as evolve_and_interpret().
+    """
+    if not frames:
+        return []
+
+    if _GPU_READY and _gpu_evolve_batch is not None:
+        try:
+            results = _gpu_evolve_batch(
+                frames,
+                max_iters=max_iters,
+                stability_threshold=stability_threshold,
+            )
+            for i, result in enumerate(results):
+                if not result["history"]:
+                    result["history"] = [frames[i].copy(), result["attractor"].copy()]
+                _enrich_metadata(result)
+            return results
+        except Exception as e:
+            logging.warning("GPU batch evolution failed, falling back to CPU: %s", e)
+
+    return [
+        evolve_and_interpret(f, max_iters=max_iters, stability_threshold=stability_threshold)
+        for f in frames
+    ]
 
 
 def evolve_with_params(

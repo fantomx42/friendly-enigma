@@ -46,6 +46,7 @@ testpaths = ["tests"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "embed: marks tests requiring sentence-transformers (deselect with '-m \"not embed\"')",
+    "gpu: marks tests requiring GPU/HIP runtime (deselect with '-m \"not gpu\"')",
 ]
 
 [tool.setuptools.packages.find]

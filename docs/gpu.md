@@ -1,7 +1,8 @@
 # GPU Acceleration
 
 Wheeler Memory supports GPU-accelerated CA evolution via **HIP kernels** on AMD GPUs
-(ROCm) and via **PyTorch CUDA** on NVIDIA GPUs.
+(ROCm) and via **PyTorch CUDA** on NVIDIA GPUs. All GPU code lives under
+`wheeler_memory/accel/` with HIP kernel sources in `accel/hip/`.
 
 ---
 
@@ -25,21 +26,25 @@ sudo pacman -S rocm-hip-sdk
 ### Build the HIP kernel
 
 ```bash
-cd wheeler_memory/gpu
-make v2                    # recommended: v2 (variable grid, global memory)
-make                       # v1 only (64×64 fixed grid, legacy)
-make all                   # build both v1 and v2
+cd wheeler_memory/accel/hip
+make all                   # build all available kernels
+make ca                    # v2 only (variable grid, global memory)
+make ca-v1                 # v1 only (64×64 fixed grid, legacy)
 
-GPU_ARCH=gfx1100 make v2  # RDNA 3 (RX 7000 series)
-GPU_ARCH=gfx906  make v2  # Vega / RX 5000 series
+GPU_ARCH=gfx1100 make all # RDNA 3 (RX 7000 series)
+GPU_ARCH=gfx906  make all # Vega / RX 5000 series
 ```
 
-This produces `wheeler_memory/gpu/libwheeler_ca_v2.so` (or `libwheeler_ca.so`
-for v1). The Python bindings in `wheeler_memory/gpu_dynamics.py` try v2 first,
-falling back to v1 if only v1 is built.
+This produces `wheeler_memory/accel/hip/libwheeler_ca.so` (v2) and
+`libwheeler_ca_v1.so`. The Python bindings in `wheeler_memory/accel/ca.py`
+try v2 first, falling back to v1 if only v1 is built.
 
-After a successful build, `gpu_available()` returns `True` and batch evolution
-automatically uses the GPU. Call `gpu_version()` to confirm which kernel loaded.
+> **Migration note:** Kernels previously lived in `wheeler_memory/gpu/`. That
+> directory is now deprecated. `gpu_dynamics.py` is a thin shim that re-exports
+> from `accel.ca` for backwards compatibility.
+
+After a successful build, `gpu_available()` returns `True` and `evolve_batch()`
+automatically dispatches to GPU. Call `gpu_version()` to confirm which kernel loaded.
 
 ---
 
@@ -135,7 +140,7 @@ detects a gap between the hardware and what PyTorch is using:
 **AMD GPU showing as CPU:**
 1. Confirm ROCm is installed: `rocminfo` should list your GPU.
 2. Confirm `hipcc` is on `$PATH`: `hipcc --version`.
-3. Build the kernel: `cd wheeler_memory/gpu && make`.
+3. Build the kernel: `cd wheeler_memory/accel/hip && make all`.
 4. Verify: `wheeler-info` — `Device` should still show `cpu` (the HIP kernel
    is separate from PyTorch's device selection) but `gpu_available()` in Python
    will return `True` after the build.
@@ -168,8 +173,10 @@ numerical correctness with `np.allclose(atol=1e-4)`.
 ## Python API
 
 ```python
-from wheeler_memory import gpu_available, gpu_evolve_batch, gpu_evolve_single
-from wheeler_memory.gpu_dynamics import gpu_version, gpu_query_vram
+from wheeler_memory.accel.ca import (
+    gpu_available, gpu_version, gpu_evolve_single, gpu_evolve_batch, gpu_query_vram,
+)
+from wheeler_memory.dynamics import evolve_batch  # high-level API (auto GPU/CPU)
 from wheeler_memory.hashing import hash_to_frame
 
 if gpu_available():
@@ -181,12 +188,15 @@ if gpu_available():
     print(result["state"], result["convergence_ticks"])
     print(result["metadata"])  # {"backend": "gpu_v2", "grid_w": 64}
 
-    # Batch (where the speedup is)
+    # Batch — the recommended API (where the speedup is)
     texts = ["memory one", "memory two", "memory three"]
     frames = [hash_to_frame(t) for t in texts]
-    results = gpu_evolve_batch(frames)
+    results = evolve_batch(frames)  # GPU if available, CPU fallback
     for r in results:
         print(r["state"])
+
+    # Low-level batch (direct GPU dispatch)
+    results = gpu_evolve_batch(frames)
 
     # v2: variable grid size
     import numpy as np
@@ -198,7 +208,7 @@ if gpu_available():
     if vram:
         print(f"~{vram / 1e6:.1f} MB needed")
 else:
-    print("GPU kernel not built — run: cd wheeler_memory/gpu && make v2")
+    print("GPU kernel not built — run: cd wheeler_memory/accel/hip && make all")
 ```
 
 ---
@@ -250,32 +260,35 @@ Both GPU paths produce numerically identical results to the CPU path
 
 | File | Purpose |
 |---|---|
-| `wheeler_memory/gpu/ca_kernel_v2.hip` | HIP C++ kernel v2 (variable grid, global memory) |
-| `wheeler_memory/gpu/ca_kernel.hip` | HIP C++ kernel v1 (64×64, shared memory — legacy) |
-| `wheeler_memory/gpu/Makefile` | Build script |
-| `wheeler_memory/gpu/libwheeler_ca_v2.so` | Compiled v2 library (not in git — build with `make v2`) |
-| `wheeler_memory/gpu/libwheeler_ca.so` | Compiled v1 library (not in git — build with `make`; verified working on RX 9070 XT) |
-| `wheeler_memory/gpu_dynamics.py` | Python `ctypes` bindings (loads v2, falls back to v1) |
+| `wheeler_memory/accel/__init__.py` | `gpu_available()`, `accel_info()`, device routing |
+| `wheeler_memory/accel/_common.py` | Shared ctypes helpers: `_lib_path()`, `_try_load()`, `_float_ptr()` |
+| `wheeler_memory/accel/ca.py` | Python ctypes bindings for CA evolution (loads v2, falls back to v1) |
+| `wheeler_memory/accel/hip/ca_evolve.hip` | HIP C++ kernel v2 (variable grid, global memory) |
+| `wheeler_memory/accel/hip/ca_evolve_v1.hip` | HIP C++ kernel v1 (64×64, shared memory — legacy) |
+| `wheeler_memory/accel/hip/Makefile` | Unified build script (auto-detects GPU arch) |
+| `wheeler_memory/gpu_dynamics.py` | Backwards-compatible shim → re-exports from `accel.ca` |
 | `scripts/bench_gpu.py` | `wheeler-bench-gpu` entry point |
+
+> **Deprecated:** `wheeler_memory/gpu/` still contains the original kernel sources for
+> reference but is no longer the active build location.
 
 ---
 
 ## Building v2
 
 ```bash
-cd wheeler_memory/gpu
-make v2                    # gfx1201 (RX 9070 XT)
-GPU_ARCH=gfx1100 make v2  # RDNA 3 (RX 7000 series)
+cd wheeler_memory/accel/hip
+make ca                    # gfx1201 (RX 9070 XT, auto-detected)
+GPU_ARCH=gfx1100 make ca  # RDNA 3 (RX 7000 series)
 ```
 
-The Python bindings load `libwheeler_ca_v2.so` first. If found, v2 is used
+The Python bindings load `libwheeler_ca.so` (v2) first. If found, v2 is used
 automatically — no code changes required. `gpu_version()` returns `2`.
 
 ### Variable grid size (v2 only)
 
 ```python
-from wheeler_memory import gpu_evolve_batch
-from wheeler_memory.gpu_dynamics import gpu_version, gpu_query_vram
+from wheeler_memory.accel.ca import gpu_evolve_batch, gpu_version, gpu_query_vram
 import numpy as np
 
 print(gpu_version())   # 2
@@ -287,13 +300,47 @@ print(result[0]["state"])
 
 # Estimate VRAM before allocating
 vram = gpu_query_vram(batch_size=500, grid_w=256)
-print(f"~{vram / 1e6:.1f} MB needed")
+if vram:
+    print(f"~{vram / 1e6:.1f} MB needed")
 ```
 
 ---
 
 ## Fallback
 
-If neither `libwheeler_ca_v2.so` nor `libwheeler_ca.so` is built, `gpu_available()`
-returns `False` and all CPU functionality works unchanged. The GPU backend is
-strictly opt-in — nothing breaks if you skip the build step.
+If no compiled `.so` is found in `accel/hip/`, `gpu_available()` returns `False`
+and all functionality works unchanged on CPU. The GPU backend is strictly opt-in
+— nothing breaks if you skip the build step. `evolve_batch()` in `dynamics.py`
+transparently falls back to serial CPU evolution.
+
+---
+
+## Batch Evolution
+
+All major call sites now use `evolve_batch()` instead of serial
+`evolve_and_interpret()` loops:
+
+| Call Site | What Gets Batched |
+|---|---|
+| `wheeler-simlex` | ~1028 unique words pre-evolved via `WordAttractorCache.warm_batch()` |
+| `wheeler-bench` | 20 deterministic test inputs |
+| `wheeler-crystallize` | Each pipeline batch of frames |
+
+The high-level API is `dynamics.evolve_batch(frames)` — it dispatches to GPU
+when available and falls back to CPU otherwise. No caller needs to check
+`gpu_available()`.
+
+---
+
+## NPU / TPU Scaffolding
+
+Future accelerator support is scaffolded under `wheeler_memory/npu/`:
+
+| Module | Status | Hardware |
+|---|---|---|
+| `npu/openvino_bridge.py` | Stub | Intel NPU (Core Ultra, OpenVINO) |
+| `npu/coral/tpu_bridge.py` | Stub | Google Coral Edge TPU (M.2, PyCoral) |
+
+Both raise `NotImplementedError` until hardware integration is complete. See
+`npu/CONTEXT.md` and `npu/coral/CONTEXT.md` for hardware notes and driver
+requirements.

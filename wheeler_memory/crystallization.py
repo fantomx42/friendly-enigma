@@ -99,7 +99,7 @@ def _configure_torch_threads(n: int) -> None:
 
 from .brick import MemoryBrick
 from .chunking import get_chunk_dir, list_existing_chunks, select_chunk
-from .dynamics import evolve_and_interpret
+from .dynamics import evolve_and_interpret, evolve_batch
 from .hashing import hash_to_frame, text_to_hex
 from .storage import _get_data_dir, _load_index, batch_store_memories
 from .temperature import MAX_ATTRACTORS
@@ -418,7 +418,7 @@ def crystallize(
         if item is SENTINEL:
             break
         texts_b, frames = item
-        ca_results = [evolve_and_interpret(f) for f in frames]
+        ca_results = evolve_batch(frames)
         store_q.put((texts_b, ca_results))
     store_q.put(SENTINEL)
 

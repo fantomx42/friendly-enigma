@@ -290,11 +290,17 @@ osc = detect_oscillation(history)
 
 ### GPU Backend (HIP/ROCm)
 
-`gpu_dynamics.py` provides a Python interface to a compiled HIP kernel (`libwheeler_ca.so`). The kernel supports single-frame and batch evolution. `evolve_and_interpret()` automatically uses the GPU when the library is detected, falling back to CPU otherwise.
+All GPU code lives under `wheeler_memory/accel/`. HIP kernel sources are in
+`accel/hip/`, Python ctypes bindings in `accel/ca.py`. The high-level
+`evolve_batch()` function in `dynamics.py` dispatches to GPU when available,
+falling back to serial CPU evolution otherwise. All major call sites (SimLex,
+benchmarks, crystallization) use batch dispatch.
 
 ```bash
-cd wheeler_memory/gpu && make
+cd wheeler_memory/accel/hip && make all
 ```
+
+`gpu_dynamics.py` is a backwards-compatible shim that re-exports from `accel.ca`.
 
 See [GPU Acceleration](gpu.md) for benchmark numbers and setup.
 
@@ -339,10 +345,19 @@ wheeler_memory/
 ├── word_encoder.py      Word-level RI + context-window RI (distributional semantics)
 ├── brick.py             MemoryBrick: temporal evolution history (.npz archives)
   CA ENGINE
-├── dynamics.py          CA engine: apply_ca_dynamics(), evolve_and_interpret() (GPU-dispatched)
-├── gpu_dynamics.py      HIP kernel interface (requires compiled libwheeler_ca.so)
+├── dynamics.py          CA engine: apply_ca_dynamics(), evolve_and_interpret(), evolve_batch()
+├── gpu_dynamics.py      Backwards-compatible shim → accel.ca
 ├── oscillation.py       Role-space periodicity detection
 ├── rotation.py          Rotation retry for non-converging seeds
+  GPU ACCELERATION (accel/)
+├── accel/__init__.py    gpu_available(), accel_info(), device routing
+├── accel/_common.py     Shared ctypes helpers for all HIP bindings
+├── accel/ca.py          Python bindings for HIP CA evolution kernel
+├── accel/hip/           HIP kernel sources (.hip) + unified Makefile
+  NPU / TPU (npu/) — future
+├── npu/__init__.py      npu_available(), device_info() (Intel NPU via OpenVINO)
+├── npu/openvino_bridge.py  Stub: INT8 inference on Intel NPU
+├── npu/coral/           Stub: Google Coral Edge TPU dual-chip pipeline
   CORTEX SYSTEM
 ├── cortex.py            L1 graph topology + L2 settlement CA orchestration
 ├── cortex_scm.py        SCM scoring: 7 layers (T, S, E, I, P, NW, ERF)
@@ -377,7 +392,7 @@ wheeler_memory/
 ├── trajectory_cache.py  Trajectory signature caching
   SUBPACKAGES
 ├── theories/            Theory experiments (basin, resonance, synthesis, etc.)
-└── gpu/                 HIP/CUDA kernel sources + compiled libwheeler_ca.so
+└── gpu/                 DEPRECATED — migrated to accel/hip/
 ```
 
 ---

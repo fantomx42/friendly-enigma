@@ -41,7 +41,7 @@ import numpy as np
 from scipy.stats import pearsonr
 
 from wheeler_memory.constants import SALIENCE_MAX_ITERS_MED
-from wheeler_memory.dynamics import compute_attractor_features, evolve_and_interpret
+from wheeler_memory.dynamics import compute_attractor_features, evolve_and_interpret, evolve_batch
 from wheeler_memory.hashing import hash_to_frame
 
 # ---------------------------------------------------------------------------
@@ -111,9 +111,11 @@ def run_benchmark(verbose: bool = True) -> dict:
 
     t0 = time.time()
 
-    for i, text in enumerate(TEST_INPUTS):
-        frame = hash_to_frame(text)
-        result = evolve_and_interpret(frame)
+    # Batch-evolve all frames in one GPU dispatch
+    frames = [hash_to_frame(text) for text in TEST_INPUTS]
+    results = evolve_batch(frames)
+
+    for i, (text, result) in enumerate(zip(TEST_INPUTS, results)):
         flat = result["attractor"].flatten()
         attractors_flat.append(flat)
         states.append(result["state"])

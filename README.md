@@ -186,7 +186,7 @@ MMLU BENCHMARK MODES
 --mode learn-interference  : Learn + experiential storage + SCM sculpting
 ```
 
-The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 (first native encoder with positive semantic signal: SimLex-999 rho = +0.101). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
+The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Batch evolution via `evolve_batch()` dispatches to GPU when available (71x speedup at batch=1000 on RX 9070 XT); all major call sites (SimLex, benchmarks, crystallization) use batch dispatch. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 (first native encoder with positive semantic signal: SimLex-999 rho = +0.101). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
 
 The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
 
@@ -424,10 +424,10 @@ wheeler_memory/          Core library
     agent.py             LLM agent wrapper (Wheeler context seasoning)
     generation.py        Generative engine (IT from BIT)
   UTILITIES
-    crystallization.py   Corpus pre-training pipeline
+    crystallization.py   Corpus pre-training pipeline (GPU batch-aware)
     temperature.py       Temperature/warmth tracking
     chunking.py          Domain routing (keyword-based)
-    gpu_dynamics.py      HIP/CUDA kernel dispatch
+    gpu_dynamics.py      Backwards-compatible shim → accel.ca
     hardware.py          Hardware detection & optimal device selection
     attention.py         Salience-weighted recall warming
     warming.py           Association tracking
@@ -438,7 +438,20 @@ wheeler_memory/          Core library
     eviction.py          Three-phase graceful degradation
     constants.py         Tunable system constants
   theories/              Theory experiments (basin, resonance, synthesis)
-  gpu/                   HIP/CUDA kernel sources
+  accel/                 GPU acceleration (primary)
+    __init__.py          gpu_available(), accel_info(), device routing
+    _common.py           Shared ctypes helpers, buffer pool
+    ca.py                Python bindings for HIP CA evolution kernel
+    hip/                 HIP kernel sources + unified Makefile
+      ca_evolve.hip      v2 kernel (variable grid, global memory)
+      ca_evolve_v1.hip   v1 legacy kernel (64x64, shared memory)
+      Makefile           Auto-detects GPU arch, builds all .so targets
+  npu/                   NPU/TPU scaffolding (future)
+    __init__.py          npu_available(), device_info()
+    openvino_bridge.py   Intel NPU stub (OpenVINO INT8 inference)
+    coral/               Google Coral Edge TPU (future hardware)
+      tpu_bridge.py      PyCoral inference + dual-TPU pipeline stubs
+  gpu/                   DEPRECATED — migrated to accel/hip/
 
 scripts/                 CLI entry points
   bench/                 Benchmarks & evaluation
@@ -455,7 +468,9 @@ scripts/                 CLI entry points
   train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
   wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
 
-tests/                   pytest suite (757 tests across 42 modules)
+tests/                   pytest suite (776 tests across 44 modules)
+  test_accel_init.py     Accelerator module imports & device detection
+  test_accel_ca.py       Batch evolution correctness, GPU vs CPU match
   test_cortex.py         Cortex system unit tests
   test_hallucination.py  Hallucination classification tests
   test_generation.py     Trajectory resonance tests

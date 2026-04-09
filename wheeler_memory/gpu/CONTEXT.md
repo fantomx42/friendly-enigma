@@ -1,20 +1,8 @@
-# wheeler_memory/gpu/ — HIP/CUDA Kernel Sources
+# wheeler_memory/gpu/ — DEPRECATED
 
-Compiled GPU kernels for CA evolution. Provides ~10-100x speedup over CPU for batch evolution.
+**Migrated to `wheeler_memory/accel/hip/`** as of 2026-04-08.
 
-## Files
-- **wheeler_ca.hip** — HIP kernel source. Implements the 3-state CA rule on GPU.
-- **libwheeler_ca.so** — Compiled shared library (built via Makefile).
-- **Makefile** — Build rules for hipcc compilation.
+These kernel sources are kept read-only for reference until the migration is fully verified.
+New development should go in `accel/hip/`. Python bindings are in `accel/ca.py`.
 
-## How It Works
-`gpu_dynamics.py` (in parent dir) loads `libwheeler_ca.so` via ctypes. If the .so doesn't exist or GPU isn't available, the system falls back to CPU (numpy) dynamics transparently.
-
-## Building
-```bash
-cd wheeler_memory/gpu && make
-# or use the install script:
-bash scripts/tools/install_hip_hook.sh
-```
-
-Requires ROCm/HIP toolchain. CUDA systems need hipcc compatibility layer or a separate CUDA build.
+To build: `cd wheeler_memory/accel/hip && make`

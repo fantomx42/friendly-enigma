@@ -33,7 +33,7 @@ from wheeler_memory.constants import (
     SALIENCE_THRESHOLD_MED,
     SPATIAL_PEARSON_WEIGHT,
 )
-from wheeler_memory.dynamics import evolve_and_interpret
+from wheeler_memory.dynamics import evolve_and_interpret, evolve_batch
 from wheeler_memory.rotation import _get_frame_fn
 from wheeler_memory.similarity import (
     hybrid_similarity,
@@ -163,6 +163,20 @@ class WordAttractorCache:
                 self._cache[word] = frame
         return self._cache[word]
 
+    def warm_batch(self, words: list[str]) -> None:
+        """Pre-evolve all uncached words in a single GPU batch dispatch."""
+        uncached = [w for w in words if w not in self._cache]
+        if not uncached or not self._evolve:
+            return
+        frames = [self._frame_fn(w) for w in uncached]
+        results = evolve_batch(
+            frames,
+            max_iters=SALIENCE_MAX_ITERS_MED,
+            stability_threshold=SALIENCE_THRESHOLD_MED,
+        )
+        for word, result in zip(uncached, results):
+            self._cache[word] = result["attractor"]
+
     @property
     def size(self) -> int:
         return len(self._cache)
@@ -194,6 +208,10 @@ def evaluate_simlex(
     """
     frame_fn = _get_frame_fn(encoder=encoder)
     cache = WordAttractorCache(frame_fn, evolve=evolve)
+
+    # Pre-evolve all unique words in one GPU batch dispatch
+    all_words = list({w for w1, w2, _, _ in pairs for w in (w1, w2)})
+    cache.warm_batch(all_words)
 
     sim_fn = SIMILARITY_FNS[mode]
     wheeler_scores = []

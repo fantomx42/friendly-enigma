@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Features
+- **GPU acceleration directory (`accel/`)**: Migrated HIP kernels from `gpu/` to `accel/hip/` with unified Makefile, shared ctypes helpers (`_common.py`), and clean Python bindings (`accel/ca.py`). `gpu_dynamics.py` is now a thin backwards-compatible shim.
+- **Batch GPU evolution (`evolve_batch()`)**: New function in `dynamics.py` dispatches multiple frames to GPU in a single kernel launch. Wired into all serial call sites: SimLex-999 (`warm_batch()` pre-evolves ~1028 words), `wheeler-bench` (20 test inputs), and crystallization pipeline.
+- **NPU scaffolding (`npu/`)**: Directory structure for Intel NPU (OpenVINO) and future Google Coral Edge TPU. Includes `npu_available()` device detection, `openvino_bridge.py` stub, and `coral/tpu_bridge.py` stub with dual-TPU pipeline support. All stubs raise `NotImplementedError` until hardware integration.
 - **Context-window random indexing encoder** (`word_encoder.py`): Distributional semantics via context-window co-occurrence vectors trained on WikiText-103 (1.16M lines, 500K vocab, 384-dim). Available as `--encoder context` across CLI tools.
 - **SimLex-999 benchmark** (`wheeler-simlex`): New CLI command for evaluating semantic similarity against the SimLex-999 gold standard. Supports all encoder types with Pearson/Spearman modes.
 
@@ -11,9 +14,18 @@
 - **Autoresearch infrastructure**: Overnight loop scripts for autonomous parameter sweeps (see `program.md`). 50 iterations logged in `results.tsv` driving quality score from 0.013 → 0.009.
 
 ### Organization
+- **`accel/` directory**: All accelerator code consolidated under `wheeler_memory/accel/` — HIP kernel sources in `accel/hip/`, Python bindings in `accel/ca.py`, shared helpers in `accel/_common.py`
+- **`npu/` directory**: Intel NPU and Google Coral stubs under `wheeler_memory/npu/` with context docs
+- **`gpu/` deprecated**: Original `gpu/` directory kept read-only for reference, `CONTEXT.md` updated with migration notice
 - Moved `CORTEX_CLASSIFIER_SUMMARY.md`, `CORTEX_CLASSIFIER_FILES.txt` to `docs/reports/`
 - Moved `VERSION_CHANGES.md` to `docs/`
 - Added `.gitignore` patterns for overnight/autoresearch artifacts
+
+### Tests
+- Added `tests/test_accel_init.py` (9 tests): Module imports, device detection, shim compatibility for accel/ and npu/
+- Added `tests/test_accel_ca.py` (10 tests): Batch evolution correctness (CPU), GPU vs CPU numerical match, `@pytest.mark.gpu` for GPU-specific tests
+- Registered `gpu` pytest marker in `pyproject.toml`
+- Test count: 757 → 776
 
 ## v0.3.1 (2026-04-01)
 
