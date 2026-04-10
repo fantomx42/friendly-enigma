@@ -29,11 +29,19 @@ import numpy as np
 from scipy import stats
 
 from wheeler_memory.constants import (
+    CONTEXT_RI_MAX_PUSH,
+    CONTEXT_RI_RESIDUAL_ALPHA,
+    CONTEXT_RI_SLOPE_FLOW,
     SALIENCE_MAX_ITERS_MED,
     SALIENCE_THRESHOLD_MED,
     SPATIAL_PEARSON_WEIGHT,
 )
-from wheeler_memory.dynamics import evolve_and_interpret, evolve_batch
+from wheeler_memory.dynamics import (
+    evolve_and_interpret,
+    evolve_batch,
+    evolve_batch_with_params,
+    evolve_with_params,
+)
 from wheeler_memory.rotation import _get_frame_fn
 from wheeler_memory.similarity import (
     hybrid_similarity,
@@ -144,21 +152,46 @@ class WordAttractorCache:
     evolved at most once, cutting total evolutions roughly in half.
     """
 
-    def __init__(self, frame_fn, evolve: bool = True):
+    def __init__(
+        self,
+        frame_fn,
+        evolve: bool = True,
+        push_strength: float | None = None,
+        slope_strength: float | None = None,
+        residual_alpha: float = 0.0,
+    ):
         self._frame_fn = frame_fn
         self._evolve = evolve
+        self._push = push_strength
+        self._slope = slope_strength
+        self._residual_alpha = residual_alpha
         self._cache: dict[str, np.ndarray] = {}
+
+    def _has_custom_params(self) -> bool:
+        return self._push is not None and self._slope is not None
 
     def get(self, word: str) -> np.ndarray:
         if word not in self._cache:
             frame = self._frame_fn(word)
             if self._evolve:
-                result = evolve_and_interpret(
-                    frame,
-                    max_iters=SALIENCE_MAX_ITERS_MED,
-                    stability_threshold=SALIENCE_THRESHOLD_MED,
-                )
-                self._cache[word] = result["attractor"]
+                if self._has_custom_params():
+                    result = evolve_with_params(
+                        frame,
+                        push_strength=self._push,
+                        slope_strength=self._slope,
+                        max_iters=SALIENCE_MAX_ITERS_MED,
+                        stability_threshold=SALIENCE_THRESHOLD_MED,
+                    )
+                else:
+                    result = evolve_and_interpret(
+                        frame,
+                        max_iters=SALIENCE_MAX_ITERS_MED,
+                        stability_threshold=SALIENCE_THRESHOLD_MED,
+                    )
+                attractor = result["attractor"]
+                if self._residual_alpha > 0:
+                    attractor = (1 - self._residual_alpha) * attractor + self._residual_alpha * frame
+                self._cache[word] = attractor
             else:
                 self._cache[word] = frame
         return self._cache[word]
@@ -169,13 +202,25 @@ class WordAttractorCache:
         if not uncached or not self._evolve:
             return
         frames = [self._frame_fn(w) for w in uncached]
-        results = evolve_batch(
-            frames,
-            max_iters=SALIENCE_MAX_ITERS_MED,
-            stability_threshold=SALIENCE_THRESHOLD_MED,
-        )
-        for word, result in zip(uncached, results):
-            self._cache[word] = result["attractor"]
+        if self._has_custom_params():
+            results = evolve_batch_with_params(
+                frames,
+                push_strength=self._push,
+                slope_strength=self._slope,
+                max_iters=SALIENCE_MAX_ITERS_MED,
+                stability_threshold=SALIENCE_THRESHOLD_MED,
+            )
+        else:
+            results = evolve_batch(
+                frames,
+                max_iters=SALIENCE_MAX_ITERS_MED,
+                stability_threshold=SALIENCE_THRESHOLD_MED,
+            )
+        for word, frame, result in zip(uncached, frames, results):
+            attractor = result["attractor"]
+            if self._residual_alpha > 0:
+                attractor = (1 - self._residual_alpha) * attractor + self._residual_alpha * frame
+            self._cache[word] = attractor
 
     @property
     def size(self) -> int:
@@ -200,6 +245,9 @@ def evaluate_simlex(
     pearson_weight: float = SPATIAL_PEARSON_WEIGHT,
     evolve: bool = True,
     verbose: bool = False,
+    push_strength: float | None = None,
+    slope_strength: float | None = None,
+    residual_alpha: float = 0.0,
 ) -> dict:
     """Evaluate Wheeler similarity against SimLex-999 human judgments.
 
@@ -207,7 +255,13 @@ def evaluate_simlex(
     n_pairs, per-pair details, and per-POS breakdowns.
     """
     frame_fn = _get_frame_fn(encoder=encoder)
-    cache = WordAttractorCache(frame_fn, evolve=evolve)
+    cache = WordAttractorCache(
+        frame_fn,
+        evolve=evolve,
+        push_strength=push_strength,
+        slope_strength=slope_strength,
+        residual_alpha=residual_alpha,
+    )
 
     # Pre-evolve all unique words in one GPU batch dispatch
     all_words = list({w for w1, w2, _, _ in pairs for w in (w1, w2)})
@@ -509,6 +563,24 @@ def _parse_args(argv=None):
         metavar="DIR",
         help="Data directory (default: ~/.wheeler_memory)",
     )
+    p.add_argument(
+        "--push",
+        type=float,
+        default=None,
+        help="CA push strength override (default: per-encoder or global)",
+    )
+    p.add_argument(
+        "--slope",
+        type=float,
+        default=None,
+        help="CA slope flow strength override (default: per-encoder or global)",
+    )
+    p.add_argument(
+        "--residual-alpha",
+        type=float,
+        default=None,
+        help="Post-evolution residual blend: 0=pure evolved, 1=pure raw (default: per-encoder)",
+    )
     p.add_argument("--verbose", "-v", action="store_true")
     return p.parse_args(argv)
 
@@ -537,6 +609,19 @@ def main(argv=None):
     evolve = not args.no_evolve
     pw = args.pearson_weight if args.pearson_weight is not None else SPATIAL_PEARSON_WEIGHT
 
+    # Resolve per-encoder CA params: explicit flags > per-encoder defaults > None (global)
+    push = args.push
+    slope = args.slope
+    residual = args.residual_alpha
+    if args.encoder in ("context", "context-blended"):
+        if push is None and slope is None:
+            push = CONTEXT_RI_MAX_PUSH
+            slope = CONTEXT_RI_SLOPE_FLOW
+        if residual is None:
+            residual = CONTEXT_RI_RESIDUAL_ALPHA
+    if residual is None:
+        residual = 0.0
+
     if args.sweep:
         run_sweep(pairs, evolve=evolve, pearson_weight=pw)
         return
@@ -549,6 +634,9 @@ def main(argv=None):
         pearson_weight=pw,
         evolve=evolve,
         verbose=args.verbose,
+        push_strength=push,
+        slope_strength=slope,
+        residual_alpha=residual,
     )
 
     print_results(result, args.encoder, args.mode, evolve=evolve)

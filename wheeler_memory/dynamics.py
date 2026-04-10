@@ -271,6 +271,46 @@ def evolve_batch(
     ]
 
 
+def evolve_batch_with_params(
+    frames: list[np.ndarray],
+    push_strength: float,
+    slope_strength: float,
+    max_iters: int = SALIENCE_MAX_ITERS_MED,
+    stability_threshold: float = SALIENCE_THRESHOLD_MED,
+) -> list[dict]:
+    """Evolve multiple frames with custom push/slope, GPU batch when available."""
+    if not frames:
+        return []
+
+    if _GPU_READY and _gpu_evolve_batch is not None:
+        try:
+            results = _gpu_evolve_batch(
+                frames,
+                max_iters=max_iters,
+                stability_threshold=stability_threshold,
+                push_strength=push_strength,
+                slope_strength=slope_strength,
+            )
+            for i, result in enumerate(results):
+                if not result["history"]:
+                    result["history"] = [frames[i].copy(), result["attractor"].copy()]
+                _enrich_metadata(result)
+            return results
+        except Exception as e:
+            logging.warning("GPU batch evolution failed, falling back to CPU: %s", e)
+
+    return [
+        evolve_with_params(
+            f,
+            push_strength=push_strength,
+            slope_strength=slope_strength,
+            max_iters=max_iters,
+            stability_threshold=stability_threshold,
+        )
+        for f in frames
+    ]
+
+
 def evolve_with_params(
     frame: np.ndarray,
     push_strength: float,

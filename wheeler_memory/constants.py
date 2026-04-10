@@ -149,6 +149,9 @@ ENSEMBLE_MARGIN_THRESHOLD = 16  # hippo margin below this → defer to secondary
 # ---------------------------------------------------------------------------
 CONTEXT_RI_WINDOW = 5  # context window radius for accumulating neighbor vectors
 CONTEXT_RI_BLEND = 0.9  # blend: this * context_vec + (1-this) * hippo_ngram_vec
+CONTEXT_RI_MAX_PUSH = 0.35  # softer than corpus (0.57), preserves semantic gradients
+CONTEXT_RI_SLOPE_FLOW = 0.40  # moderate flow; sweet spot from 54-combo grid sweep
+CONTEXT_RI_RESIDUAL_ALPHA = 0.0  # post-evolution blend: 0=pure evolved, 1=pure raw frame
 
 # ---------------------------------------------------------------------------
 # Spatial similarity (topology-aware retrieval)
