@@ -508,20 +508,46 @@ results.tsv              Latest benchmark summary (TSV)
 
 See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested reading order.
 
+### Getting Started
+
 | Guide | Description |
 |-------|-------------|
-| [Installation](docs/install.md) | venv setup, platform-specific notes, GPU acceleration, Ollama |
-| [Interactive Demo](docs/demos/demo.html) | See the CA engine in your browser (open as a file, no server) |
+| [Installation](docs/install.md) | Python venv setup, platform-specific GPU notes, Ollama |
+| [Interactive Demo](docs/demos/demo.html) | See the CA engine in your browser (no server needed) |
+
+### Core Guides
+
+| Guide | Description |
+|-------|-------------|
 | [Architecture](docs/architecture.md) | CA dynamics, encoders, three-grid interference, cortex pipeline, chunked storage |
 | [Concepts](docs/concepts.md) | Theoretical foundation, reconstructive recall, semantic vs exact search |
-| [Design Principles](docs/design.md) | The Darman philosophy |
-| [CLI Reference](docs/cli.md) | Every flag documented |
-| [API Reference](docs/api.md) | Python library usage |
-| [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup |
+| [Design Principles](docs/design.md) | The Darman philosophy — why recall is reconstruction, not retrieval |
+
+### Reference
+
+| Guide | Description |
+|-------|-------------|
+| [CLI Reference](docs/cli.md) | Every command and flag documented with examples |
+| [API Reference](docs/api.md) | Python library usage — store, recall, reconstruct, crystallize, decode |
+| [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup, benchmarks |
+
+### Project
+
+| Guide | Description |
+|-------|-------------|
 | [Vision](docs/VISION.md) | Project Ralph — full architecture vision |
 | [Roadmap](docs/future.md) | Active research and planned features |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
+
+### Suggested Reading Order
+
+1. **Installation** — get running
+2. **Concepts** — understand the theory
+3. **Architecture** — understand the implementation
+4. **CLI Reference** — start using it
+5. **API Reference** — integrate into your code
+6. **Design Principles** — understand the philosophy
 
 ---
 

@@ -19,6 +19,9 @@ models/
 # Datasets (large, ~35GB total)
 datasets/
 
+# Hardware reference PDFs (large binaries)
+docs/*.pdf
+
 # Pitch pack generated PDFs
 pitch_pack/output/
 

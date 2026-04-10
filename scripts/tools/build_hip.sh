@@ -7,8 +7,8 @@
 #   bash scripts/build_hip.sh --verify  # rebuild + run CPU vs GPU correctness check
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GPU_DIR="$REPO_DIR/wheeler_memory/gpu"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+GPU_DIR="$REPO_DIR/wheeler_memory/accel/hip"
 LOG="/tmp/wheeler-hip-build.log"
 
 echo "=== Wheeler HIP rebuild $(date) ===" | tee "$LOG"

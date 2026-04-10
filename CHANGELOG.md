@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Bug Fixes
+- **`build_hip.sh` path fix**: Updated `REPO_DIR` traversal (`../..` instead of `..`) and `GPU_DIR` target (`accel/hip` instead of `gpu/`) to match the accel/ directory migration.
+
 ### Features
 - **GPU acceleration directory (`accel/`)**: Migrated HIP kernels from `gpu/` to `accel/hip/` with unified Makefile, shared ctypes helpers (`_common.py`), and clean Python bindings (`accel/ca.py`). `gpu_dynamics.py` is now a thin backwards-compatible shim.
 - **Batch GPU evolution (`evolve_batch()`)**: New function in `dynamics.py` dispatches multiple frames to GPU in a single kernel launch. Wired into all serial call sites: SimLex-999 (`warm_batch()` pre-evolves ~1028 words), `wheeler-bench` (20 test inputs), and crystallization pipeline.
@@ -17,6 +20,7 @@
 - **`accel/` directory**: All accelerator code consolidated under `wheeler_memory/accel/` — HIP kernel sources in `accel/hip/`, Python bindings in `accel/ca.py`, shared helpers in `accel/_common.py`
 - **`npu/` directory**: Intel NPU and Google Coral stubs under `wheeler_memory/npu/` with context docs
 - **`gpu/` deprecated**: Original `gpu/` directory kept read-only for reference, `CONTEXT.md` updated with migration notice
+- **README docs restructure**: Documentation table reorganized into categorized sections (Getting Started, Core Guides, Reference, Project) with suggested reading order
 - Moved `CORTEX_CLASSIFIER_SUMMARY.md`, `CORTEX_CLASSIFIER_FILES.txt` to `docs/reports/`
 - Moved `VERSION_CHANGES.md` to `docs/`
 - Added `.gitignore` patterns for overnight/autoresearch artifacts
