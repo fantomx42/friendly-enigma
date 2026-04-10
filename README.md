@@ -229,15 +229,15 @@ The context-RI encoder is the first native (no pretrained models) encoder to sho
 
 ### Semantic Apple Test
 
-Exclude a concept from its domain, crystallize all neighbours, then query for the excluded concept. Does the topology predict the missing node?
+Exclude a concept from its domain, crystallize all neighbours, then query for the excluded concept. Does the topology predict the missing node? Uses hippocampus encoder on both sides — no external models, pure "it from bit."
 
 | Domain | Verdict | Top Similarity | Embedding Advantage |
 |--------|---------|---------------|---------------------|
-| ML Architecture | **TOPOLOGY** | 0.251 | +0.251 over hash control |
-| Physics | **TOPOLOGY** | 0.328 | +0.325 over hash control |
-| Biology | weak topology | 0.149 | +0.147 over hash control |
+| ML Architecture | **weak topology** | 0.173 | +0.159 over hash control |
+| Physics | silent | 0.077 | +0.069 over hash control |
+| Biology | silent | 0.090 | +0.083 over hash control |
 
-**The system has real geometry, not just lookup.** Quantum entanglement (excluded) fires quantum superposition (top hit, 0.328). Transformer architecture (excluded) fires feed-forward networks and self-attention.
+Hippocampus n-gram encoding produces real signal above the hash control in all domains. ML architecture shows the strongest topology: the holdout "Transformer architecture combines self-attention with feed-forward layers and residual connections" correctly fires feed-forward networks (0.173), layer normalization (0.135), and residual connections (0.106) — the three component concepts named in the holdout. The frontier is in CA dynamics that preserve more of this structure through evolution.
 
 ### Decoder Confidence Gradient
 

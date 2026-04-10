@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.3.2 (2026-04-09)
 
 ### Bug Fixes
+- **Apple test encoder mismatch**: `apple_test_semantic.py` stored with hippocampus but queried with blended encoder — Pearson correlation was noise. Fixed to use hippocampus on both sides ("it from bit" — no external models). ML architecture now reaches WEAK_TOPOLOGY (0.173) honestly.
 - **`build_hip.sh` path fix**: Updated `REPO_DIR` traversal (`../..` instead of `..`) and `GPU_DIR` target (`accel/hip` instead of `gpu/`) to match the accel/ directory migration.
 
 ### Features

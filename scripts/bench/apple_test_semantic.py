@@ -141,7 +141,7 @@ def semantic_apple_test(
         holdout,
         top_k=5,
         data_dir=data_dir,
-        encoder="blended",
+        encoder="hippocampus",
     )
 
     log.append(f"  Recalled {len(hits)} memories:")
