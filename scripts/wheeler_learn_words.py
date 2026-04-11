@@ -45,6 +45,8 @@ def _train_context_ri(args):
         data_dir=args.data_dir,
         window=args.window,
         corpus_path=args.corpus,
+        subsample_t=args.subsample_t,
+        remove_top_k=args.remove_top_k,
     )
 
     save_context_ri_vectors(vectors, vocab, data_dir=args.data_dir)
@@ -90,6 +92,18 @@ def main():
         default=None,
         metavar="FILE",
         help="JSONL corpus file for context-ri training (optional, supplements stored memories)",
+    )
+    parser.add_argument(
+        "--subsample-t",
+        type=float,
+        default=1e-4,
+        help="Word2Vec-style subsampling threshold (default: 1e-4, 0=disable)",
+    )
+    parser.add_argument(
+        "--remove-top-k",
+        type=int,
+        default=1,
+        help="Remove top-k singular components post-training (default: 1, 0=skip)",
     )
     args = parser.parse_args()
 

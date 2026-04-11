@@ -62,6 +62,8 @@ def trained_vectors(small_corpus, tmp_path):
         data_dir=str(tmp_path),
         window=3,
         corpus_path=small_corpus,
+        subsample_t=0,
+        remove_top_k=0,
     )
     save_context_ri_vectors(vectors, vocab, data_dir=str(tmp_path))
     word2idx = {w: i for i, w in enumerate(vocab)}

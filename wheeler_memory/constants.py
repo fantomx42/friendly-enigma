@@ -152,6 +152,8 @@ CONTEXT_RI_BLEND = 0.9  # blend: this * context_vec + (1-this) * hippo_ngram_vec
 CONTEXT_RI_MAX_PUSH = 0.35  # softer than corpus (0.57), preserves semantic gradients
 CONTEXT_RI_SLOPE_FLOW = 0.40  # moderate flow; sweet spot from 54-combo grid sweep
 CONTEXT_RI_RESIDUAL_ALPHA = 0.0  # post-evolution blend: 0=pure evolved, 1=pure raw frame
+CONTEXT_RI_SUBSAMPLE_T = 1e-4  # Word2Vec-style subsampling threshold for frequent words
+CONTEXT_RI_REMOVE_TOP_K = 2  # singular components to remove post-training (0=skip)
 
 # ---------------------------------------------------------------------------
 # Spatial similarity (topology-aware retrieval)

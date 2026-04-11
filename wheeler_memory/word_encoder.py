@@ -30,6 +30,8 @@ from .constants import (
     BLEND_ALPHA,
     CONTEXT_RI_WINDOW,
     CONTEXT_RI_BLEND,
+    CONTEXT_RI_SUBSAMPLE_T,
+    CONTEXT_RI_REMOVE_TOP_K,
 )
 from .hippocampus import EMBED_DIM, FRAME_SIZE, FRAME_CELLS, _get_frame_matrix
 
@@ -464,6 +466,8 @@ def train_context_ri(
     data_dir: str | None = None,
     window: int = CONTEXT_RI_WINDOW,
     corpus_path: str | None = None,
+    subsample_t: float = CONTEXT_RI_SUBSAMPLE_T,
+    remove_top_k: int = CONTEXT_RI_REMOVE_TOP_K,
 ) -> tuple[np.ndarray, list[str]]:
     """Train word context vectors via Random Indexing with hippocampus n-gram index vectors.
 
@@ -472,9 +476,15 @@ def train_context_ri(
     (e.g., "dog" and "canine" both near "bark", "leash", "pet")
     accumulate similar context vectors.
 
+    Includes Word2Vec-style subsampling of frequent words (controlled by
+    subsample_t) and post-hoc decontamination via mean-centering + top-k
+    singular component removal (Mu & Viswanath 2018).
+
     Returns (vectors, vocab) where vectors is (vocab_size, 384) and
     vocab is a sorted list of words.
     """
+    import math
+
     from .hippocampus import _text_to_vector as hippo_vector
 
     texts = _collect_texts(data_dir, corpus_path)
@@ -489,7 +499,26 @@ def train_context_ri(
             index_cache[word] = hippo_vector(word)
         return index_cache[word]
 
-    # Accumulate context vectors
+    # --- Pass 1: count word frequencies for subsampling ---
+    word_freq: dict[str, int] = {}
+    total_tokens = 0
+    for text in texts:
+        for w in _tokenize(text):
+            word_freq[w] = word_freq.get(w, 0) + 1
+            total_tokens += 1
+
+    # Precompute keep probability per word: p = min(1, sqrt(t / freq_ratio))
+    keep_prob: dict[str, float] = {}
+    if subsample_t > 0 and total_tokens > 0:
+        for w, count in word_freq.items():
+            freq_ratio = count / total_tokens
+            keep_prob[w] = min(1.0, math.sqrt(subsample_t / freq_ratio))
+
+    # Deterministic subsampling: use word hash to decide keep/drop per position
+    # (reproducible without RNG state)
+    rng = np.random.RandomState(0x1337CAFE)
+
+    # --- Pass 2: accumulate context vectors with subsampling ---
     context_accum: dict[str, np.ndarray] = {}
 
     for text in texts:
@@ -497,16 +526,29 @@ def train_context_ri(
         if len(words) < 2:
             continue
 
-        for i, target in enumerate(words):
+        # Pre-filter: subsample the token sequence
+        if keep_prob:
+            kept = [
+                w
+                for w in words
+                if rng.random() < keep_prob.get(w, 1.0)
+            ]
+        else:
+            kept = words
+
+        if len(kept) < 2:
+            continue
+
+        for i, target in enumerate(kept):
             start = max(0, i - window)
-            end = min(len(words), i + window + 1)
+            end = min(len(kept), i + window + 1)
 
             if target not in context_accum:
                 context_accum[target] = np.zeros(EMBED_DIM, dtype=np.float32)
 
             for j in range(start, end):
                 if j != i:
-                    context_accum[target] += _get_index_vec(words[j])
+                    context_accum[target] += _get_index_vec(kept[j])
 
     # Build sorted output arrays
     vocab = sorted(context_accum.keys())
@@ -518,6 +560,26 @@ def train_context_ri(
         if norm > 0:
             vectors[idx] = v / norm
 
+    # --- Post-processing: mean-centering + top-k component removal ---
+    if remove_top_k > 0 and len(vectors) > remove_top_k:
+        # Mean-center
+        mean_vec = vectors.mean(axis=0)
+        vectors -= mean_vec
+
+        # Remove top-k singular components (all-but-the-top)
+        from scipy.sparse.linalg import svds
+
+        k = min(remove_top_k, min(vectors.shape) - 1)
+        if k > 0:
+            U, S, Vt = svds(vectors, k=k)
+            # Project out the top-k directions
+            vectors -= (vectors @ Vt.T) @ Vt
+
+        # Re-normalize to unit length
+        norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+        norms = np.maximum(norms, 1e-10)
+        vectors /= norms
+
     return vectors, vocab
 
 
@@ -525,6 +587,8 @@ def save_context_ri_vectors(
     vectors: np.ndarray, vocab: list[str], data_dir: str | None = None
 ) -> None:
     """Save learned context-RI vectors to data_dir / context_ri_vectors.npz."""
+    global _context_ri_vectors, _context_ri_word2idx, _context_ri_checked
+
     if data_dir is None:
         data_dir = str(Path.home() / ".wheeler_memory")
 
@@ -533,6 +597,11 @@ def save_context_ri_vectors(
 
     npz_file = data_path / "context_ri_vectors.npz"
     np.savez(npz_file, vectors=vectors, vocab=np.array(vocab, dtype=object))
+
+    # Invalidate in-process cache so next load picks up new vectors
+    _context_ri_checked = False
+    _context_ri_vectors = None
+    _context_ri_word2idx = {}
 
 
 def load_context_ri_vectors(
