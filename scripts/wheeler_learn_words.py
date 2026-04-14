@@ -10,6 +10,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from wheeler_memory.constants import CONTEXT_RI_REMOVE_TOP_K, CONTEXT_RI_SUBSAMPLE_T
+
 
 def _train_svd(args):
     """Train word vectors via PMI + SVD (original method)."""
@@ -96,14 +98,14 @@ def main():
     parser.add_argument(
         "--subsample-t",
         type=float,
-        default=1e-4,
-        help="Word2Vec-style subsampling threshold (default: 1e-4, 0=disable)",
+        default=CONTEXT_RI_SUBSAMPLE_T,
+        help=f"Word2Vec-style subsampling threshold (default: {CONTEXT_RI_SUBSAMPLE_T}, 0=disable)",
     )
     parser.add_argument(
         "--remove-top-k",
         type=int,
-        default=1,
-        help="Remove top-k singular components post-training (default: 1, 0=skip)",
+        default=CONTEXT_RI_REMOVE_TOP_K,
+        help=f"Remove top-k singular components post-training (default: {CONTEXT_RI_REMOVE_TOP_K}, 0=skip)",
     )
     args = parser.parse_args()
 
