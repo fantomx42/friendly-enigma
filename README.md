@@ -17,7 +17,7 @@ Similar concepts produce similar attractors. Query evolution followed by three-g
 | Component | Role |
 |-----------|------|
 | **Hippocampus Encoder** | Native semantic embedding via character n-gram random indexing (no pretrained models) |
-| **Context-RI Encoder** | Distributional semantics via context-window random indexing (trained on WikiText-103) |
+| **Context-RI Encoder** | Distributional semantics via context-window random indexing (trained on WikiText-103 + OpenWebText, 601M words) |
 | **CA Dynamics** | 3-state evolution to stable attractors |
 | **Cortex** | L1 semantic topology, L2 settlement stability, L3 classifier scoring |
 | **Language Wheeler** | Renders attractor state as text (decoder, not LLM) |
@@ -46,6 +46,18 @@ wheeler-recall "how does attention work in transformers"
 ```
 
 Recall uses three-grid interference scoring by default (corpus + experiential + SCM gating). Add `--no-interference` for Pearson-only mode. Use `--encoder context` for distributional semantics or `--embed` for MiniLM sentence-transformer.
+
+### Train context-RI vectors (distributional semantics)
+
+```bash
+# Download corpora (gitignored — ~3.5GB total)
+python datasets/download_wikitext.py          # WikiText-103 (101M words)
+python datasets/download_openwebtext.py       # OpenWebText subsample (500M words)
+cat datasets/wikitext103.jsonl datasets/openwebtext_500m.jsonl > datasets/combined_corpus.jsonl
+
+# Train context-RI vectors on combined corpus
+python -m scripts.wheeler_learn_words --method context-ri --corpus datasets/combined_corpus.jsonl
+```
 
 ### Pre-train from a corpus
 
@@ -90,7 +102,7 @@ ENCODING PIPELINE
 -----------------
 Text ---> Encoder (--encoder flag, default: blended)
             ├── hippocampus  character n-gram random indexing (native)
-            ├── context      context-window RI (distributional, trained on WikiText-103)
+            ├── context      context-window RI (distributional, 601M words, 2M vocab)
             ├── blended      hippocampus(0.7) + language_wheeler(0.3) ← DEFAULT
             ├── embedding    MiniLM sentence-transformer (requires .[embed])
             └── hash/word/word-blended
@@ -186,7 +198,7 @@ MMLU BENCHMARK MODES
 --mode learn-interference  : Learn + experiential storage + SCM sculpting
 ```
 
-The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Batch evolution via `evolve_batch()` dispatches to GPU when available (71x speedup at batch=1000 on RX 9070 XT); all major call sites (SimLex, benchmarks, crystallization) use batch dispatch. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 (first native encoder with positive semantic signal: SimLex-999 rho = +0.101). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
+The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Batch evolution via `evolve_batch()` dispatches to GPU when available (71x speedup at batch=1000 on RX 9070 XT); all major call sites (SimLex, benchmarks, crystallization) use batch dispatch. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 + OpenWebText (601M words, SimLex-999 rho = +0.255). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
 
 The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
 
@@ -220,12 +232,12 @@ SimLex-999 measures how well an encoder captures genuine semantic similarity (no
 
 | Encoder | Spearman rho | Notes |
 |---------|:------------:|-------|
-| Context-RI (evolved) | **+0.101** | Context-window random indexing, CONTEXT_RI_BLEND=0.9 |
+| Context-RI (evolved) | **+0.255** | Distributional RI, trained on WikiText-103 + OpenWebText (601M words, 2M vocab) |
 | Context-RI (raw frames) | +0.046 | Before CA evolution — CA dynamics partially erode signal |
 | Hippocampus | -0.032 | Character n-grams have no semantic signal (expected) |
 | MiniLM (external ceiling) | +0.446 | Pretrained sentence-transformer, reference only |
 
-The context-RI encoder is the first native (no pretrained models) encoder to show positive semantic signal. Trained on WikiText-103 (1.16M lines, 500K vocab, 384-dim vectors). CA dynamics still erode some signal — ongoing work targets dynamics that amplify rather than degrade distributional structure.
+The context-RI encoder is the first native (no pretrained models) encoder to show positive semantic signal — now at **57% of MiniLM's ceiling**. Trained on WikiText-103 + OpenWebText (1.77M documents, 601M words, 2M vocab, 384-dim vectors). Decontamination via all-but-the-top singular component removal (K=4) and Word2Vec-style subsampling. Per-POS: nouns rho=+0.331, adjectives rho=+0.267, verbs rho=+0.050 (verbs remain the hard case for bag-of-words distributional methods).
 
 ### Semantic Apple Test
 
@@ -497,7 +509,7 @@ docs/                    Technical documentation
 
 plans/                   Research & implementation plans
 pitch_pack/              Investor/developer pitch materials
-datasets/                Training corpora (gitignored, ~35GB)
+datasets/                Training corpora (gitignored, ~4GB: WikiText-103 + OpenWebText)
 program.md               Autoresearch tuning program and constants guide
 results.tsv              Latest benchmark summary (TSV)
 ```

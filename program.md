@@ -126,20 +126,28 @@ Several iterations hit errors (failed commits, failed param edits) and large reg
 **Key result:** CONTEXT_RI_BLEND tuning (manual, pre-overnight) was the real win:
 - CONTEXT_RI_BLEND 0.5 → 0.9 boosted SimLex-999 rho from +0.034 to **+0.101**
 
-### Current Best State (as of 2026-04-08)
-- wheeler-bench score: **0.009** (CA dynamics solved)
-- SimLex-999 context-RI (evolved): rho = **+0.101** (CONTEXT_RI_BLEND=0.9)
-- SimLex-999 context-RI (raw frames): rho = +0.046
+### Current Best State (as of 2026-04-13)
+- wheeler-bench score: **0.011** (CA dynamics solved)
+- SimLex-999 context-RI (evolved): rho = **+0.255** (WikiText-103 + OpenWebText, K=4)
+- SimLex-999 context-RI per-POS: nouns +0.331, adjectives +0.267, verbs +0.050
 - SimLex-999 hippocampus: rho = -0.032 (no semantic signal, expected)
 - SimLex-999 MiniLM (external ceiling): rho = +0.446
 
+### Progress Log
+- **2026-04-08**: CONTEXT_RI_BLEND 0.5→0.9, rho +0.034 → +0.101
+- **2026-04-10**: Decontamination (REMOVE_TOP_K=2), rho +0.101 → +0.220 (+117%)
+- **2026-04-13**: REMOVE_TOP_K sweep → K=4 optimal, rho +0.220 → +0.227 (+3.1%)
+- **2026-04-13**: OpenWebText corpus (500M words), rho +0.227 → +0.255 (+12.3%)
+
 ### Open Problem
-CA evolution still erodes distributional signal (raw +0.046 → evolved +0.034 before blend tuning).
-The aggressive dynamics (MAX_PUSH 0.57, SLOPE_FLOW 0.55) were optimized for convergence quality,
-not signal preservation. Next research direction: find CA dynamics that amplify semantic structure.
+CA evolution still erodes distributional signal. Per-encoder soft dynamics
+(CONTEXT_RI_MAX_PUSH=0.35, CONTEXT_RI_SLOPE_FLOW=0.40) help but don't fully
+preserve raw signal. Verbs remain weak (rho=+0.050) — bag-of-words RI struggles
+with argument structure.
 
 ### Next Sweep Candidates
-- Softer CA dynamics specifically for context-RI frames (lower MAX_PUSH/SLOPE_FLOW)
-- Per-encoder CA parameters (corpus-tight vs context-loose, like experiential)
-- Larger context windows (`CONTEXT_RI_WINDOW` > 5)
-- Richer training corpora beyond WikiText-103
+- ~~Richer training corpora beyond WikiText-103~~ **DONE** (OpenWebText added, +12.3%)
+- Wider context windows (`CONTEXT_RI_WINDOW` 5 → 8-10)
+- Subsampling threshold tuning (`CONTEXT_RI_SUBSAMPLE_T`)
+- CA signal preservation (residual alpha, even softer dynamics)
+- Even larger corpora (full OpenWebText ~8B words, or C4)

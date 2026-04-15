@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.3 (2026-04-13)
+
+### Semantic Improvements
+- **SimLex-999 rho +0.101 → +0.255 (+152%)**: Combined effect of decontamination tuning and richer training corpus. Now at 57% of MiniLM's ceiling (0.446) with zero external models.
+- **Decontamination sweep**: Swept CONTEXT_RI_REMOVE_TOP_K across [0,1,2,3,4,5,6,8]. K=4 is the sweet spot — components 3-4 capture residual frequency bias without stripping semantic signal. Rho +0.220 → +0.227 (+3.1%).
+- **OpenWebText corpus**: Added 500M-word subsample from OpenWebText (609K docs) to complement WikiText-103 (101M words). Combined 601M-word corpus improves noun rho by +18% and adjective rho by +18%.
+
+### Bug Fixes
+- **CLI default mismatch**: `wheeler_learn_words.py --remove-top-k` defaulted to 1, while `constants.py` specified 2. CLI now imports defaults from constants (single source of truth). Also fixed `--subsample-t` default.
+
+### New Files
+- `datasets/download_openwebtext.py` — Streaming HuggingFace download with word-count cap and deterministic seed
+- `scripts/sweep_decontamination.sh` — Reusable sweep script for singular component removal tuning
+- `sweep_decontamination_results.tsv` — Full sweep results (K vs rho)
+
 ## v0.3.2 (2026-04-09)
 
 ### Bug Fixes
