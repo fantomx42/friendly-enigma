@@ -7,7 +7,9 @@ Properties:
   - 64x64 float32 grid, values in [-1, 1].  0 = fully permissive (untested).
   - Hardening: each cell tracks its update count.  Well-tested regions resist
     future change proportional to their update count.
-  - Only the self-consistency feedback loop writes to the SCM.
+  - Two feedback pathways write to the SCM:
+    1. Self-consistency check (coincidence erosion) — opens/closes based on output fidelity.
+    2. Recall-driven feedback — adjusts gate magnitude based on recall quality (κ).
   - The SCM does NOT evolve autonomously (no CA dynamics).
   - Persists across power cycles (numpy files on disk).
 
@@ -25,6 +27,10 @@ from .constants import (
     SCM_GAP_THRESHOLD,
     SCM_HARDENING_FLOOR,
     SCM_LEARNING_RATE,
+    SCM_KAPPA_EMA_RATE,
+    SCM_OPEN_FRACTION_CEIL,
+    SCM_RECALL_LR,
+    SCM_RECALL_UPDATE_CAP,
 )
 
 GRID_SIZE = 64
@@ -38,12 +44,15 @@ class SCMGrid:
         grid: np.ndarray,
         hardening: np.ndarray,
         data_dir: Path,
+        kappa_base: float = 0.0,
     ) -> None:
         self.grid = grid
         self.hardening = hardening
+        self.kappa_base = kappa_base
         self._data_dir = data_dir
         self._grid_path = data_dir / "scm_grid.npy"
         self._hardening_path = data_dir / "scm_hardening.npy"
+        self._kappa_path = data_dir / "scm_kappa_base.npy"
 
     @classmethod
     def load_or_create(cls, data_dir: str | Path | None = None) -> SCMGrid:
@@ -63,7 +72,10 @@ class SCMGrid:
             grid = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.float32)
             hardening = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.uint32)
 
-        return cls(grid=grid, hardening=hardening, data_dir=data_dir)
+        kappa_path = data_dir / "scm_kappa_base.npy"
+        kappa_base = float(np.load(kappa_path)) if kappa_path.exists() else 0.0
+
+        return cls(grid=grid, hardening=hardening, data_dir=data_dir, kappa_base=kappa_base)
 
     def save(self) -> None:
         """Atomic save — write to tmp files, then rename."""
@@ -72,12 +84,15 @@ class SCMGrid:
         # np.save appends .npy if missing, so use a .tmp prefix to avoid that
         tmp_grid = self._grid_path.with_name("_scm_grid_tmp.npy")
         tmp_hard = self._hardening_path.with_name("_scm_hardening_tmp.npy")
+        tmp_kappa = self._kappa_path.with_name("_scm_kappa_base_tmp.npy")
 
         np.save(tmp_grid, self.grid)
         np.save(tmp_hard, self.hardening)
+        np.save(tmp_kappa, np.float64(self.kappa_base))
 
         tmp_grid.replace(self._grid_path)
         tmp_hard.replace(self._hardening_path)
+        tmp_kappa.replace(self._kappa_path)
 
     def update(self, mask: np.ndarray, direction: np.ndarray) -> None:
         """Apply self-consistency feedback to the SCM.
@@ -111,6 +126,88 @@ class SCMGrid:
         self.grid[mask] += direction[mask] * effective_lr
         self.grid = np.clip(self.grid, -1, 1)
         self.hardening[mask] += 1
+
+    def update_from_recall(
+        self,
+        corpus_att: np.ndarray,
+        experiential_att: np.ndarray,
+        kappa: float,
+    ) -> int:
+        """Apply outcome-driven feedback to the SCM based on recall quality.
+
+        ΔM_i = -η · (κ - κ_base) · sign(M_i) · |C_i · X_i|
+
+        When κ > κ_base (good recall), cells where both content grids peaked
+        get driven toward ε_floor (open further — reinforce what worked).
+        When κ < κ_base (bad recall), those cells get driven toward ±1
+        (close — suppress what let noise through).
+
+        Cells where M_i = 0 (untouched by self-consistency) get no update
+        because sign(0) = 0.  Only cells with existing opinions are adjusted.
+
+        Parameters
+        ----------
+        corpus_att : (64, 64) float32 — corpus attractor of the top recalled memory.
+        experiential_att : (64, 64) float32 — experiential attractor (zeros if absent).
+        kappa : float — recall quality score (top interference score).
+
+        Returns
+        -------
+        int — number of cells updated.
+        """
+        # Advantage over rolling baseline
+        advantage = kappa - self.kappa_base
+
+        # Update kappa EMA (always, even if we skip the grid update)
+        self.kappa_base = (
+            (1 - SCM_KAPPA_EMA_RATE) * self.kappa_base
+            + SCM_KAPPA_EMA_RATE * kappa
+        )
+
+        # Homeostasis: if grid is too open, only allow closing (advantage < 0)
+        if self.openness() >= SCM_OPEN_FRACTION_CEIL and advantage > 0:
+            return 0
+
+        # Credit assignment: |C_i · X_i| — only cells in the interference path
+        credit = np.abs(corpus_att * experiential_att)
+
+        # Direction: sign(M_i) — fresh cells (M=0) get sign=0 → no update
+        m_sign = np.sign(self.grid)
+
+        # Mask: cells with existing opinion AND nonzero credit
+        mask = (m_sign != 0) & (credit > 0)
+        if not mask.any():
+            return 0
+
+        # Compute raw deltas
+        delta = np.zeros_like(self.grid)
+        delta[mask] = -SCM_RECALL_LR * advantage * m_sign[mask] * credit[mask]
+
+        # Per-recall cap: Σ|ΔM| ≤ α · N · cap_frac
+        total_delta = np.abs(delta[mask]).sum()
+        cap = SCM_LEARNING_RATE * self.grid.size * SCM_RECALL_UPDATE_CAP
+        if total_delta > cap:
+            delta *= cap / total_delta
+
+        # Apply deltas with sign preservation
+        original_signs = m_sign[mask].copy()
+        new_vals = self.grid[mask] + delta[mask]
+
+        # Prevent sign flip: if update overshoots zero, clamp at ε_floor
+        sign_changed = np.sign(new_vals) != original_signs
+        new_vals = np.where(
+            sign_changed,
+            original_signs * SCM_HARDENING_FLOOR,
+            new_vals,
+        )
+
+        # Clamp |M| ∈ [ε_floor, 1], preserving sign
+        signs = np.sign(new_vals)
+        new_vals = signs * np.clip(np.abs(new_vals), SCM_HARDENING_FLOOR, 1.0)
+
+        self.grid[mask] = new_vals.astype(np.float32)
+
+        return int(mask.sum())
 
     def gap_mask(self, threshold: float = SCM_GAP_THRESHOLD) -> np.ndarray:
         """Boolean mask where |SCM| < threshold — open gaps permitting interference."""

@@ -180,5 +180,11 @@ SCM_HARDENING_FLOOR = 0.001              # minimum update magnitude (never fully
 SCM_GAP_THRESHOLD = 0.3                   # |SCM| below this = open gap (permissive)
 SCM_ANNEAL_RATE = 0.10                    # hardening count decay per sleep cycle (10%)
 
+# SCM recall-driven feedback (outcome → topology)
+SCM_RECALL_LR = 0.015                     # η: recall-driven learning rate (~α/10)
+SCM_KAPPA_EMA_RATE = 0.1                  # EMA smoothing for recall quality baseline
+SCM_RECALL_UPDATE_CAP = 0.05             # per-recall Σ|ΔM| cap as α·N·this
+SCM_OPEN_FRACTION_CEIL = 0.95            # freeze opening updates above this openness
+
 # Interference
 INTERFERENCE_PEAK_THRESHOLD = 0.5         # |value| above this = "peak" in content grid

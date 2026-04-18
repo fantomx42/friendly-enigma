@@ -204,6 +204,196 @@ class TestSCMGridStats:
         assert set(s.keys()) == expected
 
 
+class TestSCMGridRecallFeedback:
+    """update_from_recall() — outcome-driven SCM adjustment."""
+
+    def _seeded_scm(self, tmp_path, scm_value=0.5):
+        """Create an SCM with uniform nonzero grid (has opinions from erosion)."""
+        scm = SCMGrid.load_or_create(tmp_path)
+        scm.grid[:] = scm_value
+        return scm
+
+    def _peaked_attractors(self, peak=0.8):
+        """Return corpus + experiential attractors with strong signal everywhere."""
+        c = np.full((64, 64), peak, dtype=np.float32)
+        x = np.full((64, 64), peak, dtype=np.float32)
+        return c, x
+
+    def test_good_recall_opens_gates(self, tmp_path):
+        """κ > κ_base → cells driven toward ε_floor (|M| decreases)."""
+        scm = self._seeded_scm(tmp_path, 0.5)
+        c, x = self._peaked_attractors()
+        original_abs = np.abs(scm.grid).mean()
+
+        scm.update_from_recall(c, x, kappa=0.8)  # well above baseline 0.0
+
+        assert np.abs(scm.grid).mean() < original_abs
+
+    def test_bad_recall_closes_gates(self, tmp_path):
+        """κ < κ_base → cells driven toward ±1 (|M| increases)."""
+        scm = self._seeded_scm(tmp_path, 0.3)
+        scm.kappa_base = 0.5  # set baseline above what we'll feed
+        c, x = self._peaked_attractors()
+        original_abs = np.abs(scm.grid).mean()
+
+        scm.update_from_recall(c, x, kappa=0.1)  # below baseline
+
+        assert np.abs(scm.grid).mean() > original_abs
+
+    def test_fresh_grid_no_update(self, tmp_path):
+        """M_i = 0 everywhere → sign(0) = 0 → no cells updated."""
+        scm = SCMGrid.load_or_create(tmp_path)  # all zeros
+        c, x = self._peaked_attractors()
+
+        count = scm.update_from_recall(c, x, kappa=0.5)
+
+        assert count == 0
+        np.testing.assert_array_equal(scm.grid, 0.0)
+
+    def test_sign_preservation(self, tmp_path):
+        """Update never flips sign of M_i — positive stays positive."""
+        scm = self._seeded_scm(tmp_path, 0.02)  # small positive, near zero
+        c, x = self._peaked_attractors()
+
+        # Large advantage should try to push M toward 0, but not past it
+        scm.update_from_recall(c, x, kappa=10.0)
+
+        assert (scm.grid > 0).all(), "Sign must not flip"
+
+    def test_sign_preservation_negative(self, tmp_path):
+        """Negative M cells stay negative after opening update."""
+        scm = self._seeded_scm(tmp_path, -0.02)
+        c, x = self._peaked_attractors()
+
+        scm.update_from_recall(c, x, kappa=10.0)
+
+        assert (scm.grid < 0).all(), "Negative sign must not flip"
+
+    def test_epsilon_floor_clamp(self, tmp_path):
+        """After update, |M_i| never falls below SCM_HARDENING_FLOOR."""
+        from wheeler_memory.constants import SCM_HARDENING_FLOOR
+
+        scm = self._seeded_scm(tmp_path, 0.002)  # barely above floor
+        c, x = self._peaked_attractors()
+
+        scm.update_from_recall(c, x, kappa=1.0)  # strong opening signal
+
+        updated = scm.grid[scm.grid != 0]
+        assert (np.abs(updated) >= SCM_HARDENING_FLOOR - 1e-9).all()
+
+    def test_per_recall_cap(self, tmp_path):
+        """Total |ΔM| is bounded by α · N · cap_frac."""
+        from wheeler_memory.constants import (
+            SCM_LEARNING_RATE,
+            SCM_RECALL_UPDATE_CAP,
+        )
+
+        scm = self._seeded_scm(tmp_path, 0.5)
+        c, x = self._peaked_attractors()
+        before = scm.grid.copy()
+
+        # Extreme advantage to trigger the cap
+        scm.update_from_recall(c, x, kappa=100.0)
+
+        total_delta = np.abs(scm.grid - before).sum()
+        cap = SCM_LEARNING_RATE * scm.grid.size * SCM_RECALL_UPDATE_CAP
+        assert total_delta <= cap + 1e-4, f"Total Δ {total_delta:.4f} exceeds cap {cap:.4f}"
+
+    def test_openness_ceiling_blocks_opening(self, tmp_path):
+        """When openness >= SCM_OPEN_FRACTION_CEIL, opening updates are frozen."""
+        from wheeler_memory.constants import SCM_OPEN_FRACTION_CEIL
+
+        scm = SCMGrid.load_or_create(tmp_path)
+        # Set a few cells nonzero but keep openness above ceiling
+        scm.grid[0, 0] = 0.1  # below gap threshold → still counts as open
+        assert scm.openness() >= SCM_OPEN_FRACTION_CEIL
+
+        c, x = self._peaked_attractors()
+        before = scm.grid.copy()
+
+        count = scm.update_from_recall(c, x, kappa=1.0)  # positive advantage
+
+        assert count == 0
+        np.testing.assert_array_equal(scm.grid, before)
+
+    def test_openness_ceiling_allows_closing(self, tmp_path):
+        """Closing updates (κ < κ_base) still work above the openness ceiling."""
+        scm = SCMGrid.load_or_create(tmp_path)
+        scm.grid[0, 0] = 0.1
+        scm.kappa_base = 0.5  # above what we'll feed
+        c, x = self._peaked_attractors()
+
+        count = scm.update_from_recall(c, x, kappa=0.1)  # negative advantage
+
+        # Cell [0,0] should have been pushed further from zero
+        assert count >= 1
+
+    def test_kappa_ema_tracking(self, tmp_path):
+        """kappa_base converges toward repeated κ values."""
+        scm = self._seeded_scm(tmp_path)
+        c, x = self._peaked_attractors()
+
+        for _ in range(50):
+            scm.update_from_recall(c, x, kappa=0.6)
+
+        assert scm.kappa_base == pytest.approx(0.6, abs=0.01)
+
+    def test_kappa_ema_updates_even_on_skip(self, tmp_path):
+        """EMA updates even when grid update is skipped (fresh grid)."""
+        scm = SCMGrid.load_or_create(tmp_path)  # all zeros → no grid update
+        c, x = self._peaked_attractors()
+
+        scm.update_from_recall(c, x, kappa=0.5)
+
+        assert scm.kappa_base > 0.0
+
+    def test_kappa_base_persistence(self, tmp_path):
+        """kappa_base survives save/load round-trip."""
+        scm = self._seeded_scm(tmp_path)
+        c, x = self._peaked_attractors()
+        scm.update_from_recall(c, x, kappa=0.7)
+        scm.save()
+
+        loaded = SCMGrid.load_or_create(tmp_path)
+        assert loaded.kappa_base == pytest.approx(scm.kappa_base)
+
+    def test_no_credit_no_update(self, tmp_path):
+        """Zero attractors → |C·X| = 0 everywhere → no cells updated."""
+        scm = self._seeded_scm(tmp_path, 0.5)
+        c = np.zeros((64, 64), dtype=np.float32)
+        x = np.zeros((64, 64), dtype=np.float32)
+
+        count = scm.update_from_recall(c, x, kappa=0.8)
+
+        assert count == 0
+
+    def test_returns_cell_count(self, tmp_path):
+        """Return value is the number of cells that were updated."""
+        scm = self._seeded_scm(tmp_path, 0.5)
+        c, x = self._peaked_attractors()
+
+        count = scm.update_from_recall(c, x, kappa=0.5)
+
+        # All 64*64 cells have M≠0 and C*X≠0, so all should be in the mask
+        assert count == 64 * 64
+
+    def test_partial_credit(self, tmp_path):
+        """Only cells where BOTH attractors have signal get updated."""
+        scm = self._seeded_scm(tmp_path, 0.5)
+        c = np.full((64, 64), 0.8, dtype=np.float32)
+        x = np.zeros((64, 64), dtype=np.float32)
+        # Only top-left quadrant has experiential signal
+        x[:32, :32] = 0.8
+
+        before = scm.grid.copy()
+        scm.update_from_recall(c, x, kappa=0.8)
+
+        # Bottom-right should be unchanged (no credit)
+        np.testing.assert_array_equal(scm.grid[32:, 32:], before[32:, 32:])
+        # Top-left should have changed
+        assert not np.array_equal(scm.grid[:32, :32], before[:32, :32])
+
+
 class TestSCMGridRepr:
     """__repr__() formatting."""
 

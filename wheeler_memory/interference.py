@@ -234,7 +234,7 @@ def recall_with_interference(
         # Load corpus attractor
         corpus_path = chunk_dir / "attractors" / f"{hex_key}.npy"
         if not corpus_path.exists():
-            scored.append((hit.get("similarity", 0.0), ABSORBED, hit))
+            scored.append((hit.get("similarity", 0.0), ABSORBED, hit, None, None))
             continue
         stored_corpus = np.load(corpus_path)
 
@@ -252,7 +252,7 @@ def recall_with_interference(
         hit["unconsolidated_frac"] = round(ir.unconsolidated_fraction, 3)
         hit["contested_frac"] = round(ir.contested_fraction, 3)
         hit["signal_strength"] = round(ir.signal_strength, 3)
-        scored.append((score, state, hit))
+        scored.append((score, state, hit, stored_corpus, stored_exp))
 
     # Step 4: re-rank by interference score, take top_k
     scored.sort(key=lambda x: -x[0])
@@ -260,9 +260,17 @@ def recall_with_interference(
 
     # Dominant state across top results
     state_counts: dict[str, int] = {}
-    for _, st, _ in scored[:top_k]:
+    for _, st, _, _, _ in scored[:top_k]:
         state_counts[st] = state_counts.get(st, 0) + 1
     dominant = max(state_counts, key=state_counts.get) if state_counts else SILENT
+
+    # Step 5: recall-driven SCM feedback from top result
+    if scored:
+        top_score, _, _, top_corpus, top_exp = scored[0]
+        if top_corpus is not None:
+            top_exp_safe = top_exp if top_exp is not None else np.zeros_like(top_corpus)
+            scm.update_from_recall(top_corpus, top_exp_safe, top_score)
+            scm.save()
 
     return results, dominant, scm.openness()
 
