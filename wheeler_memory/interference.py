@@ -298,7 +298,7 @@ def self_consistency_check(
     the output is self-consistent → open SCM gaps (reinforce).
     If it diverges → close SCM gaps (restrict hallucination).
 
-    This is the ONLY function that writes to the SCM grid.
+    One of two functions that writes to the SCM grid; see also ``SCMGrid.update_from_recall``.
     """
     from scipy.stats import pearsonr
 

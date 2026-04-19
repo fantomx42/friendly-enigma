@@ -393,6 +393,17 @@ class TestSCMGridRecallFeedback:
         # Top-left should have changed
         assert not np.array_equal(scm.grid[:32, :32], before[:32, :32])
 
+    def test_cold_start_negative_advantage_seeds_grid(self, tmp_path):
+        """Fresh grid + bad recall → seeds closing opinions at high-credit cells."""
+        scm = SCMGrid.load_or_create(tmp_path)  # all zeros
+        scm.kappa_base = 0.5  # simulate accumulated history
+        c, x = self._peaked_attractors()
+
+        count = scm.update_from_recall(c, x, kappa=0.1)  # advantage = -0.4
+
+        assert count > 0
+        assert np.any(scm.grid > 0)  # closing opinions seeded
+
 
 class TestSCMGridRepr:
     """__repr__() formatting."""

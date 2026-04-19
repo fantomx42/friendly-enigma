@@ -271,3 +271,92 @@ class TestAgentRecallInterference:
 
         parsed = json.loads(result)
         assert "interference_score" not in parsed["results"][0]
+
+
+# ── self_consistency_check tests ─────────────────────────────────────────────
+
+
+class TestSelfConsistencyCheck:
+    """self_consistency_check() — re-encode output, check basin convergence, update SCM."""
+
+    def _corpus_att(self, text: str) -> np.ndarray:
+        from wheeler_memory.constants import CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW
+        from wheeler_memory.dynamics import evolve_with_params
+        from wheeler_memory.rotation import _get_frame_fn
+
+        frame = _get_frame_fn(encoder="hash")(text)
+        return evolve_with_params(frame, CORPUS_MAX_PUSH, CORPUS_SLOPE_FLOW)["attractor"]
+
+    def test_same_text_synthesis(self, tmp_path):
+        """Re-encoding the same text → same basin → SYNTHESIS."""
+        from wheeler_memory.interference import self_consistency_check
+        from wheeler_memory.scm_grid import SCMGrid
+
+        text = "the quick brown fox jumps over the lazy dog"
+        corpus_att = self._corpus_att(text)
+        scm = SCMGrid.load_or_create(tmp_path)
+
+        cr = self_consistency_check(text, corpus_att, None, scm, encoder="hash")
+
+        assert cr.consistent
+        assert cr.classification == "SYNTHESIS"
+
+    def test_different_text_not_synthesis(self, tmp_path):
+        """Different text → divergent basin → not SYNTHESIS."""
+        from wheeler_memory.interference import self_consistency_check
+        from wheeler_memory.scm_grid import SCMGrid
+
+        corpus_att = self._corpus_att("the quick brown fox jumps over the lazy dog")
+        scm = SCMGrid.load_or_create(tmp_path)
+
+        cr = self_consistency_check(
+            "quantum entanglement superconductor photon", corpus_att, None, scm, encoder="hash"
+        )
+
+        assert not cr.consistent
+        assert cr.classification != "SYNTHESIS"
+
+    def test_cells_updated_nonzero(self, tmp_path):
+        """Corpus peaks always exist → cells_updated > 0."""
+        from wheeler_memory.interference import self_consistency_check
+        from wheeler_memory.scm_grid import SCMGrid
+
+        text = "memory consolidation during sleep"
+        corpus_att = self._corpus_att(text)
+        scm = SCMGrid.load_or_create(tmp_path)
+
+        cr = self_consistency_check(text, corpus_att, None, scm, encoder="hash")
+
+        assert cr.cells_updated > 0
+
+    def test_consistent_opens_gaps(self, tmp_path):
+        """Consistent output drives SCM cells toward open (direction=-1)."""
+        from wheeler_memory.interference import self_consistency_check
+        from wheeler_memory.scm_grid import SCMGrid
+
+        text = "the quick brown fox jumps over the lazy dog"
+        corpus_att = self._corpus_att(text)
+        scm = SCMGrid.load_or_create(tmp_path)
+        scm.grid[:] = 0.2  # pre-seed as partially closed
+
+        cr = self_consistency_check(text, corpus_att, None, scm, encoder="hash")
+
+        if cr.consistent:
+            # Peak cells were driven negative (opened from 0.2)
+            assert scm.grid.min() < 0.2
+
+    def test_inconsistent_closes_gaps(self, tmp_path):
+        """Inconsistent output drives SCM cells toward closed (direction=+1)."""
+        from wheeler_memory.interference import self_consistency_check
+        from wheeler_memory.scm_grid import SCMGrid
+
+        corpus_att = self._corpus_att("the quick brown fox jumps over the lazy dog")
+        scm = SCMGrid.load_or_create(tmp_path)
+
+        cr = self_consistency_check(
+            "quantum entanglement superconductor photon", corpus_att, None, scm, encoder="hash"
+        )
+
+        if not cr.consistent:
+            # Peak cells were pushed positive (closed from 0)
+            assert scm.grid.max() > 0
