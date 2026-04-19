@@ -171,8 +171,17 @@ class SCMGrid:
         # Credit assignment: |C_i · X_i| — only cells in the interference path
         credit = np.abs(corpus_att * experiential_att)
 
-        # Direction: sign(M_i) — fresh cells (M=0) get sign=0 → no update
+        # Direction: sign(M_i) — fresh cells (M=0) get sign=0 → no update by default
         m_sign = np.sign(self.grid)
+
+        # Cold-start: if no opinions exist yet and recall is poor, seed closing opinions
+        # at high-credit cells so subsequent feedback has opinions to adjust.
+        # (Positive-advantage seeding is unreachable: homeostasis blocks it for fresh grids.)
+        if not np.any(m_sign != 0) and advantage < 0 and (credit > 0).any():
+            threshold = float(np.percentile(credit[credit > 0], 75))
+            seed_mask = credit >= threshold
+            self.grid[seed_mask] = SCM_HARDENING_FLOOR
+            m_sign = np.sign(self.grid)
 
         # Mask: cells with existing opinion AND nonzero credit
         mask = (m_sign != 0) & (credit > 0)
