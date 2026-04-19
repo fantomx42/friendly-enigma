@@ -264,7 +264,9 @@ def recall_with_interference(
         state_counts[st] = state_counts.get(st, 0) + 1
     dominant = max(state_counts, key=state_counts.get) if state_counts else SILENT
 
-    # Step 5: recall-driven SCM feedback from top result
+    # Step 5: recall-driven SCM feedback — top recall score is κ; adjusts
+    # gate magnitude for cells where both grids had signal (credit > 0).
+    # Cold-start: if grid is fresh and κ < κ_base, seeds closing opinions.
     if scored:
         top_score, _, _, top_corpus, top_exp = scored[0]
         if top_corpus is not None:

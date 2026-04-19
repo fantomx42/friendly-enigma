@@ -142,8 +142,11 @@ class SCMGrid:
         When κ < κ_base (bad recall), those cells get driven toward ±1
         (close — suppress what let noise through).
 
-        Cells where M_i = 0 (untouched by self-consistency) get no update
-        because sign(0) = 0.  Only cells with existing opinions are adjusted.
+        Cells where M_i = 0 (untouched by self-consistency) are normally
+        skipped (sign(0) = 0).  Exception: on the very first bad recall
+        (negative advantage, fully-fresh grid) the top-quartile credit cells
+        are seeded with a minimal closing opinion so subsequent feedback has
+        opinions to adjust.  See cold-start block below.
 
         Parameters
         ----------

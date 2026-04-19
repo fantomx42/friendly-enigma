@@ -340,7 +340,7 @@ class TestSCMGridRecallFeedback:
 
     def test_kappa_ema_updates_even_on_skip(self, tmp_path):
         """EMA updates even when grid update is skipped (fresh grid)."""
-        scm = SCMGrid.load_or_create(tmp_path)  # all zeros → no grid update
+        scm = SCMGrid.load_or_create(tmp_path)  # positive advantage → homeostasis blocks
         c, x = self._peaked_attractors()
 
         scm.update_from_recall(c, x, kappa=0.5)
