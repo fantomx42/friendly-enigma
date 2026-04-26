@@ -198,8 +198,13 @@ class TestSCMGridStats:
         scm = SCMGrid.load_or_create(tmp_path)
         s = scm.stats()
         expected = {
-            "openness", "mean_abs_scm", "max_abs_scm",
-            "mean_hardening", "max_hardening", "hardened_cells", "closed_cells",
+            "openness",
+            "mean_abs_scm",
+            "max_abs_scm",
+            "mean_hardening",
+            "max_hardening",
+            "hardened_cells",
+            "closed_cells",
         }
         assert set(s.keys()) == expected
 
@@ -297,7 +302,9 @@ class TestSCMGridRecallFeedback:
 
         total_delta = np.abs(scm.grid - before).sum()
         cap = SCM_LEARNING_RATE * scm.grid.size * SCM_RECALL_UPDATE_CAP
-        assert total_delta <= cap + 1e-4, f"Total Δ {total_delta:.4f} exceeds cap {cap:.4f}"
+        assert total_delta <= cap + 1e-4, (
+            f"Total Δ {total_delta:.4f} exceeds cap {cap:.4f}"
+        )
 
     def test_openness_ceiling_blocks_opening(self, tmp_path):
         """When openness >= SCM_OPEN_FRACTION_CEIL, opening updates are frozen."""
@@ -414,3 +421,91 @@ class TestSCMGridRepr:
         r = repr(scm)
         assert "SCMGrid" in r
         assert "openness" in r
+
+
+class TestSCMTelemetry:
+    """JSONL telemetry on grid-modifying paths."""
+
+    EXPECTED_KEYS = {
+        "step",
+        "source",
+        "grad_mag_mean",
+        "grad_mag_max",
+        "scm_entropy",
+        "attractor_count",
+        "alive_fraction",
+    }
+
+    def _read_rows(self, tmp_path):
+        import json
+
+        path = tmp_path / "scm_telemetry.jsonl"
+        assert path.exists(), "telemetry file should be created"
+        return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+    def test_update_emits_self_consistency_row(self, tmp_path):
+        scm = SCMGrid.load_or_create(tmp_path)
+        mask = np.zeros((64, 64), dtype=bool)
+        mask[5, 5] = True
+        scm.update(mask, np.float32(1.0))
+
+        rows = self._read_rows(tmp_path)
+        assert len(rows) == 1
+        row = rows[0]
+        assert set(row.keys()) == self.EXPECTED_KEYS
+        assert row["source"] == "self_consistency"
+        assert row["step"] == 1
+        assert row["grad_mag_max"] > 0.0  # one cell moved
+
+    def test_update_from_recall_emits_recall_gradient_row(self, tmp_path):
+        scm = SCMGrid.load_or_create(tmp_path)
+        scm.grid[:] = 0.5  # nonzero so the gradient applies
+        c = np.full((64, 64), 0.8, dtype=np.float32)
+        x = np.full((64, 64), 0.8, dtype=np.float32)
+        scm.update_from_recall(c, x, kappa=0.8)
+
+        rows = self._read_rows(tmp_path)
+        assert len(rows) == 1
+        row = rows[0]
+        assert set(row.keys()) == self.EXPECTED_KEYS
+        assert row["source"] == "recall_gradient"
+        assert row["step"] == 1
+        assert row["grad_mag_max"] > 0.0
+
+    def test_step_counter_shared_across_methods(self, tmp_path):
+        scm = SCMGrid.load_or_create(tmp_path)
+        scm.grid[:] = 0.5
+        mask = np.zeros((64, 64), dtype=bool)
+        mask[0, 0] = True
+        c = np.full((64, 64), 0.8, dtype=np.float32)
+        x = np.full((64, 64), 0.8, dtype=np.float32)
+
+        scm.update(mask, np.float32(1.0))
+        scm.update_from_recall(c, x, kappa=0.8)
+        scm.update(mask, np.float32(-1.0))
+
+        rows = self._read_rows(tmp_path)
+        assert [r["step"] for r in rows] == [1, 2, 3]
+        assert [r["source"] for r in rows] == [
+            "self_consistency",
+            "recall_gradient",
+            "self_consistency",
+        ]
+
+    def test_no_op_paths_still_emit(self, tmp_path):
+        """Empty mask and homeostasis-ceiling skip both emit zero-delta rows."""
+        scm = SCMGrid.load_or_create(tmp_path)
+        empty_mask = np.zeros((64, 64), dtype=bool)
+        scm.update(empty_mask, np.float32(1.0))
+
+        # Fresh grid → sign(M)=0 everywhere → mask empty → recall no-op
+        c = np.full((64, 64), 0.8, dtype=np.float32)
+        x = np.full((64, 64), 0.8, dtype=np.float32)
+        scm.update_from_recall(c, x, kappa=0.5)
+
+        rows = self._read_rows(tmp_path)
+        assert len(rows) == 2
+        assert rows[0]["source"] == "self_consistency"
+        assert rows[0]["grad_mag_max"] == 0.0
+        assert rows[1]["source"] == "recall_gradient"
+        assert rows[1]["grad_mag_max"] == 0.0

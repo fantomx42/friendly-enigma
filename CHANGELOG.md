@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.3.4 (2026-04-26)
+
+### SCM Telemetry + Gradient Observability
+
+- **Per-step JSONL telemetry** (`scm_telemetry.jsonl`): Every call to `SCMGrid.update()` or `SCMGrid.update_from_recall()` appends one row with `step`, `source`, `grad_mag_mean`, `grad_mag_max`, `scm_entropy` (20-bin histogram), `attractor_count` (BFS connected components on |SCM|>0.1), and `alive_fraction` (|SCM|>ALIVE_THRESHOLD). Telemetry path defaults to `<data_dir>/scm_telemetry.jsonl`; injectable via `SCMGrid.load_or_create(telemetry_path=...)`.
+- **Shared monotonic step counter** (`_step_count`): Both update paths increment the same counter, giving a global ordering of grid-modifying events in the JSONL stream.
+- **No-op paths still emit**: Empty-mask `update()` and homeostasis-ceiling-blocked `update_from_recall()` both emit a zero-delta row (grad_mag_max=0.0) so the stream is continuous.
+- **Telemetry is fault-tolerant**: Write errors are silently caught — telemetry never crashes the engine.
+
+### Gradient Sanity Test
+
+- **`tests/test_scm_gradient_direction.py`**: One-step sanity check that `update_from_recall` moves the SCM toward its analytical fixed point under positive advantage. Uses S_perturbed = 0.5·sign(rng) + 0.1·noise to ensure openness < SCM_OPEN_FRACTION_CEIL (avoids homeostasis guard) and S_good = ε_floor·sign(S_perturbed) as the true attractor. Must pass before the closed-loop A/B is valid.
+
+### Closed-Loop A/B Evaluation
+
+- **`scripts/scm_ab_eval.py`**: 50-passage closed-loop A/B comparing three recall arms — Pearson baseline, frozen SCM (zeros, never updated), and learning SCM (accumulates from each recall outcome). Corpus from `datasets/arc.jsonl`, hippocampus encoder, Q-prefix queries.
+- **Experiential storage**: Each passage stored in both corpus and experiential grids so the spatial answer equation `Answer(i,j) = Corpus(i,j) * Experiential(i,j) * (1 - |SCM(i,j)|)` activates. Without experiential, frozen/learning arms collapse to scalar Pearson-identical ranking.
+- **Bug fix**: `_store_experiential` previously called `store_memory(..., grid='experiential')` which overwrote the corpus index entry with `"grid": "experiential"` — causing `recall_memory` to skip every passage (line 305-306 of storage.py skips experiential-tagged entries). Fixed by writing the experiential npy directly without touching `index.json`.
+- **Metrics**: Recall@1, Recall@3, MRR, mean_top1_score, mean_correct_score, mean_score_gap, SCM openness trajectory. JSONL output to `results/scm_ab_eval_<timestamp>.jsonl`.
+- **Design finding**: A fresh all-zeros SCM cannot be differentiated by `update_from_recall` alone — the `sign(M)` gate means only cells with existing opinions are adjusted. The learning SCM requires self-consistency feedback (`update()`) to seed initial opinions before recall-driven gradient can tune them.
+
+### Tests
+
+- Added `tests/test_scm_gradient_direction.py` (1 test): gradient direction sanity check
+- Added `TestSCMTelemetry` class to `tests/test_scm_grid.py` (4 tests): self_consistency emission, recall_gradient emission, shared step counter, no-op path emission
+
 ## v0.3.3 (2026-04-13)
 
 ### Semantic Improvements

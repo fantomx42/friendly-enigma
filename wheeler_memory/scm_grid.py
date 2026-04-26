@@ -18,11 +18,13 @@ Answer equation: Answer(i,j) = Corpus(i,j) * Experiential(i,j) * (1 - |SCM(i,j)|
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
 
 from .constants import (
+    ALIVE_THRESHOLD,
     SCM_ANNEAL_RATE,
     SCM_GAP_THRESHOLD,
     SCM_HARDENING_FLOOR,
@@ -45,6 +47,7 @@ class SCMGrid:
         hardening: np.ndarray,
         data_dir: Path,
         kappa_base: float = 0.0,
+        telemetry_path: Path | None = None,
     ) -> None:
         self.grid = grid
         self.hardening = hardening
@@ -53,9 +56,15 @@ class SCMGrid:
         self._grid_path = data_dir / "scm_grid.npy"
         self._hardening_path = data_dir / "scm_hardening.npy"
         self._kappa_path = data_dir / "scm_kappa_base.npy"
+        self._telemetry_path = telemetry_path or (data_dir / "scm_telemetry.jsonl")
+        self._step_count: int = 0
 
     @classmethod
-    def load_or_create(cls, data_dir: str | Path | None = None) -> SCMGrid:
+    def load_or_create(
+        cls,
+        data_dir: str | Path | None = None,
+        telemetry_path: Path | None = None,
+    ) -> SCMGrid:
         """Load an existing SCM grid from disk, or initialize to zeros (fully permissive)."""
         if data_dir is None:
             data_dir = Path.home() / ".wheeler_memory"
@@ -75,7 +84,13 @@ class SCMGrid:
         kappa_path = data_dir / "scm_kappa_base.npy"
         kappa_base = float(np.load(kappa_path)) if kappa_path.exists() else 0.0
 
-        return cls(grid=grid, hardening=hardening, data_dir=data_dir, kappa_base=kappa_base)
+        return cls(
+            grid=grid,
+            hardening=hardening,
+            data_dir=data_dir,
+            kappa_base=kappa_base,
+            telemetry_path=telemetry_path,
+        )
 
     def save(self) -> None:
         """Atomic save — write to tmp files, then rename."""
@@ -110,7 +125,11 @@ class SCMGrid:
         many prior updates resist further change.  The learning rate floor
         ensures updates never reach absolute zero.
         """
+        self._step_count += 1
+        pre_grid = self.grid.copy()
+
         if not mask.any():
+            self._emit_telemetry("self_consistency", pre_grid)
             return
 
         direction = np.broadcast_to(
@@ -126,6 +145,8 @@ class SCMGrid:
         self.grid[mask] += direction[mask] * effective_lr
         self.grid = np.clip(self.grid, -1, 1)
         self.hardening[mask] += 1
+
+        self._emit_telemetry("self_consistency", pre_grid)
 
     def update_from_recall(
         self,
@@ -155,17 +176,20 @@ class SCMGrid:
         -------
         int — number of cells updated.
         """
+        self._step_count += 1
+        pre_grid = self.grid.copy()
+
         # Advantage over rolling baseline
         advantage = kappa - self.kappa_base
 
         # Update kappa EMA (always, even if we skip the grid update)
         self.kappa_base = (
-            (1 - SCM_KAPPA_EMA_RATE) * self.kappa_base
-            + SCM_KAPPA_EMA_RATE * kappa
-        )
+            1 - SCM_KAPPA_EMA_RATE
+        ) * self.kappa_base + SCM_KAPPA_EMA_RATE * kappa
 
         # Homeostasis: if grid is too open, only allow closing (advantage < 0)
         if self.openness() >= SCM_OPEN_FRACTION_CEIL and advantage > 0:
+            self._emit_telemetry("recall_gradient", pre_grid)
             return 0
 
         # Credit assignment: |C_i · X_i| — only cells in the interference path
@@ -186,6 +210,7 @@ class SCMGrid:
         # Mask: cells with existing opinion AND nonzero credit
         mask = (m_sign != 0) & (credit > 0)
         if not mask.any():
+            self._emit_telemetry("recall_gradient", pre_grid)
             return 0
 
         # Compute raw deltas
@@ -216,7 +241,37 @@ class SCMGrid:
 
         self.grid[mask] = new_vals.astype(np.float32)
 
+        self._emit_telemetry("recall_gradient", pre_grid)
         return int(mask.sum())
+
+    def _emit_telemetry(self, source: str, pre_grid: np.ndarray) -> None:
+        from .dynamics import _count_clusters
+
+        delta = self.grid - pre_grid
+        hist, _ = np.histogram(self.grid, bins=20, range=(-1.0, 1.0))
+        total = hist.sum()
+        if total > 0:
+            p = hist / total
+            entropy = float(-(p * np.log2(p + 1e-12)).sum())
+        else:
+            entropy = 0.0
+
+        row = {
+            "step": self._step_count,
+            "source": source,
+            "grad_mag_mean": float(np.abs(delta).mean()),
+            "grad_mag_max": float(np.abs(delta).max()),
+            "scm_entropy": entropy,
+            "attractor_count": int(_count_clusters(np.abs(self.grid) > 0.1)),
+            "alive_fraction": float((np.abs(self.grid) > ALIVE_THRESHOLD).mean()),
+        }
+
+        try:
+            self._telemetry_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._telemetry_path, "a") as f:
+                f.write(json.dumps(row) + "\n")
+        except OSError:
+            pass
 
     def gap_mask(self, threshold: float = SCM_GAP_THRESHOLD) -> np.ndarray:
         """Boolean mask where |SCM| < threshold — open gaps permitting interference."""

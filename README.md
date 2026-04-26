@@ -131,7 +131,10 @@ Grid 1: CORPUS (Cold)           Grid 2: EXPERIENTIAL (Hot)
               - 64x64 persistent trust topology
               - WHERE interference is permitted
               - Hardening: early updates have outsized influence
-              - Only written by self-consistency feedback loop
+              - Two feedback pathways:
+                  update()             — self-consistency sculpting (primary writer)
+                  update_from_recall() — outcome-driven κ adjustment (tuning layer)
+              - Per-step JSONL telemetry → scm_telemetry.jsonl (v0.3.4)
 
 Four Interference States:
   GROUNDED       Corpus peak + Experiential peak + SCM open
@@ -201,6 +204,8 @@ MMLU BENCHMARK MODES
 The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Batch evolution via `evolve_batch()` dispatches to GPU when available (71x speedup at batch=1000 on RX 9070 XT); all major call sites (SimLex, benchmarks, crystallization) use batch dispatch. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 + OpenWebText (601M words, SimLex-999 rho = +0.255). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
 
 The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
+
+As of v0.3.4, every SCM grid event emits a JSONL row to `scm_telemetry.jsonl` (gradient magnitude, entropy, connected-component count, alive fraction, event source). A closed-loop A/B evaluation script (`scripts/scm_ab_eval.py`) validates recall quality across Pearson, frozen-SCM, and learning-SCM arms.
 
 ---
 
