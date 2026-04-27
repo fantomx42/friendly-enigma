@@ -205,7 +205,7 @@ The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`
 
 The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
 
-As of v0.3.4, every SCM grid event emits a JSONL row to `scm_telemetry.jsonl` (gradient magnitude, entropy, connected-component count, alive fraction, event source). A closed-loop A/B evaluation script (`scripts/scm_ab_eval.py`) validates recall quality across Pearson, frozen-SCM, and learning-SCM arms.
+As of v0.3.4, every SCM grid event emits a JSONL row to `scm_telemetry.jsonl` (gradient magnitude, entropy, connected-component count, alive fraction, event source). A closed-loop A/B evaluation script (`scripts/scm_ab_eval.py`) validates recall quality across Pearson, frozen-SCM, and learning-SCM arms using a two-phase design: warmup (exact queries to settle kappa_base) + paraphrase eval (content-word-shuffled queries to trigger seeding via negative advantage). As of v0.3.5, the cold-start seeding path is verified by a spatial alignment test (`test_cold_start_spatial_alignment`), and an architectural issue has been identified: `interference_score` currently collapses the 64×64 SCM to a global scalar mean_openness, making rank ordering identical between frozen and learning arms regardless of SCM state. The fix (spatial product per candidate) is tracked in the roadmap.
 
 ---
 

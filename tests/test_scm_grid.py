@@ -411,6 +411,37 @@ class TestSCMGridRecallFeedback:
         assert count > 0
         assert np.any(scm.grid > 0)  # closing opinions seeded
 
+    def test_cold_start_spatial_alignment(self, tmp_path):
+        """Cold-start seeds align to high-credit cells (p75 threshold) and are ≥ ε_floor."""
+        from wheeler_memory.constants import SCM_HARDENING_FLOOR
+
+        scm = SCMGrid.load_or_create(tmp_path)
+        assert not np.any(scm.grid != 0)
+        scm.kappa_base = 0.8  # pre-settled baseline above incoming kappa
+
+        # Non-uniform credit: top 32 rows have credit 0.64, bottom 32 have credit 0.0
+        corpus_att = np.zeros((64, 64), dtype=np.float32)
+        corpus_att[:32, :] = 0.8
+        exp_att = np.zeros((64, 64), dtype=np.float32)
+        exp_att[:32, :] = 0.8
+
+        scm.update_from_recall(corpus_att, exp_att, kappa=0.2)
+        # advantage = 0.2 - 0.8 = -0.6 < 0 → seeding fires, homeostasis guard skipped
+
+        seeded = scm.grid > 0
+        assert seeded.any(), "cold-start must seed at least one cell"
+        assert np.all(scm.grid[seeded] >= SCM_HARDENING_FLOOR), (
+            "seeded cells must have values ≥ ε_floor (seeded at ε_floor, then delta applied)"
+        )
+
+        # Spatial alignment: seeds must coincide with credit ≥ p75 threshold
+        credit = np.abs(corpus_att * exp_att)  # 0.64 in top half, 0.0 in bottom
+        threshold = float(np.percentile(credit[credit > 0], 75))  # = 0.64
+        expected_mask = credit >= threshold  # = top 32 rows only
+        assert np.array_equal(seeded, expected_mask), (
+            "seeded cells must align to credit ≥ p75 region, not elsewhere"
+        )
+
 
 class TestSCMGridRepr:
     """__repr__() formatting."""

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wheeler-memory"
-version = "0.3.4"
+version = "0.3.5"
 description = "Cellular automata-based associative memory system"
 requires-python = ">=3.11"
 dependencies = [

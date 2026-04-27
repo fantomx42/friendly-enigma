@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.5 (2026-04-27)
+
+### SCM Cold-Start Spatial Alignment Test + Paraphrase A/B Rewrite
+
+- **`test_cold_start_spatial_alignment`** added to `TestSCMGridRecallFeedback` (`tests/test_scm_grid.py`): Verifies that cold-start seeding (scm_grid.py:204-208) fires under negative advantage, seeds at least one cell, and aligns spatially to the top-quartile credit region. Setup: `kappa_base=0.8`, `kappa=0.2` (advantage = −0.6), top 32 rows of corpus/experiential attractors set to 0.8 (credit = 0.64), bottom 32 zero. Asserts: `seeded.any()`, all seeded values `>= SCM_HARDENING_FLOOR`, and `seeded == (credit >= p75_threshold)` (exact spatial match). Tighter than the existing `test_cold_start_negative_advantage_seeds_grid` — this one checks WHERE cells are seeded, not just that some are.
+- **`scripts/scm_ab_eval.py` complete rewrite**: Two-phase evaluation design (warmup + paraphrase eval). Phase 1 runs 50 exact Q-part queries through `learning_scm.update_from_recall` to settle `kappa_base` to ~1.22 via EMA (rate=0.1) before eval begins. Phase 2 runs 50 paraphrase queries across all three arms. Warmup phase settles `kappa_base` so paraphrase kappas (0.45–0.94) produce negative advantage, bypassing the homeostasis ceiling and triggering cold-start seeding. Added `_paraphrase(text, rng)`: strips stop words, shuffles remaining content words. Character n-gram encoder (hippocampus) is sensitive to word-order and boundary changes — shuffling reduces Pearson similarity without requiring new corpus. Added `--no-warmup` flag. JSONL fields extended: `warmup_kappa_base`, `paraphrase_query`, `exact_query`, `kappa_base_before`.
+
+### Architectural Finding: interference_score Collapses SCM to Global Scalar
+
+- **Root cause of frozen/learning rank equivalence diagnosed**: `interference.py:158-161` computes `mean_openness = float((1.0 - np.abs(scm_grid)).mean())` and returns `score = (c_sim + e_sim) * mean_openness`. The openness multiplier is a **global scalar** — identical for every candidate in a given query regardless of the spatial SCM pattern. This makes rank ordering provably identical between frozen and learning arms for any query, no matter how much the SCM is seeded or how different the two grids are. The spatial 64×64 trust topology is irrelevant to candidate ranking under the current formulation.
+- **Paraphrase A/B result**: Warmup correctly settles `kappa_base=1.2155`. Paraphrase kappas (0.45–0.94) produce negative advantage → seeding fires (confirmed by score ratio 0.677/0.696 = 0.974, implying mean|SCM| ≈ 0.026). But all three arms still produce R@1=1.000 and identical rank orderings. SCM openness reports 1.0000 throughout because seeded values (~0.001) are well below the 0.3 alive threshold — a misleading diagnostic.
+- **Fix required for diagnostic A/B**: `interference_score` must use spatial product instead of global scalar: `score = mean((q_corpus * s_corpus) * (1-|SCM|)) + mean((q_exp * s_exp) * (1-|SCM|))`. This changes score semantics from Pearson r (normalized) to weighted mean (unnormalized) — calibration relative to existing recall paths needs thought before merging.
+
 ## v0.3.4 (2026-04-26)
 
 ### SCM Telemetry + Gradient Observability

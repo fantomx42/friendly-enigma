@@ -1,5 +1,13 @@
 # Version Changes
 
+## v0.3.5 — 2026-04-27
+
+Paraphrase A/B rewrite, cold-start spatial alignment test, and architectural diagnosis of global-scalar interference.
+
+- **Cold-start spatial alignment test** (`tests/test_scm_grid.py`): `test_cold_start_spatial_alignment` added to `TestSCMGridRecallFeedback`. Pre-settles `kappa_base=0.8`, passes `kappa=0.2` (advantage = −0.6). Uses non-uniform attractors (top 32 rows = 0.8, bottom 32 = 0.0) to produce a credit pattern with a clear spatial structure. Asserts: seeding fires, all seeded values `>= SCM_HARDENING_FLOOR`, and seeded cells exactly match the credit-≥-p75 mask (top 32 rows only). Tighter than the existing negative-advantage test — validates spatial precision of the seeding path, not just presence.
+- **Paraphrase A/B rewrite** (`scripts/scm_ab_eval.py`): Two-phase design. Phase 1 (warmup): 50 exact Q-part queries through `learning_scm.update_from_recall`; settles `kappa_base` to ~1.22 via EMA(rate=0.1). Phase 2 (eval): 50 content-word-shuffled paraphrase queries across all three arms. `_paraphrase()` strips stop words and shuffles remaining content words — word-order change degrades character n-gram Pearson without new corpus. Warmup ensures paraphrase kappas (0.45–0.94) fall below `kappa_base`, producing negative advantage and triggering cold-start seeding. Added `--no-warmup` flag and diagnostic JSONL fields (`warmup_kappa_base`, `paraphrase_query`, `kappa_base_before`).
+- **Architectural finding: interference_score is a global scalar** (`wheeler_memory/interference.py:158-161`): `mean_openness = (1 - |SCM|).mean()` is a single float applied uniformly to every candidate's score in a query. Rank ordering between frozen and learning arms is provably identical regardless of SCM state. The 64×64 spatial trust topology currently has no effect on which candidate ranks first. Paraphrase A/B confirms: score ratio 0.974 (learning vs. frozen) proves SCM was seeded (mean|SCM| ≈ 0.026), but R@1=1.000 and rank ordering are unchanged across all arms. Fix: replace scalar mean_openness with spatial product `mean((q * s) * (1-|SCM|))` per candidate.
+
 ## v0.3.4 — 2026-04-26
 
 SCM observability layer and closed-loop A/B evaluation infrastructure.

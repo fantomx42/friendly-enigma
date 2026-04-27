@@ -1,7 +1,5 @@
 """50-passage closed-loop A/B: Pearson vs. frozen-SCM vs. learning-SCM.
 
-Run only after test_scm_gradient_direction.py passes.
-
 Arms
 ----
 pearson      : pure Pearson recall (no SCM involvement)
@@ -10,34 +8,43 @@ frozen_scm   : Pearson candidates re-ranked by interference score with
 learning_scm : Pearson candidates re-ranked by interference score with
                an SCM that learns from each recall outcome (closed loop)
 
-The learning arm accumulates knowledge across the 50 queries: its SCM starts
-at zeros and updates after every query.
+Two-phase design
+----------------
+Phase 1 — Warmup (exact queries, not scored):
+  Run the 50 stored passages through learning_scm using their exact Q-part
+  queries so kappa_base builds via EMA before the eval phase begins.
+  After 50 exact queries at kappa ~1.2, kappa_base ≈ 1.19.
+  Frozen SCM and Pearson arm are stateless and unaffected.
+
+Phase 2 — Paraphrase eval (all three arms scored):
+  Query with content-word-shuffled paraphrases. The hippocampus encoder is
+  character n-gram based, so word-order and boundary changes reduce Pearson
+  similarity substantially. With kappa_base ~1.19 and paraphrase kappa ~0.4-0.8,
+  advantage = kappa − kappa_base < 0, the homeostasis ceiling is bypassed, and
+  the cold-start seeding path activates for learning_scm.
+
+Why paraphrase over known corpus (not lower TOP_K, not new corpus):
+  Stored passages unchanged → storage and experiential paths are identical.
+  Query-side encoder drift forces recall misses without introducing corpus
+  confounds. This is the minimal perturbation that makes the A/B diagnostic.
+
+Paraphrase transform
+--------------------
+Remove stop words + shuffle word order. No external models; deterministic
+given the RNG seed. Character n-gram overlap drops substantially with
+word-order changes.
 
 Corpus  : 50 passages from datasets/arc.jsonl, seeded random sample.
-Query   : Q: part of each passage (text before " A:").
-Encoder : hippocampus (character n-gram RI; Q-prefix has high overlap with
-          full Q+A text).
+Encoder : hippocampus (character n-gram RI).
 
-Experiential pass
------------------
-Each passage is stored in BOTH corpus and experiential grids. This activates
-the spatial answer equation:
-
-    Answer(i,j) = Corpus(i,j) * Experiential(i,j) * (1 - |SCM(i,j)|)
-
-Without experiential attractors, interference_score collapses to a scalar
-gate (mean(1-|M|) * pearson_score), making frozen_scm rank-identical to
-pearson and learning_scm identical in order (only differing in absolute
-score magnitude). Experiential storage makes the spatial SCM relevant to
-re-ranking.
-
-Metrics
--------
+Metrics (paraphrase eval phase)
+--------------------------------
 Recall@1, Recall@3, MRR      : standard IR metrics
 top1_iscore                  : mean interference score of rank-1 result
 correct_iscore               : mean interference score of correct answer
 score_gap                    : mean (top1 - top2) score (confidence margin)
-scm_openness (learning only) : SCM openness after all 50 updates
+scm_openness (learning only) : SCM openness after all updates
+warmup_kappa_base            : kappa_base at end of warmup (diagnostic)
 
 Output: results/scm_ab_eval_<timestamp>.jsonl + stdout summary.
 
@@ -45,7 +52,8 @@ Usage
 -----
     python scripts/scm_ab_eval.py
     python scripts/scm_ab_eval.py --n 20 --seed 7
-    python scripts/scm_ab_eval.py --no-experiential   # scalar-gate mode
+    python scripts/scm_ab_eval.py --no-warmup     # skip warmup (debug only)
+    python scripts/scm_ab_eval.py --no-experiential
     python scripts/scm_ab_eval.py --datasets-dir /path/to/datasets
 """
 
@@ -67,6 +75,17 @@ ENCODER = "hippocampus"
 SEED = 42
 TOP_K = 15  # Pearson candidates before re-ranking
 
+_STOP = frozenset(
+    {
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+        "should", "may", "might", "must", "can", "could", "to", "of", "in",
+        "on", "at", "by", "for", "with", "about", "as", "into", "through",
+        "from", "that", "this", "which", "what", "how", "why", "when",
+        "where", "who", "q",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -77,6 +96,21 @@ def _q_part(text: str) -> str:
     """Extract the question before ' A:' in Q:...A:... passages."""
     idx = text.find(" A:")
     return text[:idx].strip() if idx != -1 else text.strip()
+
+
+def _paraphrase(text: str, rng: np.random.Generator) -> str:
+    """Content-word shuffle: remove stop words, randomise word order.
+
+    The hippocampus encoder uses character n-grams, so word-order and
+    word-boundary changes substantially reduce Pearson similarity while
+    preserving content-word identity.
+    """
+    words = text.split()
+    content = [w for w in words if w.lower().strip("?.,!:") not in _STOP]
+    if len(content) < 3:
+        content = words  # fallback: don't destroy very short queries
+    rng.shuffle(content)
+    return " ".join(content)
 
 
 def _find_rank(hits: list[dict], correct_key: str) -> int | None:
@@ -164,7 +198,7 @@ def _store_experiential(text: str, data_dir: Path, chunk: str, encoder: str) -> 
     """Write experiential attractor npy without touching the corpus index.
 
     store_memory(..., grid='experiential') overwrites the corpus index entry with
-    grid='experiential', causing recall_memory to skip it (line 305-306 of storage.py).
+    grid='experiential', causing recall_memory to skip it (storage.py:305-306).
     Writing the npy directly sidesteps the index entirely.
     """
     from wheeler_memory.constants import EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
@@ -173,8 +207,6 @@ def _store_experiential(text: str, data_dir: Path, chunk: str, encoder: str) -> 
     from wheeler_memory.hashing import text_to_hex
     from wheeler_memory.rotation import _get_frame_fn
     from wheeler_memory.storage import get_chunk_dir
-
-    import numpy as np
 
     frame_fn = _get_frame_fn(False, encoder=encoder)
     frame = frame_fn(text)
@@ -202,7 +234,12 @@ def main() -> None:
     parser.add_argument(
         "--no-experiential",
         action="store_true",
-        help="Skip experiential storage (scalar-gate mode; arms will have identical rank order)",
+        help="Skip experiential storage (scalar-gate mode)",
+    )
+    parser.add_argument(
+        "--no-warmup",
+        action="store_true",
+        help="Skip exact-query warmup pass (kappa_base stays at 0; debug only)",
     )
     args = parser.parse_args()
 
@@ -216,10 +253,12 @@ def main() -> None:
     rng = np.random.default_rng(args.seed)
     idx = rng.choice(len(all_passages), size=min(args.n, len(all_passages)), replace=False)
     passages = [all_passages[i] for i in sorted(idx)]
-    queries = [_q_part(p) for p in passages]
+    exact_queries = [_q_part(p) for p in passages]
+    paraphrase_queries = [_paraphrase(q, rng) for q in exact_queries]
     print(
         f"Loaded {len(passages)} passages (seed={args.seed}, "
-        f"experiential={'off' if args.no_experiential else 'on'})",
+        f"experiential={'off' if args.no_experiential else 'on'}, "
+        f"warmup={'off' if args.no_warmup else 'on'})",
         file=sys.stderr,
     )
 
@@ -254,17 +293,50 @@ def main() -> None:
         learning_scm = SCMGrid.load_or_create(data_dir)
         frozen_grid = np.zeros((64, 64), dtype=np.float32)
 
+        # ---- Phase 1: Warmup — exact queries to settle kappa_base ----
+        warmup_kappa_base = 0.0
+        if not args.no_warmup:
+            print("Warmup (exact queries)...", end=" ", flush=True, file=sys.stderr)
+            for i, (passage, query) in enumerate(zip(passages, exact_queries)):
+                warmup_hits = recall_memory(
+                    query,
+                    top_k=args.top_k,
+                    data_dir=data_dir,
+                    encoder=args.encoder,
+                    readonly=True,
+                )
+                if not warmup_hits:
+                    continue
+                q_frame = frame_fn(query)
+                q_corpus = evolve_and_interpret(q_frame)["attractor"]
+                q_exp = evolve_with_params(
+                    q_frame, EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
+                )["attractor"]
+                # Score the top warmup hit to get kappa
+                top_hit = warmup_hits[0]
+                hk, hc = top_hit["hex_key"], top_hit["chunk"]
+                corpus_path = data_dir / "chunks" / hc / "attractors" / f"{hk}.npy"
+                exp_path = data_dir / "chunks" / hc / "experiential" / f"{hk}.npy"
+                sc = np.load(corpus_path) if corpus_path.exists() else None
+                se = np.load(exp_path) if exp_path.exists() else None
+                if sc is not None:
+                    se_safe = se if se is not None else np.zeros_like(sc)
+                    kappa, _, _ = interference_score(q_corpus, q_exp, sc, se_safe, frozen_grid)
+                    learning_scm.update_from_recall(sc, se_safe, float(kappa))
+            warmup_kappa_base = round(learning_scm.kappa_base, 4)
+            print(f"done (kappa_base={warmup_kappa_base})", file=sys.stderr)
+
+        # ---- Phase 2: Paraphrase eval — all three arms scored ----
         arm_pearson = _ArmStats("pearson")
         arm_frozen = _ArmStats("frozen_scm")
         arm_learning = _ArmStats("learning_scm")
         rows: list[dict] = []
         scm_openness_log: list[float] = []
 
-        # ---- Per-query loop ----
         for i, (passage, query, correct_key) in enumerate(
-            zip(passages, queries, stored_keys)
+            zip(passages, paraphrase_queries, stored_keys)
         ):
-            print(f"\rQuery {i + 1}/{len(passages)}", end="  ", flush=True, file=sys.stderr)
+            print(f"\rEval {i + 1}/{len(passages)}", end="  ", flush=True, file=sys.stderr)
 
             # Shared Pearson candidates
             pearson_hits = recall_memory(
@@ -294,7 +366,7 @@ def main() -> None:
                 se = np.load(exp_path) if exp_path.exists() else None
                 hit_data.append((sc, se))
 
-            # Arm A: Pearson (sort by Pearson similarity already done by recall_memory)
+            # Arm A: Pearson
             pearson_scored = [
                 (hit.get("similarity", 0.0), hit, sc, se)
                 for hit, (sc, se) in zip(pearson_hits, hit_data)
@@ -316,7 +388,7 @@ def main() -> None:
             f_correct_score = _find_score(frozen_scored, correct_key)
             f_gap = _score_gap(frozen_scored)
 
-            # Arm C: Learning SCM (score with current grid, then update from top)
+            # Arm C: Learning SCM
             learning_scored = []
             for hit, (sc, se) in zip(pearson_hits, hit_data):
                 if sc is None:
@@ -345,7 +417,8 @@ def main() -> None:
 
             row = {
                 "query_idx": i,
-                "query": query[:100],
+                "paraphrase_query": query[:100],
+                "exact_query": exact_queries[i][:100],
                 "correct_key": correct_key,
                 "pearson_rank": pearson_rank,
                 "frozen_rank": frozen_rank,
@@ -357,6 +430,7 @@ def main() -> None:
                 "learning_score_gap": round(l_gap, 4),
                 "scm_openness": scm_openness_log[-1],
                 "scm_step": learning_scm._step_count,
+                "kappa_base": round(learning_scm.kappa_base, 4),
             }
             rows.append(row)
 
@@ -378,6 +452,8 @@ def main() -> None:
             "encoder": args.encoder,
             "top_k": args.top_k,
             "experiential": not args.no_experiential,
+            "warmup": not args.no_warmup,
+            "warmup_kappa_base": warmup_kappa_base,
             "timestamp": ts,
             "final_scm_openness": round(learning_scm.openness(), 4),
             "scm_total_steps": learning_scm._step_count,
@@ -388,29 +464,51 @@ def main() -> None:
                 f.write(json.dumps(row) + "\n")
 
         # ---- Summary ----
-        n = len(rows)
         summaries = [arm_pearson.summary(), arm_frozen.summary(), arm_learning.summary()]
 
         print(f"\n{'Arm':<14} {'R@1':>6} {'R@3':>6} {'MRR':>7} {'top1_s':>8} {'corr_s':>8} {'gap':>7}")
         print("-" * 66)
         for s in summaries:
-            corr_s = f"{s['mean_correct_score']:.4f}" if s["mean_correct_score"] is not None else "  N/A "
+            corr_s = (
+                f"{s['mean_correct_score']:.4f}"
+                if s["mean_correct_score"] is not None
+                else "  N/A "
+            )
             print(
                 f"{s['arm']:<14} {s['recall@1']:>6.3f} {s['recall@3']:>6.3f} "
                 f"{s['mrr']:>7.3f} {s['mean_top1_score']:>8.4f} {corr_s:>8} {s['mean_score_gap']:>7.4f}"
             )
 
-        print(f"\nSCM openness: start=1.0000 → end={meta['final_scm_openness']:.4f} "
-              f"({meta['scm_total_steps']} steps)")
-        print(f"Experiential attractors: {'yes' if not args.no_experiential else 'no (scalar-gate mode)'}")
+        print(
+            f"\nWarmup kappa_base: {warmup_kappa_base:.4f} "
+            f"({'skipped' if args.no_warmup else 'settled after 50 exact queries'})"
+        )
+        print(
+            f"SCM openness: start=1.0000 → end={meta['final_scm_openness']:.4f} "
+            f"({meta['scm_total_steps']} steps)"
+        )
+        print(f"Experiential attractors: {'yes' if not args.no_experiential else 'no'}")
         print(f"\nResults → {out_path}")
+
+        n = len(rows)
         if n > 0:
             not_found = sum(1 for r in rows if r["pearson_rank"] is None)
             if not_found:
                 print(
-                    f"Note: {not_found}/{n} correct answers outside top-{args.top_k} Pearson "
-                    f"candidates (counts as not-found for all arms)."
+                    f"Note: {not_found}/{n} correct answers outside top-{args.top_k} "
+                    f"Pearson candidates (counts as not-found for all arms)."
                 )
+            # Show whether openness moved (confirms seeding fired)
+            if scm_openness_log:
+                min_open = min(scm_openness_log)
+                if min_open < 1.0:
+                    print(f"SCM seeded: openness dropped to {min_open:.4f} (gradient active)")
+                else:
+                    print(
+                        "SCM openness stayed at 1.0000 — seeding did not fire. "
+                        "Paraphrase kappas may still exceed kappa_base; try --no-warmup "
+                        "to inspect or increase paraphrase aggressiveness."
+                    )
 
 
 if __name__ == "__main__":
