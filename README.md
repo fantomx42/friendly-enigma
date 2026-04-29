@@ -350,6 +350,8 @@ python scripts/tools/prepare_corpus.py
 | `wheeler-store "text" --experiential` | Store as episodic memory (loose attractors, temporal context) |
 | `wheeler-recall "text"` | Find similar memories (three-grid interference scoring by default) |
 | `wheeler-recall "text" --no-interference` | Pearson-only recall (skip experiential + SCM gating) |
+| `wheeler-recall "text" --recognize` | Recognition tier — single-pass match, no CA convergence loop on the query |
+| `wheeler-recall "text" --recognize --learn` | Recognition + accumulate per-basin Temporal Stability (T) and drift |
 | `wheeler-forget --text "text"` | Delete a specific memory |
 | `wheeler-temps` | View all memories with temperature/freshness |
 | `wheeler-sleep` | Archive cold memories to save space |
@@ -464,6 +466,8 @@ wheeler_memory/          Core library
   STORAGE & RECALL
     storage.py           Store/recall with chunked Pearson search
     reconstruction.py    Reconstructive recall (Darman philosophy)
+    recall_api.py        Two-tier recall (recognize / reconstruct_from_seed) + T-gated drift
+    t_metadata.py        Per-basin Temporal Stability (T) lazy backfill + EMA helpers
     cache.py             JSON file-based caching layer
   THREE-GRID INTERFERENCE
     scm_grid.py          SCM persistent 64x64 trust topology with hardening
@@ -509,6 +513,7 @@ scripts/                 CLI entry points
     apple_test_semantic.py   Semantic holdout test
     eval_decoder.py          Decoder quality by attractor depth
     bench_associative.py     Associative recall benchmarks
+    bench_recall_warm_vs_cold.py  Warm-start vs cold-recall ticks across 3 distance bands
     train_projection.py      Learn an optimised JL projection matrix
   exploration/           Standalone exploration scripts
   tools/                 Data prep, corpus cleanup, HIP build utilities
@@ -519,12 +524,13 @@ scripts/                 CLI entry points
   train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
   wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
 
-tests/                   pytest suite (776 tests across 44 modules)
+tests/                   pytest suite (809 tests across 47 modules)
   test_accel_init.py     Accelerator module imports & device detection
   test_accel_ca.py       Batch evolution correctness, GPU vs CPU match
   test_cortex.py         Cortex system unit tests
   test_hallucination.py  Hallucination classification tests
   test_generation.py     Trajectory resonance tests
+  test_recall_api.py     Two-tier recall: recognize/reconstruct + T-gated drift
   ... (dynamics, storage, brick, chunking, consolidation, eviction, etc.)
 
 results/                 Benchmark logs & baselines
