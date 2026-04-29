@@ -286,8 +286,8 @@ def main() -> None:
         from wheeler_memory.constants import EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
         from wheeler_memory.dynamics import evolve_and_interpret, evolve_with_params
         from wheeler_memory.interference import interference_score
+        from wheeler_memory.recall_api import recognize_top_k
         from wheeler_memory.scm_grid import SCMGrid
-        from wheeler_memory.storage import recall_memory
 
         frame_fn = _get_frame_fn(False, encoder=args.encoder)
         learning_scm = SCMGrid.load_or_create(data_dir)
@@ -298,14 +298,14 @@ def main() -> None:
         if not args.no_warmup:
             print("Warmup (exact queries)...", end=" ", flush=True, file=sys.stderr)
             for i, (passage, query) in enumerate(zip(passages, exact_queries)):
-                warmup_hits = recall_memory(
+                warmup_seeds = recognize_top_k(
                     query,
-                    top_k=args.top_k,
+                    k=args.top_k,
                     data_dir=data_dir,
                     encoder=args.encoder,
-                    readonly=True,
+                    threshold=0.0,
                 )
-                if not warmup_hits:
+                if not warmup_seeds:
                     continue
                 q_frame = frame_fn(query)
                 q_corpus = evolve_and_interpret(q_frame)["attractor"]
@@ -313,8 +313,8 @@ def main() -> None:
                     q_frame, EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
                 )["attractor"]
                 # Score the top warmup hit to get kappa
-                top_hit = warmup_hits[0]
-                hk, hc = top_hit["hex_key"], top_hit["chunk"]
+                top_seed = warmup_seeds[0]
+                hk, hc = top_seed.hex_key, top_seed.chunk
                 corpus_path = data_dir / "chunks" / hc / "attractors" / f"{hk}.npy"
                 exp_path = data_dir / "chunks" / hc / "experiential" / f"{hk}.npy"
                 sc = np.load(corpus_path) if corpus_path.exists() else None
@@ -338,16 +338,20 @@ def main() -> None:
         ):
             print(f"\rEval {i + 1}/{len(passages)}", end="  ", flush=True, file=sys.stderr)
 
-            # Shared Pearson candidates
-            pearson_hits = recall_memory(
+            # Shared Pearson candidates (recognize-only path: no CA engage on query)
+            pearson_seeds = recognize_top_k(
                 query,
-                top_k=args.top_k,
+                k=args.top_k,
                 data_dir=data_dir,
                 encoder=args.encoder,
-                readonly=True,
+                threshold=0.0,
             )
-            if not pearson_hits:
+            if not pearson_seeds:
                 continue
+            pearson_hits = [
+                {"hex_key": s.hex_key, "chunk": s.chunk, "similarity": s.similarity}
+                for s in pearson_seeds
+            ]
 
             # Query attractors for interference arms
             q_frame = frame_fn(query)

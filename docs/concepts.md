@@ -124,3 +124,98 @@ cold (<0.3):  "I vaguely recall X, but I'm uncertain..."
 ```
 
 This prevents the **recovered memory therapy** failure mode: filling reconstruction gaps with confident fabrication.
+
+---
+
+## Two-Tier Recall: Recognition vs. Reconstruction
+
+The legacy single-call `recall_memory()` collapsed identity and content. The
+two-tier API (v0.3.6+) separates them — the same separation human memory
+makes between *I know that name* (recognition) and *let me tell you about
+them* (reconstruction).
+
+### Basins are identities
+
+A stored attractor is a basin of attraction in CA state space. A basin's
+identity is the set of seeds that fall into it under CA evolution.
+Recognition asks a coordinate question: **does this query land in a known
+basin?** It does not need to retrieve, blend, or re-evolve content; it only
+needs to confirm that the query frame lies close enough to a stored
+attractor (Pearson ≥ `RECOGNITION_THRESHOLD = 0.45`) to count as the same
+basin.
+
+Because the question is purely about location, `recognize()` evaluates it on
+the **raw** query frame — no `evolve_and_interpret` on the query. A single
+`apply_ca_dynamics` probe runs on the winning basin to read its current
+stability, but that is constant 1-tick work, not a convergence loop.
+
+### Seeds as cheap handles
+
+`BasinSeed` is identity-only: `hex_key`, `chunk`, `similarity`,
+`basin_depth`, `temperature`, `t_stability`, `text`, `data_dir`,
+`basin_stability`. It is sufficient to look up the stored attractor and
+warm-start CA settling later, without paying for content retrieval up front.
+A seed answers *which basin* without committing to *what's inside*.
+
+Reconstruction takes a seed and produces content. `reconstruct(seed)`
+returns the stored attractor as-is (zero ticks). `reconstruct(seed, query)`
+blends stored with the raw query frame and re-evolves — the warm start
+skips the cold path's separate query-evolve cost.
+
+### Temporal Stability (T) as earned rigidity
+
+A fresh basin has no track record of being stable under recall. It might be
+a chance correlation in the encoding, a transient pattern, or a real
+memory waiting to crystallize. The system has no way to tell yet.
+
+T encodes that uncertainty as plasticity. `T_INIT_DEFAULT = 0.0` — every new
+basin starts fully plastic. Each successful recognition runs a one-step CA
+probe and measures `observed_stability`. T is updated via EMA:
+
+```
+T_new = (1 - T_EMA_RATE) * T_old + T_EMA_RATE * observed_stability
+       = 0.9 * T_old + 0.1 * observed_stability
+```
+
+Across 5 recalls of a stable basin (with `observed_stability ≈ 1.0`), T
+climbs `0 → 0.10 → 0.19 → 0.27 → 0.34 → 0.40` — basins **earn** rigidity
+through repeated stable recalls.
+
+### Drift gated by T
+
+When `learning_enabled=True`, the stored attractor drifts toward the
+direction the query pulls it:
+
+```
+plasticity = (1 - T) * BASIN_DRIFT_BASE_RATE
+stored_new = stored + plasticity * (observed - stored)
+```
+
+where `observed = apply_ca_dynamics(query_frame)` (one-step probe). T gates
+the drift rate. A fresh basin (T=0) drifts at the full
+`BASIN_DRIFT_BASE_RATE = 0.02`. A well-recalled basin (T=0.5) drifts at
+half that rate. A rigid basin (T→1) is functionally frozen.
+
+This separation is deliberate: recognition is cheap and side-effect-free by
+default. Drift only happens when a caller explicitly opts in
+(`set_learning_enabled(True)` or `--learn` on the CLI). The default behavior
+matches the legacy semantics — stored attractors are immutable on read.
+
+### Why split identity from content?
+
+Two reasons map to two distinct usage patterns:
+
+1. **Cheap basin probes.** Topology mapping, basin-width measurement, and
+   A/B evaluation harnesses only need hex_key/chunk handles to load the
+   right files — they don't need text, similarity-ranked text, or
+   reconstructed attractors. `recognize_top_k()` returns just enough to
+   point at the right files.
+2. **Warm-start reconstruction.** When content **is** needed, callers can
+   reconstruct from a seed without re-running recognition. This skips the
+   cold path's query-evolve cost (~2× tick reduction in
+   `scripts/bench/bench_recall_warm_vs_cold.py`).
+
+The fast path is honest about its limits — recognition rate at the
+production threshold is encoder-dependent, and queries that don't hit a
+stored basin (similarity below threshold) legitimately need cold
+reconstruction. `recognize()` returns `None` rather than guessing.

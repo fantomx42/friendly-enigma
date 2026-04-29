@@ -114,6 +114,16 @@ from .similarity import (
 # Reconstructive recall
 from .reconstruction import reconstruct, reconstruct_batch
 
+# Two-tier recall API (recognize / reconstruct from seed) and per-basin T
+from .recall_api import (
+    BasinSeed,
+    Pattern,
+    recognize,
+    recognize_top_k,
+    set_learning_enabled,
+)
+from .recall_api import reconstruct as reconstruct_from_seed
+
 # LLM agent (optional — requires Ollama running locally)
 from .agent import WheelerAgent
 
@@ -192,6 +202,13 @@ __all__ = [
     # Reconstructive recall
     "reconstruct",
     "reconstruct_batch",
+    # Two-tier recall API
+    "BasinSeed",
+    "Pattern",
+    "recognize",
+    "recognize_top_k",
+    "reconstruct_from_seed",
+    "set_learning_enabled",
     # Attention model
     "AttentionBudget",
     "compute_attention_budget",

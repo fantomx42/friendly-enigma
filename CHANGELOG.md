@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.3.6 (2026-04-28)
+
+### Two-Tier Recall API
+
+- **Recognition / reconstruction split** (`wheeler_memory/recall_api.py`): `recognize(query)` performs a single-pass Pearson match against stored attractors with no CA convergence loop on the query frame — returns a `BasinSeed` if max similarity ≥ `RECOGNITION_THRESHOLD`, else `None`. `recognize_top_k(query, k)` returns up to k seeds. `reconstruct_from_seed(seed, query=None|str, alpha=0.3)` warm-starts CA from the stored attractor: `query=None` returns it as-is (ticks=0); a query string blends stored + raw query frame and re-evolves. Wraps `recall_memory()` from `storage.py` (sacred file, untouched).
+- **Public re-exports** (`wheeler_memory/__init__.py`): `recognize`, `recognize_top_k`, `reconstruct_from_seed` exposed at package level.
+- **Default path UNCHANGED**: `wheeler-recall` still uses three-grid interference. The new path is opt-in via `--recognize` flag (CLI) or direct API import.
+
+### Per-Basin Temporal Stability (T)
+
+- **New persistent state** (`wheeler_memory/t_metadata.py`): Each chunk's `index.json` now carries a per-basin `T` field. Fresh basins start at T=0 (fully plastic) and earn rigidity through repeated stable recalls. EMA update applied on `recognize()` when learning is enabled.
+- **Drift rate**: Stored attractor drifts toward the observed pattern at rate `(1 - T) * BASIN_DRIFT_BASE_RATE` (default 0.02). Mature basins (T → 1) become near-rigid; fresh basins absorb input rapidly.
+- **CLI flag**: `wheeler-recall --learn` enables T accumulation + drift. Off by default.
+- **Trajectory** (5 consecutive recalls of the same query against a fresh basin): T 0 → 0.10 → 0.19 → 0.27 → 0.34 → 0.40, asymptoting toward observed_stability ~0.97-1.00.
+
+### `_basin_stability` Replacement
+
+- **Finding**: The original implementation called `cortex_scm.score_energy` for the per-basin stability signal. For converged attractors `score_energy` saturates to 0, which produced a degenerate T update — every recall reported stability ≈ 0 regardless of match quality, blocking T accumulation entirely.
+- **Fix** (`recall_api.py`): Replaced with `1 - p99(|delta|) / 2`, mirroring the percentile-based metric used by CA convergence detection. Numerically stable on converged frames; matches observed signal.
+- **D7 compliance**: `cortex_scm.py` itself was not modified — variable definitions in the SCM module are unchanged. The replacement lives in the calling site.
+
+### New Constants
+
+- `wheeler_memory/constants.py`: `RECOGNITION_THRESHOLD` (0.45), `T_INIT_DEFAULT` (0.0), `T_EMA_RATE` (0.1), `BASIN_DRIFT_BASE_RATE` (0.02). Four entries added.
+
+### Caller Migration
+
+- **`scripts/scm_ab_eval.py`**: Migrated from `recall_memory` to `recognize_top_k` for ranking arms. Behaviour-equivalent at default `k`.
+- **`wheeler_memory/theories/structured.py`**: Migrated to `recognize_top_k`. Theory experiments unaffected.
+- **`scripts/wheeler_recall.py`**: Added `--recognize` and `--learn` flags. Default behaviour unchanged.
+- **Deferred sites** recorded in `plans/recall_migration_audit.csv` — call sites that retain the legacy path pending behaviour review (not bugs; intentional defer).
+
+### Benchmark
+
+- **`scripts/bench/bench_recall_warm_vs_cold.py`**: Three input-distance bands (near / mid / far from stored attractor). Compares warm-start (reconstruct from seed) against cold-start (full CA from query frame).
+- **Result**: ~2x ticks reduction warm-vs-cold across all three distance bands. Quality (final-frame correlation to ground truth) within noise of cold path.
+
+### Tests
+
+- Added `tests/test_recall_api.py` (6 tests): `recognize` returns top-1 with stability, `recognize_top_k` ordering, `reconstruct_from_seed` converges from stored attractor, T accumulates under `--learn`, T stays at 0 without learning, drift respects `(1-T)` damping.
+- Full suite: 758 passing, no regressions.
+
+### Out of Scope
+
+- Sleep Pass / drift consolidation deferred. T currently only updates on recall; there is no offline pass that consolidates accumulated T into the stored corpus state. Tracked for a later release.
+
 ## v0.3.5 (2026-04-27)
 
 ### SCM Cold-Start Spatial Alignment Test + Paraphrase A/B Rewrite

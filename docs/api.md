@@ -11,6 +11,13 @@ from wheeler_memory import (
     compute_attention_budget,
     salience_from_label,
     salience_from_temperature,
+    # Two-tier recall (v0.3.6+)
+    BasinSeed,
+    Pattern,
+    recognize,
+    recognize_top_k,
+    reconstruct_from_seed,
+    set_learning_enabled,
 )
 from wheeler_memory.reconstruction import reconstruct
 from wheeler_memory.embedding import embed_to_frame
@@ -278,6 +285,240 @@ print(f"state: {recon['state']}")
 print(f"correlation with stored: {recon['correlation_with_stored']:.3f}")
 print(f"correlation with query:  {recon['correlation_with_query']:.3f}")
 ```
+
+---
+
+## Two-Tier Recall API (v0.3.6+)
+
+Splits the legacy single-call `recall_memory()` into a fast identity tier
+(`recognize`) and an explicit content tier (`reconstruct_from_seed`). The
+public surface lives in `wheeler_memory/recall_api.py` and is re-exported
+from the top-level package. Defined to wrap `storage.py` from the outside —
+the storage contract is untouched.
+
+### `BasinSeed`
+
+```python
+@dataclass(frozen=True)
+class BasinSeed:
+    hex_key: str
+    chunk: str
+    similarity: float          # Pearson(query_frame, stored_attractor)
+    basin_depth: float         # 'energy' from compute_attractor_features
+    temperature: float
+    temperature_tier: str
+    t_stability: float         # per-basin Temporal Stability T in [0, 1]
+    text: str
+    data_dir: Path
+    basin_stability: float     # 1 - p99(|one_step - stored|) / 2
+```
+
+Identity-only handle to a recognized basin. `wheeler_memory/recall_api.py:62`.
+Sufficient to look up the stored attractor and warm-start CA settling without
+re-running recognition. Frozen so seeds are safe to hash and pass between
+modules. `basin_stability` is a one-step CA probe (constant 1 tick),
+**not** a convergence-loop reading.
+
+---
+
+### `Pattern`
+
+```python
+@dataclass
+class Pattern:
+    attractor: np.ndarray
+    state: str
+    convergence_ticks: int
+    correlation_with_stored: float
+    correlation_with_query: float
+    seed: BasinSeed
+    text: str
+```
+
+Reconstructed memory pattern returned by `reconstruct_from_seed()`.
+`wheeler_memory/recall_api.py:83`. With `query=None`, `state="CONVERGED"` and
+`convergence_ticks=0` (no CA work performed).
+
+---
+
+### `recognize`
+
+```python
+def recognize(
+    query: str,
+    *,
+    data_dir: str | Path | None = None,
+    chunk: str | None = None,
+    encoder: str | None = None,
+    use_embedding: bool = False,
+    threshold: float | None = None,
+    learning_enabled: bool | None = None,
+) -> BasinSeed | None:
+```
+
+Fast path. Pearson scan over stored attractors using the **raw** query frame
+(no `evolve_and_interpret` call on the query). Returns the best `BasinSeed`
+if max similarity reaches `threshold`, else `None` (recognition miss).
+
+A single `apply_ca_dynamics` step runs on the recognized basin to compute the
+stability reading (`basin_stability`). This is constant 1-tick work — the
+function still skips the CA convergence loop entirely.
+`wheeler_memory/recall_api.py:320`.
+
+**Parameters**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `query` | — | Query text |
+| `data_dir` | `~/.wheeler_memory` | Override the storage root |
+| `chunk` | `None` | Restrict to one chunk; routes to all matching chunks if `None` |
+| `encoder` | `None` | Encoder name (same set as `recall_memory`) |
+| `use_embedding` | `False` | Legacy embedding switch (prefer `encoder`) |
+| `threshold` | `RECOGNITION_THRESHOLD` (0.45) | Min Pearson for recognition hit |
+| `learning_enabled` | module default (False) | If True, EMA-update T and drift the stored basin |
+
+**Guarantee** — `evolve_and_interpret` is not called. The implementation runs
+exactly one `apply_ca_dynamics` step per recognition. `tests/test_recall_api.py`
+test 1 monkeypatches `evolve_and_interpret` and asserts the call log is empty.
+
+**Learning** — when `learning_enabled=True`, the winning basin gets:
+
+1. T updated via EMA: `T_new = (1 - T_EMA_RATE) * T_old + T_EMA_RATE * observed_stability`
+2. Stored attractor drifted in place: `stored += (1 - T) * BASIN_DRIFT_BASE_RATE * (observed - stored)` where `observed = apply_ca_dynamics(query_frame)`
+3. `t_recall_count` incremented, `hit_count` bumped, both written under `chunks/<chunk>/index.json.lock` (`fcntl.LOCK_EX`)
+
+---
+
+### `recognize_top_k`
+
+```python
+def recognize_top_k(
+    query: str,
+    k: int = 5,
+    *,
+    data_dir: str | Path | None = None,
+    chunk: str | None = None,
+    encoder: str | None = None,
+    use_embedding: bool = False,
+    threshold: float | None = None,
+    learning_enabled: bool | None = None,
+) -> list[BasinSeed]:
+```
+
+Sibling that returns up to `k` seeds passing `threshold`, sorted by similarity.
+Drift updates apply only to the top-1 winner (consistent with `recognize`),
+not to all `k`. `wheeler_memory/recall_api.py:368`.
+
+Used by `wheeler_memory/theories/structured.py:61` (basin-width measurement)
+and `scripts/scm_ab_eval.py` for warmup and pearson hits — see
+`plans/recall_migration_audit.csv`.
+
+---
+
+### `reconstruct_from_seed`
+
+```python
+def reconstruct(  # exposed as reconstruct_from_seed
+    seed: BasinSeed,
+    query: str | None = None,
+    *,
+    alpha: float = 0.3,
+    salience: float | None = None,
+    encoder: str | None = None,
+    use_embedding: bool = False,
+) -> Pattern:
+```
+
+Slow path: warm-start CA settling from a seed. `wheeler_memory/recall_api.py:414`.
+Re-exported as `reconstruct_from_seed` from the top-level package to avoid
+clashing with `wheeler_memory.reconstruction.reconstruct` (which takes raw
+arrays, not seeds).
+
+- `query=None` — return the stored attractor as-is, `ticks=0`, no CA work
+- `query=str` — blend `(1 - alpha) * stored + alpha * query_frame` and re-evolve through `evolve_and_interpret`. The query frame is **raw** (not pre-evolved), which is the warm-start saving versus the cold path
+
+`alpha=0.3` is memory-dominant; `alpha=0` ignores the query, `alpha=1` ignores the stored attractor.
+
+---
+
+### `set_learning_enabled`
+
+```python
+def set_learning_enabled(enabled: bool) -> None:
+```
+
+Set the module-level default for `learning_enabled` on `recognize` /
+`recognize_top_k`. Per-call args still take precedence.
+`wheeler_memory/recall_api.py:52`.
+
+The default is `False` — no writes to stored attractors or T metadata happen
+unless explicitly enabled. The CLI exposes this via `wheeler-recall --learn`.
+
+---
+
+### Two-tier workflow
+
+```python
+from wheeler_memory import (
+    store_with_rotation_retry,
+    recognize,
+    reconstruct_from_seed,
+    set_learning_enabled,
+)
+
+store_with_rotation_retry("python list comprehensions are concise")
+
+# Tier 1: cheap identity check (no CA convergence loop)
+seed = recognize("python list comprehensions")
+if seed is None:
+    print("recognition miss — would need cold reconstruction")
+else:
+    print(f"basin {seed.hex_key[:8]}  sim={seed.similarity:.3f}  T={seed.t_stability:.3f}")
+
+    # Tier 2a: identity-only — return the stored attractor unchanged
+    pat = reconstruct_from_seed(seed)
+    assert pat.convergence_ticks == 0
+
+    # Tier 2b: warm-start with query context (skips query-evolve)
+    pat = reconstruct_from_seed(seed, query="list comprehensions in python", alpha=0.3)
+    print(f"warm reconstruct: {pat.convergence_ticks} ticks  state={pat.state}")
+
+# Enable basin drift for production use
+set_learning_enabled(True)
+recognize("python list comprehensions")  # T tick: 0 → 0.10 → 0.19 → ...
+```
+
+---
+
+### Per-basin Temporal Stability (T) — persistence
+
+T and `t_recall_count` live under `chunks/<chunk>/index.json` in each entry's
+`metadata` block:
+
+```json
+{
+  "metadata": {
+    "t_stability": 0.27,
+    "t_recall_count": 3,
+    "hit_count": 4,
+    "last_accessed": "2026-04-28T..."
+  }
+}
+```
+
+Backfilled lazily by `wheeler_memory/t_metadata.py:13` (`ensure_t_fields`) on
+read; legacy entries default to `T_INIT_DEFAULT=0.0` and earn rigidity through
+repeated stable recalls. See `concepts.md` for the conceptual model and
+`architecture.md` for why `T_INIT_DEFAULT=0.0`.
+
+**Constants** (`wheeler_memory/constants.py:195`):
+
+| Constant | Value | Description |
+|---|---|---|
+| `RECOGNITION_THRESHOLD` | `0.45` | Min Pearson for recognition hit |
+| `T_INIT_DEFAULT` | `0.0` | Initial T for new/legacy basins |
+| `T_EMA_RATE` | `0.1` | EMA mixing rate for T updates |
+| `BASIN_DRIFT_BASE_RATE` | `0.02` | Base drift; effective = `(1 - T) * this` |
 
 ---
 

@@ -90,7 +90,55 @@ def main():
         action="store_true",
         help="Disable three-grid interference; use Pearson-only recall",
     )
+    parser.add_argument(
+        "--recognize",
+        action="store_true",
+        help="Use the fast recognition path (no CA engagement on the query); "
+        "prints hex_key, similarity, t_stability, temperature only.",
+    )
+    parser.add_argument(
+        "--learn",
+        action="store_true",
+        help="With --recognize: enable learning_enabled (EMA-update T and drift "
+        "the top basin in place). No effect without --recognize.",
+    )
     args = parser.parse_args()
+
+    if args.recognize:
+        try:
+            from wheeler_memory.recall_api import recognize_top_k
+
+            seeds = recognize_top_k(
+                args.query,
+                k=args.top_k,
+                data_dir=args.data_dir,
+                chunk=args.chunk,
+                encoder=args.encoder,
+                use_embedding=args.embed,
+                threshold=0.0,
+                learning_enabled=args.learn,
+            )
+        except KeyboardInterrupt:
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if not seeds:
+            print("No memories stored yet.")
+            return
+
+        print(
+            f"{'Rank':<5} {'Sim':>7} {'T':>6} {'Temp':>6} {'Tier':<6} {'Chunk':<12} HexKey"
+        )
+        print("-" * 80)
+        for i, s in enumerate(seeds, 1):
+            print(
+                f"{i:<5} {s.similarity:>7.4f} {s.t_stability:>6.3f} "
+                f"{s.temperature:>6.3f} {s.temperature_tier:<6} "
+                f"{s.chunk:<12} {s.hex_key[:16]}..."
+            )
+        return
 
     sal = salience_from_label(args.salience) if args.salience else None
 

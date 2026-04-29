@@ -188,3 +188,11 @@ SCM_OPEN_FRACTION_CEIL = 0.95            # freeze opening updates above this ope
 
 # Interference
 INTERFERENCE_PEAK_THRESHOLD = 0.5         # |value| above this = "peak" in content grid
+
+# ---------------------------------------------------------------------------
+# Two-tier recall (recognize / reconstruct) and per-basin Temporal Stability
+# ---------------------------------------------------------------------------
+RECOGNITION_THRESHOLD = 0.45      # min Pearson(query_frame, stored_attractor) for a recognition hit
+T_INIT_DEFAULT = 0.0              # initial Temporal Stability for new/legacy basins; basins earn stability through recall
+T_EMA_RATE = 0.1                  # EMA mixing rate (new-info weight) for T updates: T_new = (1-r)*T_old + r*observed
+BASIN_DRIFT_BASE_RATE = 0.02      # base drift rate; effective rate = (1-T) * this

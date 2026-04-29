@@ -455,3 +455,136 @@ Input features (21 dimensions):
 - Settlement opinions (K=10)
 - Choice similarities (4 Pearson correlations)
 - SCM layers (7: Temperature, Salience, Energy, Integration, Polarity, Net Warrant, Explanation Readiness)
+
+---
+
+## 10. Two-Tier Recall (v0.3.6+)
+
+The legacy `recall_memory()` collapsed three operations into one call:
+identity lookup, content delivery, and side effects (hit-count bump,
+warming). The two-tier API splits identity from content so callers that only
+need a hex_key/chunk handle can skip the CA convergence loop entirely.
+
+```
+recognize(query) ─────────────────────────► BasinSeed | None
+  │                                            │
+  ├── select_recall_chunks(query)              │   identity tier
+  ├── encode_to_frame(query)        RAW frame  │   - no evolve_and_interpret on query
+  ├── Pearson scan vs stored attractors        │   - 1 apply_ca_dynamics step on winner
+  ├── max sim < threshold? → None              │     for basin_stability reading
+  └── 1-step CA probe → basin_stability        │   - optional T update + drift if learning
+                                               ▼
+                                         (cheap handle)
+                                               │
+reconstruct(seed, query=None) ────────────────┼─► Pattern (stored, ticks=0)
+reconstruct(seed, query=str)                   │
+  │                                            │   content tier
+  ├── load stored attractor                    │   - blend stored + RAW query frame
+  ├── blend = (1-α) stored + α query_frame     │   - re-evolve through CA
+  └── evolve_and_interpret(blend)              │   - skips cold-path query-evolve
+                                               ▼
+                                       (full content + correlations)
+```
+
+Public API in `wheeler_memory/recall_api.py`. Wraps `storage.py` from outside
+— `storage.py` is a sacred file and was not modified.
+
+### Recognition tier
+
+`recognize(query)` (`wheeler_memory/recall_api.py:320`) does a Pearson scan
+against stored attractors using the **raw** query frame (no
+`evolve_and_interpret` on the query). Skips entries with `memory_type` in
+`{avoidance, polar}` and `grid == "experiential"` to mirror `recall_memory`'s
+filter set. Uses pre-cached `att_mean` / `att_std` from each entry's metadata
+when present (`_pearson_fast`, `wheeler_memory/recall_api.py:153`).
+
+The single `apply_ca_dynamics` step on the recognized basin produces
+`basin_stability` (the per-recall stability reading). This is constant 1-tick
+work, not a convergence loop. Test 1 in `tests/test_recall_api.py`
+monkeypatches `evolve_and_interpret` and asserts the call log is empty.
+
+### Reconstruction tier (warm-start)
+
+`reconstruct(seed, query=None)` returns the stored attractor with
+`ticks=0` — no CA work. `reconstruct(seed, query=str)` blends the stored
+attractor with the raw query frame and re-evolves
+(`wheeler_memory/recall_api.py:414`). The query is **not pre-evolved**; the
+warm start is exactly the savings versus the cold path, which spends ticks
+evolving the query separately before blending.
+
+Empirically, `scripts/bench/bench_recall_warm_vs_cold.py` shows ~2× ticks
+reduction across all input-distance bands when comparing warm-start
+reconstruction against the cold path.
+
+### Per-basin Temporal Stability (T) as drift-rate controller
+
+T is per-attractor float in `[0, 1]` stored in `chunks/<chunk>/index.json`
+under `metadata.t_stability`, alongside `metadata.t_recall_count`. New basins
+initialize lazily to `T_INIT_DEFAULT=0.0` via
+`wheeler_memory/t_metadata.py:13` (`ensure_t_fields`).
+
+When `learning_enabled=True`, `recognize` updates the winning basin under
+`fcntl.LOCK_EX` on `chunks/<chunk>/index.json.lock`:
+
+```
+T_new = (1 - T_EMA_RATE) * T_old + T_EMA_RATE * observed_stability
+plasticity = (1 - T_old) * BASIN_DRIFT_BASE_RATE
+stored_new = stored + plasticity * (observed - stored)
+```
+
+where `observed = apply_ca_dynamics(query_frame)` — one-step probe captures
+the direction of pull from the query without paying for a full evolve. T
+gates the drift rate: high T means rigid (drifts slowly), low T means
+plastic (drifts quickly).
+
+Constants in `wheeler_memory/constants.py:195`:
+
+| Constant | Value | Role |
+|---|---|---|
+| `RECOGNITION_THRESHOLD` | `0.45` | Min Pearson for recognition hit |
+| `T_INIT_DEFAULT` | `0.0` | Initial T (basins earn rigidity) |
+| `T_EMA_RATE` | `0.1` | EMA mixing rate |
+| `BASIN_DRIFT_BASE_RATE` | `0.02` | Base drift rate before T gating |
+
+### `_basin_stability` — p99-based reading
+
+The first design used `cortex_scm.score_energy(stored, one_step(stored))` for
+the per-recall stability reading. `score_energy` reports `1 - max(|delta|)`
+clipped to `[0, 1]`. Converged attractors with sharp ±1 boundaries flip a
+small number of cells per CA step → `max_delta = 2` → `score_energy = 0`. T
+could not accumulate organically.
+
+`_basin_stability` (`wheeler_memory/recall_api.py:139`) replaces it with:
+
+```
+1 - p99(|one_step - stored|) / 2
+```
+
+This mirrors the CA's own convergence detection
+(`CONVERGENCE_PERCENTILE = 99.0` in `constants.py`), which already uses p99
+to ignore handfuls of flipping cells. The `/ 2` normalises for the `[-1, 1]`
+value range so the reading is bounded in `[0, 1]`. After the fix, both hash
+and hippocampus encoders show clean T accumulation across 5 recalls:
+`0 → 0.10 → 0.19 → 0.27 → 0.34 → 0.40`, asymptoting toward an
+`observed_stability ~ 0.97-1.00` per probe.
+
+### Migration audit
+
+Existing call sites of `recall_memory` are catalogued in
+`plans/recall_migration_audit.csv` and classified:
+
+- **RECOGNITION_ONLY** — only consumes hex_key/chunk; safe to migrate to `recognize_top_k`
+- **RECONSTRUCTION** — consumes text/similarity/structural features; stay on `recall_memory`
+- **BOTH** — ambiguous; deferred or kept on `recall_memory`
+
+Migrated as of v0.3.6: `wheeler_memory/theories/structured.py:61`
+(basin-width measurement), `scripts/scm_ab_eval.py:301`,
+`scripts/scm_ab_eval.py:342`. CLI: `scripts/wheeler_recall.py` gains
+`--recognize` and `--learn` flags but defaults are unchanged.
+
+### What stays in `storage.py`
+
+The new module wraps `recall_memory()` from outside — `storage.py` is a
+sacred file (see `CLAUDE.md`) and was untouched. Tests
+(`tests/test_storage.py`) still verify the original API contract; the 758-test
+suite passes with no regressions.

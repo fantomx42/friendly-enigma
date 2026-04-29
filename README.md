@@ -24,6 +24,8 @@ Similar concepts produce similar attractors. Query evolution followed by three-g
 
 Memories have **temperature** - frequently recalled memories stay warm, stale ones cool. Recall is **reconstructive**: stored attractors blend with query context and re-evolve.
 
+As of v0.3.6, an opt-in two-tier recall path is available: a recognition tier that matches against stored attractors with no CA convergence loop on the query, and a reconstruction tier that warm-starts CA from the stored attractor. The default `wheeler-recall` path is unchanged (three-grid interference).
+
 **Benchmark goal:** MMLU against frontier models, measured as **learning gain** (train → consolidate → test), not as language modeling.
 
 ---
@@ -92,6 +94,38 @@ wheeler-mmlu --all --mode cortex --output results.tsv
 ```bash
 wheeler-ui  # opens http://localhost:7437
 ```
+
+---
+
+## Recognition vs Reconstruction
+
+The default recall path (three-grid interference) is unchanged. v0.3.6 adds an opt-in two-tier API:
+
+- **Recognition** — single-pass match against stored attractors, no CA convergence loop on the query. Returns top-1 (or top-k) with a stability score.
+- **Reconstruction** — warm-start CA evolution from a named stored attractor. ~2x fewer ticks than cold-start across near/mid/far input-distance bands.
+
+CLI:
+
+```bash
+wheeler-recall "how does attention work in transformers" --recognize         # recognition tier only
+wheeler-recall "how does attention work in transformers" --recognize --learn # also accumulate per-basin T (Temporal Stability)
+```
+
+Python:
+
+```python
+from wheeler_memory import recognize, recognize_top_k, reconstruct_from_seed
+
+seed = recognize("how does attention work in transformers")  # Optional[BasinSeed]
+if seed is not None:
+    pattern = reconstruct_from_seed(seed, query="how does attention work in transformers")
+    print(pattern.text, pattern.convergence_ticks)
+
+# Top-k seeds for ranked identity-only use
+seeds = recognize_top_k("how does attention work in transformers", k=5)
+```
+
+Each basin carries a Temporal Stability `T` in `index.json` (T=0 fresh, T→1 rigid). With `--learn`, recognition applies an EMA update to T and drifts the stored attractor toward the observed pattern at rate `(1 - T) * BASIN_DRIFT_BASE_RATE`.
 
 ---
 

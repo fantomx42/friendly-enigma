@@ -12,7 +12,8 @@ import numpy as np
 
 from ..dynamics import evolve_and_interpret
 from ..hashing import hash_to_frame
-from ..storage import DEFAULT_DATA_DIR, list_memories, recall_memory
+from ..recall_api import recognize_top_k
+from ..storage import DEFAULT_DATA_DIR, list_memories
 from ..temperature import effective_temperature
 from .basin import measure_basin_width
 
@@ -57,21 +58,17 @@ def build_theory(
         data_dir = DEFAULT_DATA_DIR
     data_dir = Path(data_dir)
 
-    # Recall relevant memories
-    recalled = recall_memory(query, top_k=top_k, data_dir=data_dir)
-    if not recalled:
+    # Recognize relevant memories (no CA engagement on the query)
+    seeds = recognize_top_k(query, k=top_k, data_dir=data_dir, threshold=0.0)
+    if not seeds:
         return Theory()
 
     # Build theory frames with basin widths
     frames = []
     raw_weights = {}
 
-    for mem in recalled:
-        hex_key = mem["hex_key"]
-        chunk = mem["chunk"]
-
-        # Load attractor for basin width measurement
-        att_path = data_dir / "chunks" / chunk / "attractors" / f"{hex_key}.npy"
+    for seed in seeds:
+        att_path = data_dir / "chunks" / seed.chunk / "attractors" / f"{seed.hex_key}.npy"
         if not att_path.exists():
             continue
 
@@ -80,12 +77,12 @@ def build_theory(
         bw_result = measure_basin_width(attractor, n_probes=10, steps=5)
         bw = bw_result["width"]
 
-        temp = mem.get("temperature", 0.0)
+        temp = seed.temperature
         confidence = temp * bw if bw > 0 else 0.0
 
         frame = TheoryFrame(
-            hex_key=hex_key,
-            text=mem["text"],
+            hex_key=seed.hex_key,
+            text=seed.text,
             temperature=temp,
             basin_width=bw,
             confidence=confidence,
@@ -94,7 +91,7 @@ def build_theory(
 
         # Weight for context budget: hit_count proxy via temperature * basin_width
         hit_count = max(1, int(temp * 10))  # Approximate from temperature
-        raw_weights[hex_key] = hit_count * bw
+        raw_weights[seed.hex_key] = hit_count * bw
 
     # Normalize context budget
     total_weight = sum(raw_weights.values())
