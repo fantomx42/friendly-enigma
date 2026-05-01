@@ -55,99 +55,99 @@ style: |
 ---
 
 # Wheeler Memory (Darman)
-## Cellular Automata Associative Recall
+## Cellular-Automaton Associative Memory — v0.3.6
 
 ---
 
 ## The Problem
 
-Current AI systems have no persistent memory between conversations. They retrieve confidently without admitting uncertainty, confabulating when they don't know. **Humans do the opposite**: we remember imperfectly, hedge on uncertain memories, and reconstruct differently depending on context.
+Current AI systems have no persistent memory between conversations. Vector databases retrieve the same row every time. Humans don't — we remember imperfectly, hedge on uncertain memories, and reconstruct differently depending on context.
 
 ## The Solution
 
-Wheeler Memory is a cellular automata–based associative memory system that stores memories as stable attractor patterns on a 64×64 grid. Recall isn't retrieval—it's **reconstruction**: the system finds the closest stored pattern, blends it with query context (30% new, 70% stored), and re-evolves it through the automaton. Same memory, different reconstructions depending on context, just like human recall.
+Wheeler Memory stores text as stable attractor patterns on a 64×64 cellular-automaton grid — no LLM, no pretrained models in the core. Recall isn't retrieval; it's **reconstruction**: find the closest stored pattern, blend it with query context, re-evolve through the CA. Same memory, different reconstructions in different contexts.
+
+As of v0.3.6, recall is **two-tier**: a cheap recognition pass returns identity without engaging the CA loop on the query, and an opt-in reconstruction pass warm-starts the CA from a named basin.
 
 ---
 
 ## How It Works
 
 ```
-Text → Hash → CA Evolution (40–100 ticks)
-  ↓
-Stable Attractor (pattern) → Store
-  ↓
-Query → Find Closest (Pearson) → Blend (α=0.3)
-  ↓
-Re-Evolve → Reconstruct Answer
+Text → Encoder → 64×64 frame → CA evolution (~5–14 ticks)
+                                       ↓
+                            Stable attractor → Store
+                                       ↓
+Query → Recognition (Pearson scan, no CA on query) → BasinSeed | None
+                                       ↓
+                Reconstruction (warm-start CA from seed) → Pattern
 ```
 
-**Three CA Rules per Cell:**
-- Peak (local max) → +1
-- Valley (local min) → −1
-- Slope → flow uphill
+**Three-grid interference (default recall path)**:
+`Answer = Corpus × Experiential × (1 − |SCM|)`
 
-**Temperature-Based Decay:**
-- Hot (≥0.6): "I remember clearly..."
-- Warm (≥0.3): "I believe... but I'm not sure..."
-- Cold (<0.3): "I vaguely recall..."
-- Half-life: 7 days without recall
+- **Corpus**: crystallized knowledge, tight attractors
+- **Experiential**: episodic memory, loose attractors, 2-day half-life
+- **SCM**: 64×64 trust topology, sculpted by self-consistency feedback
+
+Four interference states: GROUNDED, ABSORBED, UNCONSOLIDATED, CONTESTED.
 
 ---
 
-## Key Facts
+## What's Native (No Pretrained Models)
 
-- **Speed**: ~3ms CPU, 10× faster on GPU (HIP/ROCm + CUDA)
-- **Local-Only**: No cloud APIs; all memories stay on your machine
-- **19 Modules, 167 Tests**: Fully tested across 6 domains (code, hardware, daily_tasks, science, meta, general)
-- **95%+ Paraphrase Coverage**: Semantic embeddings optional; core recall works without ML
-- **Reconstructive, Not Retrieval**: Context-colored recall; same memory yields different outputs
-- **Epistemic Humility**: Temperature reflects confidence; system admits uncertainty
+- **Hippocampus encoder**: character n-gram random indexing (default)
+- **Context-RI encoder**: distributional semantics, trained on WikiText-103 + OpenWebText (601M words). SimLex-999 ρ = +0.255 — **first native encoder with positive semantic signal**, 57% of MiniLM's pretrained ceiling (+0.446)
+- **Cortex L1/L2/L3**: graph topology → settlement CA → numpy SGD classifier (11K params)
+- **Two-tier recall**: per-basin Temporal Stability `T` accumulates via EMA on each `--learn` recall; high-T basins resist drift, low-T basins absorb new context
 
----
-
-## Validation
-
-- **10K+ Test Cases**: Across MBPP, SWE-bench, BABILong, and domain-specific datasets
-- **Diversity Report**: 95%+ coverage of paraphrases and semantic variations
-- **Reconstruction Fidelity**: Blended memories preserve core semantics while adapting to query context
-- **GPU Performance**: Demonstrated 10× speedup on ROCm; auto-fallback to CPU
+`sentence-transformers` is optional, only via `.[embed]`.
 
 ---
 
-## Roadmap
+## Numbers (current)
 
-**Done:**
-- Core CA engine & attractor storage
-- Pearson correlation–based recall
-- Temperature-based decay
-- Web UI dashboard
-- CLI tools (store, recall, temps, scrub)
-- Darman chatbot agent
-- GPU support (HIP/ROCm + CUDA)
-- Semantic embeddings (optional)
-
-**Next:**
-- Multimodal (images & audio)
-- Concept clustering
-- Federated memory
-- WebAssembly browser runtime
+- **Speed**: ~3 ms/tick CPU; **71× speedup** on RX 9070 XT at batch=1000
+- **Repository**: 44 modules, 775 tests, 16 CLI commands
+- **MMLU all 57 subjects (14,042 questions, test split)**:
+  - zero-shot cortex: 24.3% (3,418/14,042) — chance is 25%
+  - cortex + learned facts: 25.3% (3,557)
+  - cortex + L3 classifier: 25.9% (3,643)
+- **Two-tier recall**: ~2× fewer ticks warm-vs-cold across near/mid/far input distance bands (with band-dependent recognition rate)
+- **Local-only**: all memories stay on disk, no cloud calls
 
 ---
 
-## Open Source
+## Honest Caveats
 
-**GitHub**: [fantomx42/wheeler-memory](https://github.com/fantomx42/wheeler-memory)
+- L3 classifier "barely moved from chance" — needs more training data or richer features. We say so.
+- Context-RI captures noun similarity well (ρ=+0.331) but verbs are still the hard case (+0.050). Bag-of-words distributional methods just are like that.
+- The interference engine's spatial-vs-scalar SCM rank ordering has a known issue tracked in the roadmap.
 
-**License**: CC BY-NC 4.0 (Non-Commercial Creative Commons)
-
-**Citation**: Wheeler, J. A. (1989). *It from Bit*. In *A Brief History of Time* (Ed. S. Hawking). Elizabeth Loftus on reconstructive memory.
-
-**Community**: Contributions welcome. All local, no cloud dependency.
+The pitch isn't "we beat GPT" — the pitch is "this is real, here's what works, here's what doesn't, and the codebase tells the truth either way."
 
 ---
 
-## Why This Matters
+## Try It
 
-AI should remember **like you do**—imperfectly, associatively, context-dependent. Current systems retrieve; Wheeler Memory reconstructs. It's the first architecture to combine cellular automata theory with associative recall, giving AI a mind that admits uncertainty and adapts recall to context.
+```
+git clone https://github.com/fantomx42/wheeler-memory.git
+pip install -e .
+wheeler-store "self-attention computes relationships between all positions"
+wheeler-recall "how does attention work in transformers"
+wheeler-recall "..." --recognize --learn  # two-tier path with T accumulation
+```
 
-**"The formula is the foundation. Everything else is commentary."**
+Static demo: open `docs/demos/demo.html` in a browser.
+
+**Repo**: https://github.com/fantomx42/wheeler-memory
+**License**: CC BY-NC 4.0
+**Citation**: Wheeler, J. A. — *Information, Physics, Quantum: The Search for Links* (1989). Loftus on reconstructive memory.
+
+---
+
+## Why It Matters
+
+AI should remember the way humans do — imperfectly, associatively, context-dependent. Current systems retrieve; Wheeler Memory reconstructs. The architecture treats Wheeler's "It from Bit" literally: bits are the substrate, attractor dynamics are the meaning, epistemic states (GROUNDED / ABSORBED / UNCONSOLIDATED / CONTESTED) emerge from interference rather than getting hand-coded.
+
+**"Convergence is ground truth."**

@@ -161,14 +161,6 @@ wheeler-primary --verbose                            # pipeline diagnostics
 
 Wheeler-primary mode: Wheeler Memory is the cognitive system, the small model is a pure language renderer. The model reads Wheeler's attractor state and renders it as natural language — it does not reason or add its own knowledge.
 
-## Web dashboard
-
-```bash
-wheeler-ui                         # launch on http://localhost:7437
-```
-
-Opens a local browser dashboard for storing, recalling, and browsing memories. See `ui/README.md` for details.
-
 ## Encoder types
 
 The `--encoder` flag (available on `wheeler-store`, `wheeler-recall`, and benchmark commands) selects the text-to-frame encoding strategy:

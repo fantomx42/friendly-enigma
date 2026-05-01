@@ -61,7 +61,7 @@ from .warming import get_neighbors, load_associations
 
 # GPU backend (optional — available only when a HIP .so is built)
 try:
-    from .gpu_dynamics import (
+    from .accel.ca import (
         gpu_available,
         gpu_evolve_batch,
         gpu_evolve_single,

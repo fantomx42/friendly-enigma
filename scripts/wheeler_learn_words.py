@@ -1,9 +1,11 @@
-"""CLI: Train word vectors from stored Wheeler memories.
+"""Train word vectors from stored Wheeler memories.
+
+Run as a module — there is no registered CLI entry point.
 
 Usage:
-    wheeler-learn-words
-    wheeler-learn-words --method svd --data-dir /path/to/data --window 5 --dim 384
-    wheeler-learn-words --method context-ri --corpus datasets/corpus.jsonl
+    python -m scripts.wheeler_learn_words
+    python -m scripts.wheeler_learn_words --method svd --data-dir /path/to/data --window 5 --dim 384
+    python -m scripts.wheeler_learn_words --method context-ri --corpus datasets/corpus.jsonl
 """
 
 import argparse

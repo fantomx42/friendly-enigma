@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.3.6 — Cleanup pass (2026-04-29)
+
+A separate cleanup commit on top of the v0.3.6 release. No behaviour change to the running system; everything tested green (775 tests passing, down from 808 only because three theory test files moved to the archive — the production paths still test the same code).
+
+### Removed
+
+- **`wheeler-ui` CLI and `scripts/wheeler_ui.py`**: orphaned since 2026-03-20 (its `UI_FILE` / `CHAT_FILE` paths pointed at a `ui/` directory that had been moved to `docs/demos/`). The script aborted on a missing-file check; nothing was rescuing it. Removed from `pyproject.toml` `[project.scripts]`. Static demo HTML remains under `docs/demos/`.
+- **`wheeler_memory/gpu/` directory**: deprecated since 2026-04-08 (superseded by `wheeler_memory/accel/hip/`). Stale duplicate `.so` binaries and `.hip` sources removed. Five live doc/script references re-pointed at the active path.
+- **`wheeler_memory/gpu_dynamics.py` shim**: only callers were two internal imports plus a single test that existed solely to verify the shim. Internal imports switched to `from .accel.ca import ...`; shim and shim-only test deleted.
+- **5 dead constants in `wheeler_memory/constants.py`**: `CORTEX_CLASSIFIER_LR`, `CORTEX_CLASSIFIER_PATH`, `TRAJECTORY_CURVE_LEN`, `RECALL_ENCODER`, `EXPERIENTIAL_HIT_SATURATION` (zero callers in production code).
+
+### Reorganised
+
+- **`scripts/exploration/` → `notes/exploration/`** (9 research-notebook scripts; not pytest, not CLI entry points). The four scripts that produce diagrams in `docs/assets/reports/` are still invoked manually as `python notes/exploration/test_diversity*.py --output ...`; updated `docs/assets/README.md` accordingly.
+- **`scripts/experiments/` → `notes/experiments/`** (6 per-theory exercises that pair with the theory modules).
+- **3 theory modules archived**: `wheeler_memory/theories/lichtenberg.py`, `resonance.py`, `structured.py` → `notes/theories/`. Their pytest suites moved with them to `notes/theories/tests/`. The `__init__.py` was rewritten to drop the archived imports.
+- **Production-supporting theories stayed live**: `wheeler_memory/theories/basin.py`, `metrics.py`, `synthesis.py` remain in the package because production code (agent, decoder, wheeler_mmlu, the apple-test benchmark) imports them. Their tests stayed under `tests/`.
+- **`results/archive/`**: 6 March-2026 MMLU logs + 5 older `scm_ab_eval` JSONLs moved out of the active `results/` directory; latest run artifacts kept at the top level. `BASELINES.md` (the textual record) stays live.
+- **`plans/archive/`**: all 5 March-2026 plan markdowns + the `planned-theories-test/` directory archived; `plans/recall_migration_audit.csv` (the live v0.3.6 deliverable) stays. New `plans/README.md` describes active vs archived.
+
+### Documentation
+
+- **Pitch pack rewritten for v0.3.6**: `BLUEPRINT.md`, `one_pager/darman_one_pager.md`, `slides/01_investor_pitch.md`, `slides/02_developer_pitch.md`, `slides/03_general_pitch.md`, and `demo_script/demo_script.md` fully rewritten. The 1324-line `whitepaper/wheeler_memory_whitepaper.md` was updated section by section: new abstract; revised contributions list with two-tier recall + per-basin Temporal Stability + three-grid interference + Context-RI as headline architectural moves; expanded §5 with five new validation subsections (warm-vs-cold benchmark, T trajectory, SimLex-999, Apple Test, MMLU). The previous "Symbolic Collapse Model" framing was renamed to "convergence-as-meaning" so the abbreviation **SCM** is reserved for the **Structural Coherence Map** (the trust-topology grid in three-grid interference).
+- **Honest numbers**: pitch pack and README now cite 44 modules / 775 tests / 16 CLI commands; ~3 ms/tick CPU, 71× GPU speedup at batch=1000; MMLU all-57 cortex 24.3% / cortex+facts 25.3% / cortex+L3 25.9% (chance 25%); Context-RI ρ=+0.255 (57% of MiniLM ceiling); two-tier ~2× tick reduction. The L3-at-chance result is named honestly in every audience-facing file rather than buried.
+- **Cross-doc consistency**: `README.md`, `docs/architecture.md`, `docs/cli.md`, `docs/install.md`, `docs/gpu.md`, `docs/assets/README.md`, `docs/demos/README.md`, `wheeler_memory/CONTEXT.md`, `scripts/CONTEXT.md` all updated for the post-cleanup project shape.
+- **`scripts/wheeler_learn_words.py` docstring**: previously claimed a `wheeler-learn-words` CLI that was never registered. Updated to say `python -m scripts.wheeler_learn_words` to match reality.
+
+### Verification
+
+- `pytest -m "not slow"` → 729 passed + 46 deselected (775 total), no regressions.
+- All `wheeler-ui` mentions outside historical version-history disclosures are gone.
+- `pyproject.toml` version bumped 0.3.5 → 0.3.6 to match the CHANGELOG.
+
 ## v0.3.6 (2026-04-28)
 
 ### Two-Tier Recall API
@@ -45,6 +78,10 @@
 ### Out of Scope
 
 - Sleep Pass / drift consolidation deferred. T currently only updates on recall; there is no offline pass that consolidates accumulated T into the stored corpus state. Tracked for a later release.
+
+### Removed
+
+- **`wheeler-ui` CLI and `scripts/wheeler_ui.py`**: The web dashboard entry point was already broken — `UI_FILE` and `CHAT_FILE` pointed at a `ui/` directory that was relocated to `docs/demos/` in March 2026 (commit `cadab70c`), so any invocation of `wheeler-ui` aborted immediately on a missing-file check. The orphaned script and its `pyproject.toml` entry have been removed; static demo HTML remains under `docs/demos/`. If a live dashboard is wanted again, it should be a fresh implementation against the current `recall_api` / `storage` surfaces.
 
 ## v0.3.5 (2026-04-27)
 

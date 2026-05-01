@@ -300,8 +300,6 @@ benchmarks, crystallization) use batch dispatch.
 cd wheeler_memory/accel/hip && make all
 ```
 
-`gpu_dynamics.py` is a backwards-compatible shim that re-exports from `accel.ca`.
-
 See [GPU Acceleration](gpu.md) for benchmark numbers and setup.
 
 ---
@@ -346,7 +344,6 @@ wheeler_memory/
 ├── brick.py             MemoryBrick: temporal evolution history (.npz archives)
   CA ENGINE
 ├── dynamics.py          CA engine: apply_ca_dynamics(), evolve_and_interpret(), evolve_batch()
-├── gpu_dynamics.py      Backwards-compatible shim → accel.ca
 ├── oscillation.py       Role-space periodicity detection
 ├── rotation.py          Rotation retry for non-converging seeds
   GPU ACCELERATION (accel/)
@@ -391,7 +388,7 @@ wheeler_memory/
 ├── trajectory.py        Trajectory similarity for retrieval
 ├── trajectory_cache.py  Trajectory signature caching
   SUBPACKAGES
-├── theories/            Theory experiments (basin, resonance, synthesis, etc.)
+├── theories/            Production-supporting helpers (basin, metrics, synthesis)
 └── gpu/                 DEPRECATED — migrated to accel/hip/
 ```
 

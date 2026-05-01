@@ -2,6 +2,10 @@
 
 All 16 CLI commands are registered in `pyproject.toml [project.scripts]` and point to functions in these files.
 
+> Research notebooks (`exploration/`) and per-theory exercises (`experiments/`) used
+> to live here. They were moved to `notes/` to fight feature creep — see
+> `notes/README.md` for what's there and how to revive any of it.
+
 ## Top-Level Scripts (CLI Entry Points)
 
 ### Core Operations
@@ -29,7 +33,6 @@ All 16 CLI commands are registered in `pyproject.toml [project.scripts]` and poi
 - **wheeler_scm.py** — `wheeler-scm` CLI. Inspect SCM trust topology: openness, heatmap, reset.
 
 ### Utilities
-- **wheeler_ui.py** — `wheeler-ui` CLI. Web dashboard at localhost:7437.
 - **scrub_brick.py** — `wheeler-scrub` CLI. Brick inspector / memory formation visualizer.
 - **wheeler_learn_words.py** — Word vector training from stored corpus.
 - **train_cortex_classifier.py** — L3 cortex classifier training script.

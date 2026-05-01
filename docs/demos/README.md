@@ -1,41 +1,17 @@
-# Wheeler Memory User Interfaces
+# Wheeler Memory Demos
 
-This directory contains interactive web-based interfaces for Wheeler Memory.
+Static HTML demonstrations of the Wheeler Memory system.
 
-## Dashboard (`dashboard.html`)
+## Files
 
-The main Wheeler Memory control dashboard. This is the primary UI for:
-- Storing new memories
-- Recalling memories by similarity
-- Viewing active memory state and temperatures
-- Consolidating memories (sleep)
-- Forgetting memories
+- **demo.html** — Interactive educational walkthrough. Standalone, opens directly in a browser. Covers CA dynamics, attractors, temperature, and example evolutions.
+- **dashboard.html** — Historical control-panel UI. Was previously served by a `wheeler-ui` Python entry point that has been retired (the entry point and its server were removed in v0.3.6 because they had drifted out of date with the core).
+- **chat.html** — Historical chat-style demo, also previously server-backed.
 
-**Launch**: Use the `wheeler-ui` command (entry point in `pyproject.toml`):
-```bash
-wheeler-ui
-```
+## Status
 
-This starts a local HTTP server on `http://localhost:7437` and opens the dashboard automatically.
+Only `demo.html` is fully functional today and runs offline as a static page. `dashboard.html` and `chat.html` are kept for reference; they will not work without a server implementing the `/api/` endpoints they expect.
 
-## Demo (`demo.html`)
+## Future
 
-An interactive demonstration and educational walkthrough of Wheeler Memory. This page showcases:
-- Core concepts (CA dynamics, attractors, temperature)
-- Visual evolution animations
-- Example memory formation and recall
-- System architecture explanations
-
-**Note**: The demo is standalone and can be opened directly in a browser as a static file, or served locally.
-
-## Architecture Notes
-
-- **dashboard.html**: Server-driven via `/api/` endpoints in `wheeler_ui.py` (store, recall, forget, sleep endpoints)
-- **demo.html**: Standalone static HTML; includes embedded JavaScript for educational visualization
-- Both share design system CSS (dark theme, violet/cyan/magenta accents)
-
-## Future Work
-
-- Merge dashboard and demo into a unified, tabbed interface
-- Add real-time CA evolution visualization with WebGL
-- Export memory snapshots and attractor correlation matrices
+If you want a live dashboard back, the right path is a fresh implementation that talks to the current `wheeler_memory.recall_api` and `wheeler_memory.storage` surfaces — not a revival of the old `wheeler_ui.py`.

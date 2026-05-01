@@ -40,15 +40,6 @@ def test_accel_ca_module_imports():
     assert hasattr(ca, "gpu_evolve_batch")
 
 
-def test_gpu_dynamics_shim():
-    """gpu_dynamics.py re-exports from accel.ca."""
-    from wheeler_memory import gpu_dynamics
-
-    assert hasattr(gpu_dynamics, "gpu_available")
-    assert hasattr(gpu_dynamics, "gpu_evolve_single")
-    assert hasattr(gpu_dynamics, "gpu_evolve_batch")
-
-
 def test_npu_imports():
     """npu package imports without error."""
     from wheeler_memory import npu

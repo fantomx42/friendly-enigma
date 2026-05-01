@@ -25,289 +25,300 @@ style: |
 ---
 
 # Wheeler Memory
-## Project Darman
+## Project Darman — v0.3.6
 
-**A memory system that remembers like you do — imperfectly, associatively, and influenced by context.**
+**A reconstructive memory substrate for AI — pure-Python, native, local-first.**
+
+We will not pitch the next AGI. We will pitch a real, tested, honest memory engine.
 
 ---
 
 ## The Problem
 
-### Why Memory Matters in LLMs
+### Why memory matters in LLMs
 
-- **Confabulation**: Current LLMs hallucinate confidently with zero uncertainty signals
-- **Statelessness**: No memory = no personalization, no context persistence across sessions
-- **Information Loss**: Context windows close; conversational history is discarded
-- **Enterprise Risk**: Mission-critical applications can't rely on models that don't know what they don't know
+- **Confabulation**: LLMs hallucinate confidently with no uncertainty signal
+- **Statelessness**: no memory across sessions = no real personalization
+- **Information loss**: context windows close; conversational history is discarded
+- **Vector DBs are filing cabinets**: same query, same row, no reconstruction
 
 **Today's LLMs are amnesiacs who don't admit it.**
 
 ---
 
-## Market Opportunity
+## Market opportunity
 
-### The $100B+ LLM Market Needs Memory
+### The LLM market needs a memory layer that is honest about itself
 
-| Market Segment | Size | Pain Point |
-|---|---|---|
-| Enterprise Copilots | $30B+ | Need reliable recall for customer history, docs |
-| AI Search/RAG | $20B+ | Vector DBs don't reconstruct; retrieval ≠ memory |
-| Agentic Systems | $25B+ | Agents need persistent state, forgetting curves |
-| Personalized LLMs | $25B+ | User models require associative recall |
+| Market segment | Pain |
+|---|---|
+| Enterprise copilots | Need reliable recall + auditable confidence |
+| AI search / RAG | Static retrieval ≠ memory |
+| Agentic systems | Persistent state, forgetting curves |
+| Personalized assistants | Associative recall, context-dependent reconstruction |
 
-**Memory is the missing layer.** Every major LLM platform (OpenAI, Anthropic, Google) is exploring it. The first production-ready system wins.
-
----
-
-## Our Solution: Wheeler Memory
-
-### A Cellular-Automaton Memory Engine
-
-**Text → CA Attractor → Correlation Search → Context-Dependent Reconstruction**
-
-- **Unique**: Uses 3-state cellular automaton instead of vectors
-- **Reconstructive**: Every recall is context-dependent (like human memory)
-- **Temperature-Aware**: Explicit confidence tiers prevent confabulation
-- **Local-First**: Runs entirely on-device; no cloud dependency
-- **GPU-Optional**: Works on CPU; accelerates on HIP/ROCm/CUDA
-
-**"Darman doesn't retrieve. Darman reconstructs."**
+Every major LLM platform is now exploring "memory." The differentiator we've been building is: **memory that admits what it knows, doesn't know, and can't decide.**
 
 ---
 
-## How It Works (Simplified)
+## Our solution: Wheeler Memory
+
+### A cellular-automaton memory engine
 
 ```
-Text Input
-    ↓
-SHA-256 hash (or semantic embedding)
-    ↓
-64×64 grid seed
-    ↓
-3-State CA Evolution (40-100 ticks)
-    ↓
-Stable Attractor Pattern
-    ↓
-Search: Pearson correlation against query
-    ↓
-Reconstruct: Blend stored + query, re-evolve
-    ↓
-Result: Context-dependent memory
+text → encoder → 64×64 frame → CA evolution (5–14 ticks) → attractor
+                                                                ↓
+query → recognize() → BasinSeed | None
+                                                                ↓
+       reconstruct_from_seed(seed, query) → Pattern
 ```
 
-**Convergence: ~3 ms on CPU. Deterministic. Reproducible.**
+- **3-state CA dynamics** (peak/valley/slope) instead of vectors
+- **Reconstructive recall** — every recall is context-dependent
+- **Three-grid interference** — corpus × experiential × SCM-trust topology
+- **Two-tier API** (v0.3.6) — cheap recognition vs expensive reconstruction
+- **Native encoders** — no pretrained models in the core
+- **Local-first** — runs entirely on-device
 
 ---
 
-## Key Differentiator #1: Reconstructive Recall
+## Key differentiator #1: reconstructive recall
 
-### Darman Reconstructs, Not Retrieves
-
-Same stored memory reconstructs differently depending on context:
+### Same memory, different reconstructions
 
 ```
-blend = (1 - α) × stored + α × query    (α = 0.3)
+blend = (1 − α) × stored + α × query        (α = 0.3 default)
 reconstructed = evolve_and_interpret(blend)
 ```
 
-- Query "machine learning" vs. "debugging" → different reconstructions
-- **Like human memory** (Elizabeth Loftus, cognitive psychology)
-- **Prevents database-like rigidity** — memories stay alive and contextual
-
-**Competitors** (vector DBs, RAG): Static retrieval. Same result every time. No context dependency.
+- Query "machine learning" vs "debugging" → different reconstructions of the *same* stored attractor
+- Aligned with cognitive science (Loftus on reconstructive memory)
+- **Vector DBs can't do this** by construction — they're row stores
 
 ---
 
-## Key Differentiator #2: Temperature System
+## Key differentiator #2: two-tier recall (v0.3.6 headline)
 
-### Epistemic Humility — Confidence Built In
+### Identity is cheap. Content is expensive. Separate them.
 
-```
-temp = base_from_hits × decay_from_time
-Half-life: 7 days
-```
-
-| Tier | Temp Range | Darman's Language |
+| Tier | What it does | Cost |
 |---|---|---|
-| **Hot** | ≥ 0.6 | "I clearly remember…" |
-| **Warm** | ≥ 0.3 | "I think we discussed…" |
-| **Cold** | < 0.3 | "I vaguely recall, but I'm uncertain…" |
+| **Recognize** | Single Pearson scan against stored attractors using the raw query frame. Returns a `BasinSeed` (id, similarity, basin stability) or `None`. | No CA loop on the query |
+| **Reconstruct** | Warm-start the CA from the stored attractor. Re-evolve. | ~2× fewer ticks than cold start across distance bands |
 
-- **Prevents confabulation**: LLM can't sound confident about stale memories
-- **Competitive advantage**: Customers know when to trust the system
-- **Explainable AI**: Confidence is auditable, not a black box
+Plus per-basin **Temporal Stability `T`**: drift `(1 − T) × base_rate` toward observed pattern on each `--learn` recall. Mature basins become rigid; fresh basins absorb new context.
 
 ---
 
-## Key Differentiator #3: Local-First, Privacy-Preserving
+## Key differentiator #3: three-grid interference
 
-### No Cloud. No API Keys. No Data Escape.
-
-- **All computation on-device**: CPU or local GPU
-- **All storage local**: `~/.wheeler_memory/` by default
-- **No vendor lock-in**: Sentence-transformers runs locally; Ollama serves LLM locally
-- **Enterprise-ready**: HIPAA, GDPR, CFAA compliance by architecture
-
-**Market advantage**: Enterprises demand data sovereignty. We deliver it.
-
----
-
-## Technical Validation
-
-### Proof Points
-
-- **167+ automated tests** covering CA dynamics, recall, reconstruction, temperature decay
-- **3 major datasets**: MBPP (code), SWE-bench (software engineering), BABILong (long-context reasoning)
-- **Diversity validation**: Rotation retry (0°/90°/180°/270°) ensures stability across seed angles
-- **Reconstruction demo**: Semantic recall on embedding-based paraphrases
-- **GPU benchmarks**: HIP/ROCm + CUDA with auto-fallback
-
-**All tests reproducible. All benchmarks public.**
-
----
-
-## Architecture: 19 Modules, Deep Stack
+### Epistemic state emerges from physics, not heuristics
 
 ```
-Agent Loop (Ollama integration)
-    ↓
-Chunking & Routing (6 domain-specific stores)
-    ↓
-Reconstruction Engine (context-dependent blending)
-    ↓
-Temperature Dynamics (decay + confidence tiers)
-    ↓
-Storage & Recall (Pearson correlation)
-    ↓
-3-State CA Dynamics (local max/min/slope rules)
+Answer = Corpus × Experiential × (1 − |SCM|)
 ```
 
-- **Modular**: Swap any layer without touching others
-- **Testable**: Each module has isolated test suite
-- **Extensible**: Custom embeddings, hashing, GPU kernels
+- **Corpus** — crystallized knowledge, tight attractors
+- **Experiential** — episodic memory, loose attractors, fast decay
+- **SCM** — Structural Coherence Map (permission topology, sculpted by self-consistency feedback)
+
+Four interference states fall out: GROUNDED, ABSORBED, UNCONSOLIDATED, CONTESTED. *No state is hand-coded.*
 
 ---
 
-## Engine Philosophy
+## Key differentiator #4: native by default
 
-### "The Engine Is the Mind. The LLM Is the Voice."
+### No pretrained models in the core
 
-**Key insight**: Swap the underlying model (GPT-4 → Mistral → local 7B) and Darman's *behavior* stays the same. Only *phrasing* changes.
+- **Hippocampus** — character n-gram random indexing
+- **Context-RI** — distributional semantics, trained on **601M words** (WikiText-103 + OpenWebText). **First native encoder with positive SimLex-999 signal**: ρ = +0.255, vs MiniLM's pretrained ceiling of +0.446 (57% of ceiling, no pretrained models).
+- **Cortex L1/L2/L3** — graph topology + settlement CA + numpy SGD classifier (~11K params)
 
-**Why this matters**:
+`sentence-transformers` is *optional*, behind `pip install -e ".[embed]"`.
+
+---
+
+## Key differentiator #5: temperature & forgetting
+
+### Confidence is computed, not guessed
+
+```
+temp = base_from_hits × decay_from_time     (7-day half-life default)
+```
+
+| Tier | Range | Meaning |
+|---|---|---|
+| **Hot** | ≥ 0.6 | Recent or frequently recalled |
+| **Warm** | ≥ 0.3 | Middle ground |
+| **Cold** | ≥ 0.05 | Rarely accessed |
+| **Fading / Dead** | < 0.05 / < 0.01 | Eviction candidates |
+
+Sleep consolidation prunes redundant keyframes from cold bricks. Capacity ceiling: 10,000 attractors with graceful degradation.
+
+---
+
+## Key differentiator #6: local-first, privacy-preserving
+
+### No cloud. No API keys. No data escape.
+
+- All computation on-device (CPU or local GPU)
+- All storage local (`~/.wheeler_memory/`)
+- Optional Ollama for LLM rendering — entirely local
+- HIPAA / GDPR / sovereignty story is **architectural**, not policy-based
+
+Enterprises demand data sovereignty. We deliver it by construction.
+
+---
+
+## Honest technical numbers
+
+### Things we say with citations, not adjectives
+
+| Metric | Value | Source |
+|---|---|---|
+| Modules / tests / CLIs | 44 / 775 / 16 | repo |
+| CA evolution speed | ~3 ms/tick CPU | `wheeler-bench` |
+| GPU speedup (RX 9070 XT, batch=1000) | **71×** | `wheeler-bench-gpu` |
+| Two-tier warm-vs-cold ticks | ~2× fewer | `bench_recall_warm_vs_cold.py` |
+| Context-RI SimLex-999 ρ | +0.255 | `wheeler-simlex` |
+| MiniLM ceiling (external, ref) | +0.446 | `wheeler-simlex` |
+| MMLU 57-subject zero-shot cortex | 24.3% | `wheeler-mmlu --all --mode cortex` |
+| MMLU + L3 classifier | 25.9% | same |
+| Random chance | 25.0% | — |
+
+L3 barely beat chance. We say so. We then say what fixes it.
+
+---
+
+## What we have NOT built
+
+### Said out loud
+
+- No multimodal (no images, no audio)
+- No federated memory
+- No browser runtime
+- No live web dashboard right now (the prior `wheeler-ui` was retired in v0.3.6 because the script had drifted out of date with the core)
+
+The pitch is "this is real, here's what works, here's what doesn't."
+
+---
+
+## Engine philosophy
+
+### "The engine is the mind. The LLM is the voice."
+
+Swap GPT-4 → Mistral → local 1.5B model and Wheeler's *behavior* stays the same. Only *phrasing* changes.
+
 - Behavior is deterministic, auditable, provable
-- Not dependent on model capability
-- Cheaper to operate at scale (smaller models work)
+- Not dependent on the LLM's capability
+- Cheaper to operate at scale (small models work)
 - Personality emerges from memory, not from prompt engineering
 
-**Enterprise value**: Darman's identity is stable regardless of LLM upgrade.
+`wheeler-primary --interactive --show-state` shows both layers explicitly.
 
 ---
 
-## Design Principles
+## Architecture: 44 modules, deep stack
 
-### 7 Axioms That Drive Everything
+```
+agent.py / decoder.py / language_wheeler.py     ← optional renderers
+       ↓
+recall_api.py (recognize / reconstruct_from_seed)   ← v0.3.6
+       ↓
+interference.py (three-grid scoring)            ← v0.3.1+
+       ↓
+storage.py (chunked Pearson search)             ← sacred
+       ↓
+cortex.py / cortex_scm.py / cortex_classifier.py    ← native L1/L2/L3
+       ↓
+dynamics.py + accel/ca.py (CPU + HIP/ROCm)      ← CA substrate
+```
 
-1. **Engine is the mind** — behavior from CA, phrasing from LLM
-2. **Reconstructive recall** — context-dependent, not static lookup
-3. **Temperature is epistemic humility** — uncertainty is computed, not guessed
-4. **Memories are suggestions** — LLM can disagree with stale memories
-5. **Minimize LLM dependency** — engine handles search/decay/reconstruction
-6. **Local-only by default** — cloud is optional, not required
-7. **Formula is the foundation** — CA rule is load-bearing; UI is commentary
-
-These principles prevent feature creep and ensure the system stays coherent as it scales.
+Modular. Testable. CC BY-NC 4.0.
 
 ---
 
-## Competitive Positioning
+## Competitive positioning
 
-### Wheeler vs. Alternatives
+### Wheeler vs alternatives
 
 | Aspect | Vector DB | RAG | Wheeler Memory |
 |---|---|---|---|
-| Retrieval | Static | Static | **Context-Dependent** |
-| Confidence Signal | None | None | **Temperature Tier** |
-| Reconstruction | No | No | **Yes** |
-| Local-First | Sometimes | Sometimes | **Always** |
-| Forgetting | Manual | Manual | **Automatic (7d)** |
-| Associative Recall | No | No | **Yes** |
-| Cost at Scale | Linear | Linear | **Sublinear** |
+| Retrieval | Static | Static | **Context-dependent reconstruction** |
+| Confidence signal | None | None | **Temperature + interference state** |
+| Identity vs content | Conflated | Conflated | **Two-tier (recognize / reconstruct)** |
+| Per-item plasticity | None | None | **Per-basin Temporal Stability** |
+| Local-first | Sometimes | Sometimes | **Always** |
+| Forgetting | Manual | Manual | **Automatic (7d half-life)** |
+| Pretrained dependency | Yes | Yes | **Optional** |
 
-**Market position**: Not an upgrade to existing memory systems. A new category.
-
----
-
-## Traction & MVP
-
-### Launch Status
-
-- ✓ **Core CA engine**: 19 modules, production-ready
-- ✓ **Automated testing**: 167+ tests across datasets (MBPP, SWE-bench, BABILong)
-- ✓ **Web UI**: Wheeler dashboard with live recall, temperature display
-- ✓ **Darman chatbot**: Live demo, integrated with Ollama
-- ✓ **GPU support**: HIP/ROCm + CUDA with CPU fallback
-- ✓ **Open source**: GitHub live, CC BY-NC 4.0, community-ready
-
-**No VC funding yet. Built by founding team. Ready to accelerate.**
+A new category, not an upgrade.
 
 ---
 
-## Named After Wheeler's "It from Bit"
+## Status: open-source, real, tested
+
+- ✓ Core CA engine (5–14 ticks to converge with tuned dynamics)
+- ✓ 775 automated tests, all passing
+- ✓ Three-grid interference (default since v0.3.1)
+- ✓ SCM telemetry + closed-loop A/B eval (v0.3.4)
+- ✓ Two-tier recall + per-basin T (v0.3.6 headline)
+- ✓ Native distributional encoder (601M-word Context-RI)
+- ✓ HIP/ROCm GPU with CPU fallback
+- ✓ MMLU benchmark runner (57 subjects, multiple modes)
+
+No VC funding yet. Built by the founding team. CC BY-NC 4.0 on GitHub.
+
+---
+
+## Named after Wheeler's "It from Bit"
 
 > "Every 'it' — every physical thing — derives its existence as an information system from answered physical questions."
 > — John Archibald Wheeler
 
-**Insight**: In our system, meaning emerges from dynamics. Information isn't stored; it's *computed*. Memories exist because the CA *interacts* with them through repeated recall.
+In our system, meaning emerges from CA dynamics. Memory isn't stored; it's *computed*. Epistemic states emerge from interference; they aren't hand-coded.
 
-**Philosophy**: Information emerges from physical process, not from static representation.
-
----
-
-## Open Source, Commercial Ready
-
-### GitHub: `fantomx42/wheeler-memory`
-
-- **License**: CC BY-NC 4.0 (open source, non-commercial)
-- **Quick start**: 3 commands to running instance
-- **Documentation**: Architecture, CLI, API, design principles
-- **Community**: Issues, discussions, contribution guidelines
-- **Integration ecosystem**: Ollama, Open WebUI, Hugging Face
-
-**Path to commercialization**: Dual licensing, managed service, enterprise integrations.
+**Convergence is ground truth.**
 
 ---
 
-## Closing: "The Formula Is the Foundation"
+## Path to commercialization
 
-### Call to Action
+### Dual licensing model
 
-**We've built the engine. The market needs it. Let's scale it.**
+- **CC BY-NC 4.0** for open-source / non-commercial users
+- **Commercial license** for production deployments
+- **Managed service** (Wheeler-as-a-Service) for API consumers
+- **Enterprise integration** for sovereignty-sensitive verticals (healthcare, finance, defense)
 
-- **For investors**: Memory is the missing layer in the $100B LLM market
-- **For enterprises**: Privacy-first, on-device, auditable confidence signals
-- **For the market**: A new category, not an incremental improvement
-
-**Next steps**:
-1. Seed round: 18-month runway to commercial product
-2. Enterprise partnerships: First 3 pilot customers
-3. Open source acceleration: Grow contributor base
-4. Managed service: Wheeler-as-a-Service for API consumers
-
-**"Darman doesn't retrieve. Darman reconstructs."**
+The substrate is real. Productization is a deliberate next step, not a leap.
 
 ---
 
-# Demo + Questions
+## What we need
 
-**Try it now**:
+### Seed round
+
+- 12–18 month runway to commercial product
+- 3 enterprise pilot customers in privacy-sensitive verticals
+- Contributor growth in the open-source codebase
+- Compute budget for the next two architectural moves: reconstruction scoring + offline T consolidation
+
+We are honest about what works and what doesn't. We expect the same honesty in return.
+
+---
+
+## Try it now
+
 ```bash
 git clone https://github.com/fantomx42/wheeler-memory.git
+cd wheeler-memory
 pip install -e .
-wheeler-ui
-# Open http://localhost:7437
+wheeler-store "self-attention computes relationships between all positions"
+wheeler-recall "how does attention work in transformers"
+wheeler-recall "..." --recognize --learn   # two-tier path with T accumulation
 ```
 
-**Contact**: [Your email / website]
+Static demo: open `docs/demos/demo.html` in a browser.
 
----
+**Contact**: [your email / website]

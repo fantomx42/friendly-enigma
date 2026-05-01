@@ -95,10 +95,9 @@ def apply_ca_dynamics_parameterized(
     return np.clip(frame + delta, -1, 1)
 
 
-# GPU dispatch — imported after apply_ca_dynamics is defined to avoid circular
-# import (gpu_dynamics imports apply_ca_dynamics from this module).
+# GPU dispatch — imported after apply_ca_dynamics is defined.
 try:
-    from .gpu_dynamics import (
+    from .accel.ca import (
         gpu_available,
         gpu_evolve_batch as _gpu_evolve_batch,
         gpu_evolve_single as _gpu_evolve,

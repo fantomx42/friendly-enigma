@@ -39,9 +39,9 @@ This produces `wheeler_memory/accel/hip/libwheeler_ca.so` (v2) and
 `libwheeler_ca_v1.so`. The Python bindings in `wheeler_memory/accel/ca.py`
 try v2 first, falling back to v1 if only v1 is built.
 
-> **Migration note:** Kernels previously lived in `wheeler_memory/gpu/`. That
-> directory is now deprecated. `gpu_dynamics.py` is a thin shim that re-exports
-> from `accel.ca` for backwards compatibility.
+> **Migration note:** Kernels previously lived in `wheeler_memory/gpu/`; that
+> directory has been removed in v0.3.6. The active build location is
+> `wheeler_memory/accel/hip/`.
 
 After a successful build, `gpu_available()` returns `True` and `evolve_batch()`
 automatically dispatches to GPU. Call `gpu_version()` to confirm which kernel loaded.
@@ -266,11 +266,7 @@ Both GPU paths produce numerically identical results to the CPU path
 | `wheeler_memory/accel/hip/ca_evolve.hip` | HIP C++ kernel v2 (variable grid, global memory) |
 | `wheeler_memory/accel/hip/ca_evolve_v1.hip` | HIP C++ kernel v1 (64×64, shared memory — legacy) |
 | `wheeler_memory/accel/hip/Makefile` | Unified build script (auto-detects GPU arch) |
-| `wheeler_memory/gpu_dynamics.py` | Backwards-compatible shim → re-exports from `accel.ca` |
 | `scripts/bench_gpu.py` | `wheeler-bench-gpu` entry point |
-
-> **Deprecated:** `wheeler_memory/gpu/` still contains the original kernel sources for
-> reference but is no longer the active build location.
 
 ---
 

@@ -89,12 +89,6 @@ wheeler-mmlu --all --mode cortex --classifier-weights cortex_classifier.npz
 wheeler-mmlu --all --mode cortex --output results.tsv
 ```
 
-### Launch the web dashboard
-
-```bash
-wheeler-ui  # opens http://localhost:7437
-```
-
 ---
 
 ## Recognition vs Reconstruction
@@ -227,8 +221,8 @@ Decoder output ---> Re-encode ---> Re-evolve under corpus rules
 
 MMLU BENCHMARK MODES
 --------------------
---mode cortex              : Cortex L3 classifier scoring (default, no LLM)
---mode semantic            : Pure CA attractor Pearson correlation
+--mode semantic            : Pure CA attractor Pearson correlation (default)
+--mode cortex              : Cortex L3 classifier scoring (no LLM)
 --mode recall-text         : Reconstruction + text decode
 --mode decode              : Small model decoder for rendering
 --mode learn               : Full cycle (learn → consolidate → test)
@@ -377,7 +371,6 @@ python scripts/tools/prepare_corpus.py
 
 | Command | Description |
 |---------|-------------|
-| `wheeler-ui` | Web dashboard at http://localhost:7437 |
 | `wheeler-scrub --text "text"` | Visualise how a memory formed (brick inspector) |
 | `wheeler-info` | System info (hardware, GPU, paths) |
 | `wheeler-bench` | Quality score benchmark for CA dynamics tuning |
@@ -392,7 +385,8 @@ python scripts/tools/prepare_corpus.py
 |---------|-------------|
 | `wheeler-mmlu --subjects SUBJECT` | Run MMLU on specific subjects |
 | `wheeler-mmlu --all` | Run all 57 MMLU subjects |
-| `wheeler-mmlu --mode cortex` | Cortex L3 classifier scoring (default) |
+| `wheeler-mmlu --mode cortex` | Cortex L3 classifier scoring |
+| `wheeler-mmlu --mode semantic` | Pure CA Pearson correlation (default) |
 | `wheeler-mmlu --mode learn` | Learn dev+val → consolidate → test on test split |
 | `wheeler-mmlu --mode learn-interference` | Learn + experiential storage + SCM sculpting |
 | `wheeler-mmlu --mode decode --model qwen2.5:1.5b` | Decoder mode (requires Ollama) |
@@ -473,6 +467,9 @@ wheeler_memory/          Core library
     scm_grid.py          SCM persistent 64x64 trust topology with hardening
     experiential.py      Episodic memory encoding with temporal context
     interference.py      Three-grid interference engine + self-consistency loop
+    similarity.py        Pearson + spatial similarity helpers
+    trajectory.py        Trajectory signatures (curve-based hybrid retrieval)
+    trajectory_cache.py  Cached trajectory signatures per chunk
   AGENTS & RENDERING
     decoder.py           Language Wheeler decoder (text rendering)
     language_wheeler.py  Language Wheeler component (CA state → text)
@@ -482,7 +479,6 @@ wheeler_memory/          Core library
     crystallization.py   Corpus pre-training pipeline (GPU batch-aware)
     temperature.py       Temperature/warmth tracking
     chunking.py          Domain routing (keyword-based)
-    gpu_dynamics.py      Backwards-compatible shim → accel.ca
     hardware.py          Hardware detection & optimal device selection
     attention.py         Salience-weighted recall warming
     warming.py           Association tracking
@@ -492,7 +488,8 @@ wheeler_memory/          Core library
     consolidation.py     Sleep consolidation (prune redundant keyframes)
     eviction.py          Three-phase graceful degradation
     constants.py         Tunable system constants
-  theories/              Theory experiments (basin, resonance, synthesis)
+  theories/              Production-supporting theory helpers (basin, metrics, synthesis)
+                         Archived siblings (lichtenberg, resonance, structured) live under notes/theories/
   accel/                 GPU acceleration (primary)
     __init__.py          gpu_available(), accel_info(), device routing
     _common.py           Shared ctypes helpers, buffer pool
@@ -515,7 +512,7 @@ scripts/                 CLI entry points
     bench_associative.py     Associative recall benchmarks
     bench_recall_warm_vs_cold.py  Warm-start vs cold-recall ticks across 3 distance bands
     train_projection.py      Learn an optimised JL projection matrix
-  exploration/           Standalone exploration scripts
+  (exploration/ and experiments/ moved to notes/ — research notebooks, not part of pytest)
   tools/                 Data prep, corpus cleanup, HIP build utilities
     prepare_corpus.py    Corpus preparation (SWE-bench, mbpp, LongBench)
     topology_map.py      Co-activation adjacency map
@@ -524,7 +521,7 @@ scripts/                 CLI entry points
   train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
   wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
 
-tests/                   pytest suite (809 tests across 47 modules)
+tests/                   pytest suite (775 tests across 44 modules)
   test_accel_init.py     Accelerator module imports & device detection
   test_accel_ca.py       Batch evolution correctness, GPU vs CPU match
   test_cortex.py         Cortex system unit tests

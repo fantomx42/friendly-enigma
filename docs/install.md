@@ -65,7 +65,7 @@ See [GPU Acceleration](gpu.md) for benchmark numbers.
 #    See https://rocm.docs.amd.com for other distros
 
 # 2. Build the HIP kernel
-cd wheeler_memory/gpu
+cd wheeler_memory/accel/hip
 make                    # default: gfx1201 (RX 9070 XT / RDNA 4)
 GPU_ARCH=gfx1100 make  # RDNA 3 (RX 7000 series)
 ```
@@ -146,7 +146,6 @@ If `Device` shows `cpu` but you have a GPU, follow the steps in
 | `wheeler-temps` | List memories with temperature tiers |
 | `wheeler-info` | Print hardware and device summary |
 | `wheeler-scrub` | Inspect a brick evolution timeline |
-| `wheeler-ui` | Launch the web dashboard |
 | `wheeler-agent` | Start the LLM agent loop (requires Ollama) |
 | `wheeler-primary` | Wheeler-primary agent — small model as decoder (requires Ollama) |
 | `wheeler-crystallize` | Crystallize a text corpus into attractor landscape |

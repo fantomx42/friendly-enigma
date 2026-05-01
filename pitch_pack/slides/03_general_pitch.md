@@ -20,258 +20,261 @@ style: |
 ---
 
 # Wheeler Memory
-## A Memory System That Remembers Like You Do
+## A memory system that remembers like you do
 
-Darman: Cellular automata meet associative recall.
-
----
-
-## Why Do You Remember Your First Kiss Differently Every Time?
-
-Context shapes memory. The same event, reconstructed through different lenses.
-
-Same memory, infinite recalls.
-
-That's human memory.
+Darman: cellular automata meet associative recall.
+Open-source. Local. Native. v0.3.6.
 
 ---
 
-## The Problem With Today's AI
+## Why do you remember the same event differently every time?
 
-ChatGPT has no memory between conversations.
-- Never forgets
-- Never uncertain
-- Never hedges
+Context shapes memory. Same event, reconstructed through different lenses.
 
-But humans do all three.
+Same memory, different recalls.
 
-They confabulate confidently. They should say "I'm not sure" and mean it.
+That's human memory. That's what we built.
 
 ---
 
-## What If AI Could Actually Remember?
+## The problem with today's AI
 
-Forget things? ✓
-Hedge on uncertain memories? ✓
-Reconstruct context-dependently? ✓
+Current AI systems:
+- Never forget
+- Never hedge
+- Never say "I'm not sure" and mean it
+
+Vector databases retrieve the same row every time. Same query → same answer, regardless of context.
+
+Humans don't work that way.
+
+---
+
+## What if AI could actually remember?
+
+- Forget gracefully? ✓ (temperature decay)
+- Hedge on uncertain memories? ✓ (epistemic state from interference)
+- Reconstruct context-dependently? ✓ (blend + re-evolve)
+- Tell identity apart from content? ✓ (two-tier recall, v0.3.6)
 
 That's Wheeler Memory.
 
 ---
 
-## Cellular Automata: Inspired by Conway, Solving Memory
+## Cellular automata: the substrate
 
-64×64 grid. Three simple rules per cell:
-- **Peak** (local max) → push +1
-- **Valley** (local min) → push −1
+64×64 grid. Each cell holds a value in [−1, +1]. Three rules per cell:
+
+- **Peak** (local max) → push toward +1
+- **Valley** (local min) → push toward −1
 - **Slope** → flow uphill
 
-The grid evolves. Chaos settles into stable patterns. Those patterns ARE memories.
+Run the rules. Chaos settles into a stable pattern in 5–14 ticks (~3 ms CPU).
+
+That stable pattern *is* the memory.
 
 ---
 
-## How It Works: Storing a Memory
+## Storing a memory
 
-1. Text enters the system
-2. Text is hashed (SHA-256)
-3. CA evolves for ~40–100 ticks
-4. Chaos converges to a stable pattern (attractor)
-5. Pattern is stored as numbers on disk
+1. Encode text → 64×64 frame (we have multiple native encoders, no pretrained models needed)
+2. Run CA evolution
+3. Save the resulting attractor (.npy on disk + metadata in `index.json`)
 
-In ~3 milliseconds. GPU: 10x faster.
+On a recent AMD GPU, batched evolution is **71× faster** at batch=1000. CPU works fine for live use.
 
 ---
 
-## How It Works: Recalling a Memory
+## Recall, two tiers (v0.3.6 headline)
 
-1. You ask a question (query)
-2. System finds the closest stored memory (Pearson correlation)
-3. Blends it with your query context (30% query, 70% stored)
-4. Re-evolves the blend through CA
-5. Out comes a reconstructed answer
+Identity is cheap. Content is expensive. v0.3.6 separates them.
 
-Context colors the recall.
+- **Recognition**: single Pearson scan over stored attractors. Returns a `BasinSeed` or `None`. No CA loop on the query.
+- **Reconstruction**: warm-start the CA from the stored attractor, blended with the query. Re-evolve. Same memory, current context.
 
----
-
-## The Magic: Reconstruction
-
-Same stored memory.
-Different query contexts.
-Different reconstructed outputs.
-
-**Same memory. Infinite variations. Like your brain.**
+`wheeler-recall "..." --recognize` → identity only.
+`wheeler-recall "..."` → default three-grid interference (full content).
 
 ---
 
-## Temperature: Forgetting Built In
+## The magic: reconstruction
 
-Memories have a lifespan:
-- **New** (cool) — "I vaguely remember..."
-- **Warm** (frequently used) — "I think..."
-- **Hot** (recent) — "I distinctly remember..."
+Same stored attractor. Different queries. Different reconstructed outputs.
 
-Half-life: 7 days without recall.
-Decay matters. Age matters.
+`new = stored × (1−α) + query × α`, then re-evolve.
+
+Same memory. Different recalls. Like your brain.
 
 ---
 
-## Epistemic Humility: The LLM Mirrors Memory Quality
+## Three-grid interference (default recall)
 
-**Hot memory** (≥0.6 temperature):
-> "I remember clearly that..."
+```
+Answer = Corpus × Experiential × (1 − |SCM|)
+```
 
-**Warm memory** (≥0.3):
-> "I believe... but I'm not entirely certain..."
+- **Corpus** — crystallized knowledge, tight attractors
+- **Experiential** — episodic memory, loose attractors, 2-day half-life
+- **SCM** — trust topology (permission, not content), sculpted by self-consistency
 
-**Cold memory** (<0.3):
-> "I vaguely recall... it might have been..."
-
-Confidence reflects freshness. The system admits uncertainty.
-
----
-
-## Why This Matters
-
-Current LLMs confabulate confidently.
-
-Wheeler Memory lets AI say **"I'm not sure"** and **mean it**.
-
-Grounded in theory (Wheeler's information dynamics).
-Validated in practice (10K+ test cases).
+Four interference states fall out: GROUNDED, ABSORBED, UNCONSOLIDATED, CONTESTED.
 
 ---
 
-## Not Just Search
+## Temperature: forgetting built in
 
-**Vector DBs** (traditional): Find stored text that matches the query.
-- Retrieval-based
-- Exact-ish match
-- No reconstruction
+Every memory has a temperature.
 
-**Wheeler Memory**: Find the closest pattern, blend it with your context, re-evolve it.
-- Reconstruction-based
-- Context-colored
-- Meaning emerges from dynamics
+- **Hot** (≥0.6) — recent or frequently recalled
+- **Warm** (≥0.3) — middle ground
+- **Cold** (≥0.05) — rarely accessed
+- **Fading** / **Dead** — eviction candidates
 
----
-
-## Two Modes: Exact + Fuzzy Recall
-
-**Exact**: Store "buy milk". Query "buy milk". Get the exact memory back.
-
-**Fuzzy**: Store "grocery list". Query "shopping". Get a context-colored reconstruction.
-
-Same system. Two recall philosophies.
+Half-life: 7 days without recall. Decay is honest.
 
 ---
 
-## The Philosophical Foundation
+## Per-basin plasticity
 
-Wheeler: "**It from Bit**" — Information emerges from dynamics, not storage.
+Each basin carries a Temporal Stability `T` ∈ [0, 1].
 
-A memory isn't retrieved. It's **computed**. Reconstructed. Born anew each time.
+- Fresh basins start at T=0 (fully plastic).
+- `--learn` recalls accumulate T via EMA.
+- Drift rate is gated: `(1 − T) × base_rate`.
+- Mature basins become rigid; fresh ones absorb new context.
 
-Like you. Every recall rewrites the memory.
-
----
-
-## Design Philosophy: Engine ≠ Voice
-
-**Engine**: The cellular automaton (the mind).
-**Voice**: The LLM wrapper (the speaker).
-
-Swap the LLM. The memory system stays the same.
-The behavior persists.
-
-Meaning comes from structure, not labels.
+The brain analogue: rehearsal hardens the engram.
 
 ---
 
-## Privacy & Ownership
+## Why this matters
+
+Vector DBs retrieve. Wheeler Memory reconstructs.
+
+- Retrieval is fast and **static**.
+- Reconstruction is slower and **adaptive**.
+
+Epistemic states emerge from interference rather than getting hand-coded. That's "It from Bit" applied to memory.
+
+---
+
+## What's native (no pretrained models)
+
+- **Hippocampus encoder**: character n-gram random indexing
+- **Context-RI encoder**: distributional semantics, trained on 601M words from WikiText-103 + OpenWebText. **First native encoder with positive SimLex-999 signal**: ρ = +0.255
+- **Cortex L1/L2/L3**: graph topology + settlement CA + numpy SGD classifier (~11K params)
+
+`sentence-transformers` is *optional*, behind `pip install -e ".[embed]"`.
+
+---
+
+## Honest numbers
+
+- **44 modules, 775 tests, 16 CLI commands**
+- ~3 ms/tick CPU, 71× speedup on RX 9070 XT
+- MMLU all 57 subjects (14,042 questions, test split):
+  - zero-shot cortex: 24.3%
+  - cortex + learned facts: 25.3%
+  - cortex + L3 classifier: 25.9%
+  - random chance: 25.0%
+- L3 classifier loss barely moved from chance. We say so.
+
+---
+
+## What we have NOT built
+
+- No multimodal (no images, no audio)
+- No federated memory
+- No browser runtime
+- No web dashboard right now (the prior `wheeler-ui` was retired in v0.3.6)
+
+We list this on purpose. The pitch is honest, not heroic.
+
+---
+
+## Engine vs voice
+
+**Engine**: the cellular automaton — the mind.
+**Voice**: an optional small LLM (via Ollama) — the speaker.
+
+These are *separate*. Swap the LLM and the memory stays the same. The CA decides what the answer should look like; the LLM only renders it.
+
+`wheeler-primary --interactive --show-state` shows both.
+
+---
+
+## Privacy & ownership
 
 All local. No cloud APIs. No third-party servers.
 
-Your memories stay on your machine.
+Memories stay on your disk. The optional embedding model stays optional.
 
-Your data. Your automaton. Your voice.
-
----
-
-## Real Numbers
-
-- **10K+** test cases across 6 domains
-- **95%+** paraphrase coverage (semantic recall)
-- **~3ms** CPU (convergence)
-- **GPU**: 10× faster (HIP/ROCm + CUDA)
-- **19 modules**, 167 tests, fully open-source
-
-Validated. Tested. Ready.
+You own the substrate.
 
 ---
 
-## What's Running Today
+## What's running today
 
-✓ Web UI dashboard
-✓ CLI tools (store, recall, temps, scrub)
-✓ Darman chatbot agent
-✓ Sleep consolidation (spreading activation)
-✓ Semantic embeddings (optional)
-✓ GPU auto-fallback
+✓ Native encoders (hippocampus, blended, context-RI)
+✓ Three-grid interference recall (default path)
+✓ Two-tier `--recognize` / `--learn` recall
+✓ Sleep consolidation, eviction, temperature decay
+✓ Cortex L1/L2/L3 native scoring
+✓ HIP/ROCm GPU acceleration with CPU fallback
+✓ MMLU benchmark runner (57 subjects, multiple modes)
 
-Everything works locally. Nothing leaves your machine.
-
----
-
-## Live Demo
-
-*[Walkthrough of Web UI → Darman agent → CLI tools → under the hood]*
-
-Watch memories being stored, recalled, and reconstructed in real time.
+Everything local. Nothing leaves your machine.
 
 ---
 
-## What's Next
+## Live demo
 
-- **Images & Audio** — Extend to multimodal memories
-- **Concept Clustering** — Organize related memories
-- **Federated Memory** — Distributed learning between trusted peers
-- **WebAssembly** — Run in the browser
+Walk through:
+- Static demo page (`docs/demos/demo.html`) for the visual substrate
+- `wheeler-store` / `wheeler-recall` / `--recognize` / `--learn`
+- A small crystallization + MMLU sanity run
+- Optional: `wheeler-primary` driving an Ollama model
 
-The foundation is proven. Now we build.
+See `pitch_pack/demo_script/demo_script.md`.
 
 ---
 
-## Open Source
+## What's next
+
+- **Reconstruction scoring for MMLU**: evolve the query, settle the CA, read the attractor's answer, compare to choices. The "It from Bit" path to scoring.
+- **Sleep consolidation of T**: an offline pass that consolidates accumulated Temporal Stability into the stored corpus state.
+- **Spatial-product SCM scoring**: fix the known scalar-collapse issue in the interference engine.
+
+The foundation is real. Each next step is named, scoped, and tracked.
+
+---
+
+## Open source
 
 **GitHub**: [fantomx42/wheeler-memory](https://github.com/fantomx42/wheeler-memory)
 
 **License**: CC BY-NC 4.0 (Non-Commercial Creative Commons)
 
-**Community**: Contributions welcome.
+**Citation**: John A. Wheeler, *Information, Physics, Quantum: The Search for Links* (1989). Elizabeth Loftus on reconstructive memory.
+
+Contributions welcome.
 
 ---
 
-## Why This Excites Us
+## Why this excites us
 
-First-of-a-kind memory architecture for AI.
+Pure-Python cellular-automaton memory with two-tier recall, three-grid interference, and a native distributional encoder that hits 57% of MiniLM's pretrained ceiling — without ever touching a pretrained model in the core.
 
-Rooted in cellular automata theory.
-Validated in practice.
-Grounded in cognitive science (Elizabeth Loftus on reconstructive memory).
-
-AI with a mind that remembers like you do.
+We're not pitching the next AGI. We're pitching a reconstructive memory substrate that admits what it does and does not know.
 
 ---
 
-## The Formula Is The Foundation
+## Convergence is ground truth
 
 *Everything else is commentary.*
 
-Wheeler Memory: Not a search engine.
-Not a retrieval system.
-A **reconstruction engine**.
+Wheeler Memory isn't a search engine. Isn't a retrieval system.
 
-A mind. An automaton. A voice.
+It's a **reconstruction engine**. A mind. An automaton. An optional voice.
 
 Darman remembers.

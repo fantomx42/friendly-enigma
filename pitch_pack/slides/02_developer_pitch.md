@@ -25,559 +25,448 @@ style: |
 ---
 
 # Wheeler Memory
-## Open-Source Cellular Automaton Memory for LLMs
+## Open-source cellular-automaton memory for LLMs — v0.3.6
 
-**Build agentic systems that remember, forget, and reconstruct like humans do.**
-
----
-
-## Why This Matters
-
-### The LLM Memory Problem
-
-- **Vector DBs ≠ Memory**: Similarity search is not episodic recall. Same query = same result always.
-- **Reconstruction is novel**: Human memory doesn't retrieve verbatim. Context reshapes recall.
-- **Forgetting is useful**: Models without decay never reach epistemic humility. They hallucinate confidently.
-- **Associative recall is missing**: Semantic search finds similar documents. CA finds related *concepts* through learned dynamics.
-
-**Status quo**: We're treating databases like memory. Time for something different.
+**Build agentic systems that remember, forget, reconstruct — without depending on pretrained models in the core.**
 
 ---
 
-## What You Can Build
+## Why this matters
 
-### Use Cases, Research & Production
+### The LLM memory problem
 
-| Use Case | What's Possible |
+- **Vector DBs are filing cabinets**: same query → same row, no reconstruction
+- **Reconstruction is novel**: human memory does *not* return verbatim — context reshapes recall
+- **Forgetting is useful**: models that never decay never reach epistemic humility
+- **Identity ≠ content**: knowing "which memory is this" is cheap; knowing "what does it say" is expensive — but most APIs conflate them
+
+We treat databases like memory. Wheeler is something different.
+
+---
+
+## What you can build
+
+| Use case | What's possible |
 |---|---|
-| **Agentic systems** | Agents with persistent state, forgetting curves, contextual decision-making |
-| **Chatbots** | Personalized conversation that remembers and forgets naturally |
-| **Semantic search** | Query expansion via associative warmth (2-hop spreading activation) |
-| **Memory evaluation** | Benchmark reconstruction fidelity, oscillation detection, temperature dynamics |
-| **Research** | Test neuroscience theories via symbolic collapse (IIT connections) |
-| **Privacy-first LLMs** | Local-only memory, no cloud, no data escape |
+| **Agentic systems** | Persistent state, forgetting curves, contextual decision-making |
+| **Chatbots** | Personalized recall that reconstructs based on conversation context |
+| **Semantic search** | Pearson + spatial similarity, with associative warmth (2-hop spreading activation) |
+| **Memory evaluation** | Convergence-state distribution, oscillation detection, basin-stability metrics |
+| **Privacy-first LLMs** | All-local memory, no cloud, no pretrained model in the core |
+| **Native semantic** | Context-RI distributional encoder trained on 601M words, 0 pretrained weights |
 
-**No proprietary backend. Pure Python. Run anywhere.**
+Pure Python. Run anywhere. CC BY-NC 4.0.
 
 ---
 
-## Quick Start: 3 Commands
-
-### Install and Run
+## Quick start
 
 ```bash
 git clone https://github.com/fantomx42/wheeler-memory.git
 cd wheeler-memory
-pip install -e .
+pip install -e .                           # core (numpy/scipy/matplotlib/psutil)
+# pip install -e ".[embed]"                # optional: sentence-transformers
 ```
-
-### Launch the Dashboard
 
 ```bash
-wheeler-ui
-# Opens http://localhost:7437
+wheeler-store "self-attention computes weighted relationships between positions"
+wheeler-recall "how does attention work in transformers"
+wheeler-recall "..." --recognize           # v0.3.6: identity only, no CA on query
+wheeler-recall "..." --recognize --learn   # v0.3.6: + per-basin Temporal Stability
 ```
 
-### Store and Recall a Memory
-
-```bash
-wheeler-store "remind me to debug the API timeout"
-wheeler-recall "api performance issues"  # finds it via semantic similarity
-```
-
-**Done. No GPU required. Runs on CPU. Python 3.11+ only.**
+No GPU required. CPU works fine. Python 3.11+ only.
 
 ---
 
-## Two Recall Modes
+## Encoders (no pretrained models in the core)
 
-### Exact vs. Semantic
+| Encoder | Cost | Notes |
+|---|---|---|
+| `hash` | 0 | SHA-256 deterministic; default for benchmarks |
+| `hippocampus` | low | Native character n-gram random indexing |
+| `blended` (default) | low | hippocampus(0.7) + language wheeler(0.3) |
+| `context` | medium | Distributional RI, 601M words, **SimLex-999 ρ=+0.255** |
+| `embedding` | high | Optional MiniLM via `pip install -e ".[embed]"` |
+| `word`, `word-blended` | low | Word-level RI variants |
 
-#### Exact Recall (Default)
-```bash
-wheeler-store "fix the python syntax error"
-wheeler-recall "fix the python syntax error"  # exact match only
-```
-- Uses SHA-256 hashing
-- Deterministic: same text always produces same fingerprint
-- Fast, zero dependencies
-- One word changes = completely different pattern
-
-#### Semantic Recall (Install Extra)
-```bash
-pip install -e ".[embed]"
-wheeler-store --embed "fix the python syntax error"
-wheeler-recall --embed "debug python code"  # finds it!
-```
-- Uses `sentence-transformers` (all-MiniLM-L6-v2)
-- Meaning-based: "debugging code" finds "fix the syntax error"
-- Similar meanings produce similar CA seeds
-- ~80 MB model, runs locally
-
-**Caveat**: Seeds stored with `--embed` can only be recalled with `--embed`.
+**Context-RI is the headline**: first native encoder with positive SimLex signal — 57% of MiniLM's pretrained ceiling, no pretrained models.
 
 ---
 
-## The Science: Symbolic Collapse Model
-
-### What We're Actually Computing
-
-**Hypothesis**: Meaning is what *survives symbolic pressure*.
-
-```
-Input text
-    ↓
-Dimensionality reduction (hash → 64×64)
-    ↓
-3-state CA evolution (local rules only)
-    ↓
-Convergence → Attractor (unique fixed point)
-    ↓
-Symbolic pressure: Information collapses to essential structure
-```
-
-**Key insight**: The attractor is not the text. It's what remains after lossy compression through dynamics.
-
-### Connections to IIT (Integrated Information Theory)
-- **Integrated information**: CA convergence measures how much the grid constraints itself
-- **Phi**: Oscillation metrics relate to irreducibility
-- **Markov blanket**: Von Neumann neighborhoods create local causal closure
-
-**Research opportunity**: Validate IIT predictions against empirical CA behavior.
-
----
-
-## The 3-State CA Rule
-
-### How Attractors Form
+## The 3-state CA rule
 
 ```python
-# Simplified pseudocode
-for each cell in grid:
-    neighbors = von_neumann(cell)
-    local_max = max(neighbors) > threshold
-    local_min = min(neighbors) < threshold
-    slope_uphill = uphill_direction_exists()
-
-    if local_max:
-        cell += 1  # push toward +1 (35% probability)
-    elif local_min:
-        cell -= 1  # push toward -1 (35% probability)
-    elif slope_uphill:
-        cell += sign(uphill_direction)  # flow (20% probability)
+# Conceptual, real version is in wheeler_memory/dynamics.py
+for cell in grid:
+    neighbors = von_neumann(cell)             # 4-connected, wrapping
+    if cell == max(neighbors):
+        cell += MAX_PUSH_STRENGTH * (+1 - cell)   # push toward +1
+    elif cell == min(neighbors):
+        cell += MAX_PUSH_STRENGTH * (-1 - cell)   # push toward -1
+    else:
+        cell += SLOPE_FLOW_STRENGTH * (uphill_neighbor - cell)
 ```
 
-- **Von Neumann neighborhood**: Only 4-connected (up/down/left/right)
-- **Wrapping boundaries**: Grid is a torus (no edge artifacts)
-- **Stochastic rule**: Each operation has fixed probability
-- **Convergence**: Typically 40-100 ticks. ~3 ms on CPU.
-
-### Three End States
-
-| State | Meaning | Action |
-|---|---|---|
-| **CONVERGED** | Fixed point reached | Store attractor, proceed to recall |
-| **OSCILLATING** | Periodic cycle detected | Indicates ambiguous input, log for user |
-| **CHAOTIC** | Unbounded growth | Input may need rephrasing |
+- Continuous values in [−1, +1] (not strictly 3-state)
+- Default `MAX_PUSH_STRENGTH = 0.57`, `SLOPE_FLOW_STRENGTH = 0.55`
+- Convergence: **5–14 ticks** with current tuning
+- ~3 ms/tick on CPU; **71× speedup** on RX 9070 XT at batch=1000
 
 ---
 
-## Temperature & Forgetting
+## Convergence states
 
-### How Memories Decay
+| State | Meaning | What we do |
+|---|---|---|
+| **CONVERGED** | Stable fixed point reached | Store the attractor |
+| **OSCILLATING** | Periodic cycle detected | Surface as epistemic uncertainty |
+| **CHAOTIC** | Iteration cap exhausted | Reject the seed, retry with rotation |
+| **DEGENERATE** | <5% alive cells | Reject — 0-dominant frame |
 
-#### Formula
+`oscillation.py` detects cycles by role-space periodicity. `rotation.py` retries seeds at 90/180/270° to escape bad initial conditions.
+
+---
+
+## Two-tier recall (v0.3.6 headline)
+
+```python
+from wheeler_memory import recognize, recognize_top_k, reconstruct_from_seed
+
+seed = recognize("how does attention work")        # BasinSeed | None
+if seed is not None:
+    pattern = reconstruct_from_seed(seed,
+                                    query="how does attention work",
+                                    alpha=0.3)
+    print(pattern.text, pattern.convergence_ticks)
+
+# Top-k for ranked identity-only use
+seeds = recognize_top_k("how does attention work", k=5)
+```
+
+- Recognition does a single Pearson scan over stored attractors using the **raw query frame** — no CA loop on the query.
+- Reconstruction warm-starts the CA from the stored attractor — ~2× fewer ticks vs cold start across distance bands (`scripts/bench/bench_recall_warm_vs_cold.py`).
+
+---
+
+## Per-basin Temporal Stability (T)
+
+Each stored basin carries a `T ∈ [0, 1]` in its `index.json` metadata.
+
+```
+T_new = (1 − T_EMA_RATE) × T_old + T_EMA_RATE × observed_stability
+drift_rate = (1 − T) × BASIN_DRIFT_BASE_RATE
+new_basin = stored + drift_rate × (observed − stored)
+```
+
+- Defaults: `T_INIT_DEFAULT = 0.0`, `T_EMA_RATE = 0.1`, `BASIN_DRIFT_BASE_RATE = 0.02`
+- Fresh basins (T=0) absorb new context fast; mature basins (T→1) become rigid
+- Updates apply only when `learning_enabled=True` (off by default)
+- Persisted under one fcntl lock per chunk, mmap-safe
+
+---
+
+## Three-grid interference (default recall path)
+
+```
+Answer(i,j) = Corpus(i,j) × Experiential(i,j) × (1 − |SCM(i,j)|)
+```
+
+| Grid | Role | Push | Decay |
+|---|---|---|---|
+| **Corpus** | Crystallized knowledge | 0.57 (tight) | 7-day half-life |
+| **Experiential** | Episodic memory | 0.35 (loose) | 2-day half-life |
+| **SCM** | Trust topology (permission, not content) | — | Sculpted by self-consistency feedback |
+
+Four interference states emerge: GROUNDED, ABSORBED, UNCONSOLIDATED, CONTESTED.
+
+`scm_telemetry.jsonl` captures every SCM event. `scripts/scm_ab_eval.py` runs the closed-loop A/B eval.
+
+---
+
+## Reconstructive recall
+
+```python
+blend = (1 - α) * stored_attractor + α * query_seed
+reconstructed = evolve_and_interpret(blend)   # re-evolve under CA
+```
+
+- **Default α = 0.3** — memory-dominant
+- α = 0.5 — balanced
+- α = 0.7 — query-dominant (stress test, hallucination probing)
+- Aligned with Loftus on reconstructive memory
+
+`reconstruction.py` (the live primitive) and the v0.3.6 wrapper `reconstruct_from_seed` both use this formula. Same memory, different reconstructions in different contexts.
+
+---
+
+## Temperature
 
 ```
 temp = base_from_hits × decay_from_time
-
-base_from_hits  = min(1.0,  0.3 + 0.7 × (hit_count / 10))
-decay_from_time = 2 ^ (−days_since_last_access / 7)
+base_from_hits  = min(1.0, 0.3 + 0.7 × hit_count / HIT_SATURATION)
+decay_from_time = 2 ^ (-days_since_last_access / HALF_LIFE_DAYS)
 ```
 
-#### Constants
-- **Half-life**: 7 days (configurable)
-- **Hit saturation**: 10 recalls (configurable)
-- **Fresh memory baseline**: 0.3 (warm on arrival)
+Defaults: `HIT_SATURATION = 10`, `HALF_LIFE_DAYS = 7.0`.
 
-#### Temperature Tiers
-
-```
-Hot:  temp ≥ 0.6  (frequently accessed, recent)
-Warm: temp ≥ 0.3  (default for new memories)
-Cold: temp < 0.3  (stale, candidate for archival)
-```
-
-### Tracking Access
-```bash
-wheeler-temps  # List all memories with temperature, decay, hit count
-```
-
----
-
-## Reconstructive Recall
-
-### The Context-Dependent Memory Mechanism
-
-#### Formula
-```
-blend = (1 - α) × stored_attractor + α × query_seed
-reconstructed = evolve_and_interpret(blend)
-```
-
-**Default**: α = 0.3 (memory-dominant, 70% stored + 30% query)
-
-#### Why This Works
-- **Like human memory**: Loftus research shows recall is reconstructive, not retrieval
-- **Prevents rigidity**: Same memory reconstructs differently for different queries
-- **Preserves stability**: Memory-dominant bias means recall is mostly stable
-
-#### Tuning
-- **α = 0.3**: Conservative (recall looks like stored memory)
-- **α = 0.5**: Balanced (equal weighting)
-- **α = 0.7**: Query-driven (stress testing, hallucination detection)
-
----
-
-## Validation: 19 Modules, 167+ Tests
-
-### What We Prove
-
-#### Datasets
-| Dataset | Size | Domain |
+| Tier | Range | Behaviour |
 |---|---|---|
-| **MBPP** | 10k problems | Python code snippets |
-| **SWE-bench** | Software engineering tasks | Real-world repo operations |
-| **BABILong** | Multi-hop reasoning | Long-context synthesis |
+| **Hot** | ≥ 0.6 | Recent or frequently recalled |
+| **Warm** | ≥ 0.3 | Default for new memories |
+| **Cold** | ≥ 0.05 | Recall-eligible but stale |
+| **Fading** | ≥ 0.01 | Eviction candidates |
+| **Dead** | < 0.01 | Full eviction |
 
-#### Test Coverage
-- **Dynamics**: CA convergence, rotation retry, oscillation detection
-- **Storage**: Pearson correlation, chunking, metadata persistence
-- **Reconstruction**: Blending fidelity, context-dependent variance
-- **Temperature**: Decay curves, tier thresholds, access tracking
-- **GPU**: HIP/ROCm vs CPU parity, speedup benchmarks
+Capacity ceiling: `MAX_ATTRACTORS = 10_000`. `EVICTION_RATIO = 0.10`. `MIN_AGE_DAYS = 1.0`.
 
-### Running Tests
-```bash
-pytest tests/  -v
-# 167 tests across all modules
+---
+
+## Cortex L1/L2/L3 (native semantic scoring)
+
+```
+retrieved attractors
+        ↓
+L1: Pearson adjacency graph + BFS clustering
+        ↓
+L2: settlement CA — opinion diffusion until convergence
+        ↓
+L3: native classifier — numpy SGD, ~11K params
+```
+
+- L1 in `cortex.py`
+- L2 in `cortex_scm.py` (Soft Constraint Satisfaction)
+- L3 in `cortex_classifier.py`
+
+`scripts/train_cortex_classifier.py` trains it. We say honestly: L3 loss barely moved from chance — needs more data or richer features. The next move is **reconstruction scoring** (let the CA settle and read the answer off the attractor).
+
+---
+
+## Architecture: 44 modules
+
+```
+ENCODING
+  hashing.py / hippocampus.py / embedding.py / word_encoder.py / brick.py
+
+CA ENGINE
+  dynamics.py / oscillation.py / rotation.py
+  accel/ca.py + accel/hip/*  (HIP/ROCm GPU bindings)
+  npu/ scaffolding for OpenVINO + Coral (stub today)
+
+STORAGE & RECALL
+  storage.py (sacred) / chunking.py (sacred) / cache.py
+  reconstruction.py / recall_api.py / t_metadata.py
+
+THREE-GRID INTERFERENCE
+  scm_grid.py / experiential.py / interference.py / similarity.py
+  trajectory.py / trajectory_cache.py
+
+CORTEX
+  cortex.py / cortex_scm.py / cortex_classifier.py
+
+LIFECYCLE
+  temperature.py / warming.py / consolidation.py / eviction.py / attention.py
+
+THEORIES (production helpers)
+  theories/basin.py / theories/metrics.py / theories/synthesis.py
+  (lichtenberg, resonance, structured archived to notes/theories/)
+
+AGENTS & RENDERING
+  agent.py / decoder.py / language_wheeler.py / generation.py
+
+CONFIG
+  constants.py (only file edited during autoresearch)
 ```
 
 ---
 
-## Architecture Deep Dive
+## Validation: 44 modules, 775 tests
 
-### 7-Layer Stack
-
-```
-1. agent.py          ← Ollama integration, tool dispatch, chat loop
-2. chunking.py       ← Domain routing (code, hardware, science, general, …)
-3. reconstruction.py ← Blending, α parameter, re-evolution
-4. storage.py        ← Pearson correlation, recall ranking
-5. temperature.py    ← Decay formulas, tier logic
-6. polarity.py       ← Dual encoding, aversion attractors, decay count
-7. dynamics.py       ← CA rules, convergence detection, GPU dispatch
-```
-
-### Key Modules
-
-| Module | Responsibility |
+| Group | Coverage |
 |---|---|
-| `dynamics.py` | 3-state CA evolution, convergence logic |
-| `gpu_dynamics.py` | HIP/ROCm CUDA kernels, CPU fallback |
-| `storage.py` | Chunked storage, Pearson search |
-| `brick.py` | Memory brick (history + metadata) |
-| `hashing.py` | SHA-256 or embedding-based hashing |
-| `chunking.py` | Keyword routing to 6 domain chunks |
-| `temperature.py` | Decay, hit tracking, tier assignment |
-| `polarity.py` | Dual attractors, aversion patterns |
-| `warming.py` | Spreading activation, associative recall |
-| `oscillation.py` | Cycle detection, period extraction |
-| `rotation.py` | 0°/90°/180°/270° retry logic |
-| `embedding.py` | Sentence-transformers integration |
-| `reconstruction.py` | Blend + re-evolve pipeline |
-| `consolidation.py` | Sleep consolidation, stale brick pruning |
-| `eviction.py` | Memory limit enforcement |
-| `attention.py` | Selective recall, focus weighting |
-| `hardware.py` | Platform detection (CPU/GPU) |
+| Dynamics | CA convergence, batch parity (CPU vs GPU), oscillation detection |
+| Storage | Pearson search, chunking, fcntl locking, cache invalidation |
+| Recall | `recognize` no-CA-loop guarantee, two-tier drift, top-k ordering |
+| Interference | Three-grid scoring, four state classification, SCM cold-start |
+| Reconstruction | Blending fidelity, α tuning, context dependence |
+| Temperature | Decay curves, tier thresholds, eviction sweeps |
+| Cortex | L1 graph correctness, L2 settlement, L3 classifier training |
+| Theories | basin width, energy, hallucination classification, apple test |
 
----
-
-## Extensibility Points
-
-### Pluggable Layers
-
-#### Custom Hashing
-```python
-from wheeler_memory import store_memory
-
-# Replace SHA-256 with your own encoder
-store_memory("my text", hash_fn=my_custom_encoder)
-```
-
-#### Custom Chunks
-```python
-# Add a domain-specific chunk beyond the built-in 6
-chunking.add_chunk("robotics", keywords=["servo", "motor", "ros", ...])
-```
-
-#### Custom CA Rules
-```python
-# Extend dynamics.py with alternative evolution rules
-class MyCustomDynamics(CADynamics):
-    def update_rule(self, cell, neighbors):
-        # Your rule here
-```
-
-#### GPU Kernels
-```python
-# Implement custom HIP/ROCm kernel in gpu_dynamics.py
-# Auto-fallback to CPU if kernel unavailable
-```
-
----
-
-## Testing & Benchmarks
-
-### What the Test Suite Covers
-
-#### Oscillation Detection
-```python
-# Tests ensure we catch periodic cycles reliably
-brick = evolve(seed)
-assert brick.state in ["CONVERGED", "OSCILLATING", "CHAOTIC"]
-```
-
-#### Rotation Retry
-```python
-# Same seed at 0°/90°/180°/270° should converge consistently
-for angle in [0, 90, 180, 270]:
-    brick = evolve(seed, rotation=angle)
-    assert brick.state != "CHAOTIC"
-```
-
-#### GPU Benchmarks
 ```bash
-wheeler-bench-gpu
-# Outputs: CPU time, GPU time, speedup factor
-# Typical: 2-5x speedup on HIP/ROCm, 5-10x on CUDA
-```
-
-#### Temperature Decay
-```python
-# Verify 7-day half-life
-old_temp = compute_temperature(hits=5, days_since=0)
-halved_temp = compute_temperature(hits=5, days_since=7)
-assert abs(halved_temp - old_temp / 2) < 0.01
+pytest -m "not slow"   # full suite
 ```
 
 ---
 
-## Web UI & CLI Ecosystem
+## CLI surface (16 commands)
 
-### 10 CLI Tools
-
-| Tool | Purpose |
+| Command | Purpose |
 |---|---|
-| `wheeler-store` | Save a memory |
-| `wheeler-recall` | Find similar memories |
-| `wheeler-ui` | Web dashboard |
-| `wheeler-temps` | List all memories + temperatures |
-| `wheeler-forget` | Delete a memory |
-| `wheeler-sleep` | Consolidate stale memories |
-| `wheeler-agent` | Start the Darman chatbot |
-| `wheeler-info` | System info + config |
-| `wheeler-scrub` | Visualize attractor formation |
-| `wheeler-bench-gpu` | Benchmark GPU vs CPU |
+| `wheeler-store` | Encode + store a memory |
+| `wheeler-recall` | Default recall (three-grid). Flags: `--recognize`, `--learn`, `--no-interference`, `--encoder`, `--embed` |
+| `wheeler-temps` | List memories with temperature/freshness |
+| `wheeler-forget` | Delete memories by text |
+| `wheeler-sleep` | Run sleep consolidation |
+| `wheeler-agent` / `wheeler-primary` | LLM wrappers (require Ollama) |
+| `wheeler-crystallize` | Pre-train from a JSONL/CSV/TXT/Parquet corpus |
+| `wheeler-mmlu` | MMLU benchmark runner — `semantic`, `cortex`, `learn`, `learn-interference`, `recall-text`, `decode`, `ternary*`, `multi-choice`, `reverse-lookup`, `spatial` modes |
+| `wheeler-bench`, `wheeler-bench-gpu` | Quality + GPU benchmarks |
+| `wheeler-info`, `wheeler-scm`, `wheeler-scrub`, `wheeler-simlex`, `wheeler-generate` | Diagnostics, SCM topology, brick inspector, SimLex eval, generative engine |
 
-### Web Dashboard (Wheeler UI)
-
-- **Live recall**: Search by text or embedding
-- **Temperature display**: See memory age/heat at a glance
-- **Brick visualization**: Interactive slider through CA evolution
-- **Oscillation log**: Detect problematic inputs
-- **Chunk breakdown**: See distribution across domains
-- **Export**: Dump memories as JSON or CSV
+There is no `wheeler-ui` web server in v0.3.6 — the prior implementation was retired because it had drifted out of date with the core. Static demos live at `docs/demos/`.
 
 ---
 
-## Integration Points
+## Extensibility
 
-### Ecosystem
+```python
+# Custom encoder
+from wheeler_memory.storage import store_memory
+store_memory("...", encoder="hash")          # any registered encoder
+store_memory("...", encoder=my_custom_encoder)
 
-| Tool | Integration | Notes |
+# Custom chunk
+from wheeler_memory import chunking
+# (chunking.py is sacred — extension via configuration, not code edits)
+
+# Custom CA dynamics
+from wheeler_memory.dynamics import apply_ca_dynamics_parameterized
+apply_ca_dynamics_parameterized(frame, push=0.45, slope=0.35)
+
+# GPU dispatch is automatic — accel/ca.py auto-falls back to CPU
+```
+
+Extension is config-driven where possible. The sacred files (`hashing.py`, `storage.py`, `chunking.py`, `rotation.py`, `bench_quality.py` TEST_INPUTS) are off-limits by design.
+
+---
+
+## GPU acceleration
+
+```bash
+# Build
+cd wheeler_memory/accel/hip
+make                           # default: gfx1201 (RX 9070 XT / RDNA 4)
+GPU_ARCH=gfx1100 make          # RDNA 3 (RX 7000 series)
+```
+
+- HIP kernels in `wheeler_memory/accel/hip/`
+- Python bindings in `wheeler_memory/accel/ca.py`
+- Auto-fallback to CPU when no `.so` is built or GPU is unavailable
+- v2 kernel supports variable grid sizes (64×64 to 1000×1000)
+- 71× speedup at batch=1000 on RX 9070 XT
+
+---
+
+## Honest MMLU numbers
+
+All 57 subjects, 14,042 questions, test split:
+
+| Run | Score | Δ vs chance |
 |---|---|---|
-| **Ollama** | Native | `--ollama-host` flag in agent |
-| **Open WebUI** | Pipeline function | Drop-in Wheeler memory layer |
-| **Hugging Face** | Hub integration | Load/share memory archives |
-| **LangChain** | Adapter (contrib) | Use Wheeler as memory backend |
-| **LlamaIndex** | Vector store (planned) | Pluggable recall engine |
-| **FastAPI** | HTTP API (demo) | Stateless recall endpoints |
+| Zero-shot cortex (0 stored memories) | **24.3%** | -0.7% |
+| Cortex + 1,812 learned facts | **25.3%** | +0.3% |
+| Cortex + L3 classifier | **25.9%** | +0.9% |
+| Random chance | 25.0% | — |
 
-### Running the Agent
-```bash
-wheeler-agent --ollama-host "http://localhost:11434"
-# Starts interactive chatbot with auto-recall and auto-store
-```
+The previous external-MiniLM baseline at 27.5% was **removed** because it depended on a pretrained model. We don't fake the win.
+
+Next move: **reconstruction scoring** — evolve the query, settle the CA, read the attractor's answer, compare to choices.
 
 ---
 
-## Roadmap (6–12 Months)
+## Empirical work the repo carries
 
-### Phase 1: Core Hardening (Now)
-- ✓ Test suite expansion (done)
-- ✓ GPU parity validation (done)
-- 🔄 Documentation polish
-- 🔄 Community outreach
+- **SimLex-999** with `wheeler-simlex` — Context-RI ρ=+0.255 (best native)
+- **Apple Test** (`scripts/bench/apple_test_semantic.py`) — exclude a concept from a domain, crystallize neighbors, query for the held-out concept; ML domain shows weak topology, Physics + Biology silent
+- **Diversity / paraphrase reports** in `docs/assets/reports/`, generated by `notes/exploration/test_diversity*.py`, `test_paraphrase*.py`
+- **Warm-vs-cold ticks** with `scripts/bench/bench_recall_warm_vs_cold.py` — three input-distance bands, recognition rate reported separately
 
-### Phase 2: Multimodal (Q3 2026)
-- Image embedding (CLIP)
-- Audio embeddings (wav2vec)
-- Cross-modal reconstruction
-
-### Phase 3: Distributed (Q4 2026)
-- Peer-to-peer memory sync
-- Federated recall (query multiple nodes)
-- Gossip consolidation
-
-### Phase 4: WebAssembly (Q1 2027)
-- Client-side CA in browser
-- Offline-first web app
-- Edge memory inference
+All reproducible from the repo. Datasets live under `datasets/` (gitignored for the large ones).
 
 ---
 
-## How to Contribute
+## Sacred files & autoresearch
 
-### High-Impact Areas
+`wheeler_memory/CLAUDE.md` documents the off-limits list:
 
-#### GPU Optimization
-- Improve HIP/ROCm kernels for 64×64 grids
-- Add METAL (Apple Silicon) support
-- Optimize rotation retry parallelism
+- `hashing.py` — deterministic SHA-256, foundational
+- `bench_quality.py` TEST_INPUTS — fixed corpus, comparable across experiments
+- `storage.py` — locked storage contract
+- `chunking.py` — locked domain routing
+- `rotation.py` — locked rotation logic
 
-#### Multimodal Encoders
-- CLIP integration for images
-- Audio embeddings for speech
-- Multimodal reconstruction pipeline
-
-#### Distributed Protocols
-- Memory replication scheme
-- Federated query aggregation
-- Conflict resolution for contradictory memories
-
-#### Benchmarks & Research
-- Validate IIT predictions against empirical CA
-- Compare reconstruction fidelity vs. vector DBs
-- Publish neuroscience connections
-
-#### Documentation
-- Tutorials for agentic systems
-- Case studies (chatbot, code assistant, etc.)
-- Blog posts on symbolic collapse
+Autoresearch protocol: edit only `constants.py`, run `wheeler-bench --commit <hash7> --changed "<param>"`, keep if score improved, revert if it dropped >10%. See `program.md`.
 
 ---
 
-## Philosophy: "The Formula Is the Foundation"
+## What's not built (said out loud)
 
-### Backward Compatibility is Sacred
+- No multimodal (no images, no audio, no CLIP, no wav2vec)
+- No federated memory or peer-to-peer sync
+- No browser / WebAssembly runtime
+- No live web dashboard right now
+- No reconstruction-scoring MMLU mode yet (next on the roadmap)
 
-**Rule**: The CA rule, convergence detection, and Pearson recall are load-bearing walls.
-
-- Changes to `dynamics.py` affect *all* existing memories
-- Changes to `hashing.py` require regeneration
-- Changes to `storage.py`'s similarity function shift recall rankings
-
-**Consequence**: Modifications are treated as breaking changes. Version bumps are semantic. Deprecation is documented.
-
-### Everything Else is Commentary
-
-- UI can be replaced
-- Agent prompt can be tweaked
-- CLI tools are extensible
-- GPU kernels can be optimized
-
-**Design principle**: Upstream changes are rare; downstream extensions are encouraged.
+This list exists on purpose. The pitch is real, not heroic.
 
 ---
 
-## Community & Support
+## How to contribute
 
-### GitHub: `fantomx42/wheeler-memory`
+### High-impact areas
 
-- **Issues**: Bug reports, feature requests, discussions
-- **Discussions**: Q&A, architecture deep-dives, use cases
-- **Contributing**: Pull request workflow, code review, CLA
-- **Roadmap**: Public issue tracking, milestone planning
+- **Reconstruction scoring** — the next MMLU mode where the CA itself answers the question
+- **Sleep consolidation of T** — offline pass that consolidates accumulated Temporal Stability into the stored corpus
+- **SCM scoring fix** — replace scalar `mean_openness` with spatial product per candidate (known issue)
+- **Multimodal encoders** — CLIP for images, wav2vec for audio
+- **Native verb semantics** — Context-RI's verb ρ is +0.05; bag-of-words distributional methods just are like that, but a context-aware variant could close the gap
 
 ### Documentation
-- **Architecture**: Layer-by-layer walkthrough
-- **API Reference**: Every class, function, parameter
-- **CLI Guide**: All 10 tools with examples
-- **Design Principles**: 7 axioms + rationale
-- **Concepts**: Reconstruction theory, symbolic collapse, IIT
 
-### Whitepaper & Research
-- "Symbolic Collapse and Reconstructive Memory" (in prep)
-- Connections to Integrated Information Theory
-- Benchmark suite against vector DBs and RAG systems
+- Tutorials for two-tier recall use cases
+- Reconstruction-scoring walkthrough once it lands
+- IIT / Wheeler "It from Bit" connection writeups
 
 ---
 
-## Call to Action
+## Philosophy: convergence is ground truth
 
-### Start Contributing Today
+### Sacred (rare changes, deliberate version bumps)
+
+- The CA rule (3-state local dynamics)
+- Pearson correlation as the recall similarity primitive
+- The SHA-256 encoding for hash-mode memories
+- The chunked storage contract
+
+### Commentary (extend freely)
+
+- Encoders, decoders, agents
+- CLI tools
+- GPU kernels (CUDA path is open if anyone wants it)
+- Cortex variants
+- New benchmarks
+
+Upstream changes are rare; downstream extensions are encouraged.
+
+---
+
+## Try it now
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/fantomx42/wheeler-memory.git
-cd wheeler-memory
-
-# 2. Set up dev environment
-pip install -e ".[dev]"
-pytest tests/ -v
-
-# 3. Check the roadmap
-# See CONTRIBUTING.md for high-impact areas
-
-# 4. Open a PR or discussion
+cd wheeler-memory && pip install -e .
+wheeler-store "..." && wheeler-recall "..."
+wheeler-recall "..." --recognize --learn   # v0.3.6 two-tier path
+wheeler-mmlu --subjects high_school_biology --mode cortex --samples 20
 ```
 
-### Your Project Ideas
+Static demo: open `docs/demos/demo.html` in a browser.
 
-- **Chatbot**: Personal memory assistant
-- **Code memory**: Remember debugging patterns
-- **Research**: Test neuroscience theories
-- **Agent**: Long-running autonomous system
-- **Search**: Associative document recall
-
-**We provide the engine. You build the application.**
+GitHub: **`github.com/fantomx42/wheeler-memory`** — CC BY-NC 4.0.
 
 ---
 
-## Next Steps
-
-### For Researchers
-- Read `docs/concepts.md` (symbolic collapse model)
-- Explore `docs/design.md` (7 principles)
-- Open an issue with your research questions
-
-### For Practitioners
-- Follow the [Installation Guide](docs/install.md)
-- Try the [Interactive Demo](docs/demos/demo.html)
-- Build something and share on Discussions
-
-### For Contributors
-- Pick a [roadmap task](CONTRIBUTING.md)
-- Review the [architecture](docs/architecture.md)
-- Comment on a draft PR to help shape features
-
----
-
-# "The formula is the foundation."
+# "Convergence is ground truth."
 
 **Star the repo. Read the docs. Build with us.**
-
-`github.com/fantomx42/wheeler-memory`
-
----

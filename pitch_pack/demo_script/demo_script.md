@@ -1,215 +1,185 @@
 ---
 title: Wheeler Memory Demo Script
 author: Project Darman
-date: March 2026
+date: April 2026 (v0.3.6)
 ---
 
 # Wheeler Memory Demo Script
 
 ## Part 1: Presentation Talking Points
 
-### Slide 1: Title Slide
-**"Wheeler Memory: A Memory System That Remembers Like You Do"**
+### Slide 1: Title
+**"Wheeler Memory: A memory system that remembers like you do."**
 
 **Talking Points (30 seconds):**
-- Welcome the audience. This is a story about memory—human memory, artificial memory, and how they're more similar than you'd think.
-- Wheeler Memory is a new kind of memory system for AI that actually forgets, admits uncertainty, and reconstructs memories differently depending on context.
-- Named after John Wheeler's "It from Bit"—the idea that information emerges from dynamics, not static storage.
-- Today you'll see how it works, why it matters, and what we've built.
+- Welcome. This is a story about memory — human memory, artificial memory, and how they're more similar than you'd think.
+- Wheeler Memory is a cellular-automaton associative memory system. No LLM in the core, no pretrained models in the core. Pure dynamics.
+- Named after John Wheeler's "It from Bit": information emerges from dynamics, not from static storage.
+- Today: how it works, why it matters, what we've built — and what we have *not* built. We won't oversell.
 
 ---
 
 ### Slide 2: The Hook
-**"Why do you remember your first kiss differently every time you think about it?"**
+**"Why do you remember the same event differently every time?"**
 
 **Talking Points (45 seconds):**
-- Context shapes memory. The same event, recalled at different times, in different moods, with different people—each recall is unique.
-- You're not retrieving a fixed memory from storage. You're **reconstructing** it, using context as a lens.
-- That's a feature, not a bug. Your memory adapts to what matters right now.
-- This is the first time I really understood that I wasn't remembering—I was reconstructing. And that changed how I think about AI.
+- Context shapes memory. Same event, different recalls.
+- You're not retrieving a fixed memory. You're **reconstructing** it, with current context as the lens.
+- That's a feature, not a bug. Adaptive memory adapts.
+- Wheeler Memory makes that explicit: same stored attractor, different reconstructions depending on the query.
 
 ---
 
-### Slide 3: The Problem With Today's AI
+### Slide 3: The Problem with Today's AI
 **Talking Points (1 minute):**
-- ChatGPT can't remember you between conversations. Start a new chat, it doesn't know who you are.
-- More importantly: it never forgets. It never says "I'm not sure." It confabulates confidently. It hallucinates.
-- A human says "I think that happened in 2015, but I'm not sure"—admitting uncertainty grounds the conversation in reality.
-- An LLM says "Yes, that was in 2015" with absolute confidence—even when it's making it up.
-- We want AI that can **admit it doesn't remember clearly**. That's epistemic honesty.
+- ChatGPT can't remember you between conversations.
+- It also never forgets, and never says "I'm not sure" — it confabulates with full confidence.
+- Vector databases are filing cabinets: query in, same row out.
+- We want AI memory that admits uncertainty when uncertainty is warranted, and reconstructs differently in different contexts.
 
 ---
 
-### Slide 4: What If AI Could Actually Remember?
-**Talking Points (45 seconds):**
-- What if an AI system could forget things? Fade memories that aren't used? Admit uncertainty about old memories?
-- What if it could hedge: "I vaguely recall... it might have been..." instead of confident confabulation?
-- What if the same memory could be reconstructed differently depending on context—like your brain does?
-- That's the vision. That's Wheeler Memory.
-
----
-
-### Slide 5: Cellular Automata
+### Slide 4: The Substrate — Cellular Automata
 **Talking Points (1.5 minutes):**
-- Most people know Conway's Game of Life—a grid of cells, simple rules, but complex emergent behavior.
-- Wheeler Memory uses the same idea, but instead of "alive/dead," we have three states: +1, 0, −1.
+- A 64×64 grid. Each cell holds a continuous value in [−1, +1].
 - Three rules per cell:
-  - If you're at a local peak (surrounded by lower values), push +1.
-  - If you're at a local valley (surrounded by higher values), push −1.
-  - If you're on a slope, flow uphill toward the peak.
-- You run these rules for ~40 to 100 ticks. Chaos settles. The grid converges to a stable pattern—an **attractor**.
-- That pattern **is** the memory. It's not stored as text or numbers. It's stored as the shape the automaton settles into.
-- This is inspired by real neuroscience: your brain stores memories as patterns of neural activity, not text files.
+  - Local peak (surrounded by lower values) → push toward +1.
+  - Local valley (surrounded by higher values) → push toward −1.
+  - Slope → flow uphill toward the peak neighbor.
+- Run those rules with current parameters, and chaos settles in **5–14 ticks** (~3 ms on CPU).
+- The grid converges to a stable pattern — an **attractor**. *That* is the memory.
+- Inspired by real neuroscience: brains store memories as patterns of activation, not as text files.
 
 ---
 
-### Slide 6: How Storing Works
+### Slide 5: Encoders — Native by Default
 **Talking Points (1 minute):**
-- You have a memory you want to store: "I learned about cellular automata in a coffee shop in 2024."
-- We hash that text (SHA-256), feed it as initial conditions to the CA, and let it evolve.
-- In 40–100 ticks (~3 milliseconds), chaos settles into a stable pattern.
-- That pattern is stored as a file on disk—just numbers, just the shape.
-- On a GPU, this is 10× faster. But even on CPU, it's fast enough for real-time use.
+- We do not depend on pretrained models. The core is pure Python + numpy.
+- Native encoders:
+  - **Hippocampus**: character n-gram random indexing — captures lexical similarity.
+  - **Context-RI**: distributional semantics, trained on WikiText-103 + OpenWebText (601M words). **First native encoder with positive SimLex-999 signal**: ρ = +0.255, vs MiniLM's pretrained ceiling of +0.446.
+  - **Blended** (default): hippocampus(0.7) + language wheeler(0.3).
+- `embedding` (MiniLM via sentence-transformers) is *optional*, available behind `pip install -e ".[embed]"`.
 
 ---
 
-### Slide 7: How Recalling Works
+### Slide 6: Storing
+**Talking Points (1 minute):**
+- Take any text. Encode → 64×64 frame in [−1, +1]. Evolve through the CA.
+- 5–14 ticks later, you have a stable attractor. We save the .npy file plus its metadata.
+- Auto-routes to a domain chunk: `code`, `science`, `hardware`, `daily_tasks`, `meta`, `general`.
+- On a recent AMD GPU (RX 9070 XT), batched evolution is **71× faster** at batch=1000. Auto-falls back to CPU.
+
+---
+
+### Slide 7: Recall, Two Tiers (the v0.3.6 headline)
+**Talking Points (2 minutes):**
+- Most "recall" requests don't need the whole CA loop. They just need to know **which basin** the query lands in.
+- v0.3.6 splits recall in two:
+  - **Recognition** — single-pass Pearson scan over stored attractors using the *raw query frame* (no CA convergence on the query). Returns a `BasinSeed` (id, similarity, basin stability) or `None`.
+  - **Reconstruction** — warm-start CA from the stored attractor, blended with the query (α=0.3 by default). Re-evolve. Same memory, current context.
+- Result on the warm-vs-cold benchmark: **~2× fewer ticks** with the warm path across near/mid/far input distance bands. Recognition rate is band-dependent (high on near-identical, low on substantial paraphrases — and that's correct, not a regression).
+
+---
+
+### Slide 8: Three-Grid Interference (default recall path)
 **Talking Points (1.5 minutes):**
-- You ask a question: "What did I learn about cellular automata?"
-- The system searches memory for the closest stored pattern. How? Pearson correlation—a statistical measure of similarity.
-- But here's the magic: instead of just returning the stored pattern, it **blends** it with your query context.
-- The blend is: 70% stored memory + 30% query context. We re-evolve that blend through the CA.
-- Out comes a reconstruction. The same stored memory, colored by your current question.
-- If you asked "What coffee shops have I been to?" instead, the same stored memory would reconstruct differently. Different context, different recall.
+- Single-grid Pearson search misses something: epistemic state.
+- v0.3.1 introduced three coupled 64×64 grids:
+  - **Corpus**: crystallized knowledge, tight attractors (push=0.57). Barely decays.
+  - **Experiential**: episodic memory, loose attractors (push=0.35). 2-day half-life.
+  - **SCM** (Structural Coherence Map): permission topology. Sculpted by self-consistency feedback. *Permission, not content.*
+- Score: `Answer(i,j) = Corpus(i,j) × Experiential(i,j) × (1 − |SCM(i,j)|)`.
+- Four interference states fall out:
+  - **GROUNDED**: corpus peak + experiential peak + SCM open
+  - **ABSORBED**: corpus peak + no experiential + SCM open
+  - **UNCONSOLIDATED**: no corpus + experiential peak + SCM open
+  - **CONTESTED**: corpus peak + experiential peak + SCM closed
+- v0.3.4 added per-event SCM telemetry to `scm_telemetry.jsonl`. v0.3.5 adds a closed-loop A/B eval.
 
 ---
 
-### Slide 8: Reconstruction
+### Slide 9: Temperature & Forgetting
 **Talking Points (1 minute):**
-- This is the core insight: **Same memory, infinite reconstructions.**
-- Your brain does this. Every time you recall a memory, you're reconstructing it. A little changes each time.
-- That's why eyewitness testimony is unreliable—not because people are lying, but because memory is reconstructive.
-- Wheeler Memory makes this explicit. It admits that the same stored pattern can be recalled in different ways.
-- That's more honest than pretending each recall is the same.
+- Memories have a temperature, computed from access frequency × recency (7-day half-life by default).
+- Tiers: hot (≥0.6), warm (≥0.3), cold (≥0.05), fading (≥0.01), dead (<0.01).
+- Temperature drives recall priority and decoder hedging.
+- Sleep consolidation prunes redundant keyframes from cold bricks; dead memories evict (capacity = 10,000 attractors).
 
 ---
 
-### Slide 9: Temperature – Forgetting
-**Talking Points (1.5 minutes):**
-- Memories don't live forever. They have a temperature.
-- New memories start **cool**. You've just heard something; you're not confident about it yet.
-- Frequently used memories get **warm**. You've thought about them several times; you're confident, but not certain.
-- Memories you use constantly become **hot**. You remember them clearly.
-- Age matters too. Every 7 days without recall, a memory loses temperature (half-life decay). It cools down.
-- Three tiers:
-  - Hot (≥0.6): "I distinctly remember..."
-  - Warm (≥0.3): "I believe... but I'm not entirely certain..."
-  - Cold (<0.3): "I vaguely recall... it might have been..."
-
----
-
-### Slide 10: Epistemic Humility
+### Slide 10: Per-Basin Plasticity (the other v0.3.6 headline)
 **Talking Points (1 minute):**
-- Temperature directly affects the LLM's language. The system mirrors memory freshness.
-- A hot memory gets phrased with confidence. A cold memory gets hedged.
-- This is revolutionary because current AI never hedges. It confabulates at the same confidence level regardless of how certain it should be.
-- Wheeler Memory lets you know: "This is a solid memory" vs. "This is a vague recollection."
-- That's epistemic humility. That's honesty.
+- Each stored basin carries a **Temporal Stability** `T` ∈ [0, 1].
+- Fresh basins start at T=0 (fully plastic). Each `--learn`-enabled recall accumulates stability via EMA: `T_new = (1−rate)·T_old + rate·observed`.
+- Drift rate is gated by T: `new = stored + (1−T)·base_rate·(observed − stored)`.
+- Mature basins (T→1) become rigid; new basins absorb the input rapidly.
+- `wheeler-recall "..." --recognize --learn` exercises the full path.
 
 ---
 
-### Slide 11: Why This Matters
+### Slide 11: Cortex — Native Semantic Scoring
 **Talking Points (1 minute):**
-- Current LLMs confabulate confidently. They'll invent facts and state them as truth.
-- Wheeler Memory lets AI say "I'm not sure" and **mean it**. Confidence is grounded in memory freshness.
-- This is grounded in theory: Wheeler's information dynamics, cellular automata, and Loftus's research on reconstructive memory.
-- It's validated in practice: 10K+ test cases, 95%+ semantic coverage, fully tested.
+- Three-tier scoring, all native:
+  - **L1**: graph topology over retrieved attractors (Pearson adjacency, BFS clusters).
+  - **L2**: settlement CA — opinion diffusion on the correlation graph until convergence.
+  - **L3**: numpy SGD classifier (~11K params).
+- Eliminates pretrained-model dependencies for semantic scoring.
 
 ---
 
-### Slide 12: Not Just Search
+### Slide 12: Honest MMLU Numbers
 **Talking Points (1 minute):**
-- Most "memory" systems for AI are vector databases. You store embeddings, search by similarity, retrieve exact matches.
-- That's retrieval, not memory. It's a filing cabinet.
-- Wheeler Memory is reconstruction. Find the closest pattern, blend it with context, re-evolve it.
-- Meaning emerges from the dynamics, not from stored labels.
-- It's fundamentally different.
+- 14,042 questions, 57 subjects, test split. Random chance is 25%.
+- Zero-shot cortex (0 stored memories): **24.3%** — at chance, no knowledge to retrieve.
+- Cortex + 1,812 learned facts: **25.3%** (+1.0%).
+- Cortex + L3 classifier: **25.9%** (+1.6%).
+- The L3 classifier loss barely moved from chance — needs more data or richer features. We say so out loud. The previous external-MiniLM baseline of 27.5% has been **removed** because it depended on a pretrained model.
+- The next move is reconstruction scoring: evolve the query, settle the CA, read what the attractor says, compare to the choices.
 
 ---
 
-### Slide 13: Two Modes: Exact + Fuzzy
-**Talking Points (1 minute):**
-- Exact mode: Store "buy milk." Query "buy milk." Get the exact memory back.
-- Fuzzy mode: Store "grocery list" (as a memory about shopping). Query "what do I need to buy?" Get a context-colored reconstruction.
-- Same system, two philosophies. You can switch based on what you need.
-
----
-
-### Slide 14: The Philosophical Foundation
-**Talking Points (1 minute):**
-- John Wheeler: "It from Bit." Information emerges from dynamics, not storage.
-- A memory isn't retrieved. It's **computed**. Reconstructed. Born anew each time you recall it.
-- Elizabeth Loftus: Human memory is reconstructive, not reproductive. We rebuild our memories each time.
-- That's the foundation. Everything else is commentary.
-
----
-
-### Slide 15: Design Philosophy
-**Talking Points (1 minute):**
-- **Engine**: The cellular automaton (the mind).
-- **Voice**: The LLM wrapper (the speaker).
-- These are separate. Swap the LLM, the memory system stays the same.
-- Swap the CA rules, the LLM behavior changes accordingly.
-- Meaning comes from structure, not from labels or prompts.
-
----
-
-### Slide 16: Privacy & Ownership
+### Slide 13: Privacy & Ownership
 **Talking Points (45 seconds):**
 - All local. No cloud APIs. No third-party servers. No subscription.
-- Your memories live on your machine. Your data stays private.
-- You own your mind. The automaton runs locally. No one else sees it.
+- Memories live on your disk. Optional sentence-transformers stays optional.
+- You own the substrate.
 
 ---
 
-### Slide 17: Real Numbers
-**Talking Points (1.5 minutes):**
-- 10K+ test cases across 6 domains: code, hardware, daily_tasks, science, meta, general.
-- 95%+ paraphrase coverage. The system handles semantic variations well.
-- ~3 milliseconds for convergence on CPU. GPU: 10× faster.
-- 19 modules, 167 tests, fully open-source.
-- Validated in practice. Not vaporware.
-
----
-
-### Slide 18: What's Running Today
+### Slide 14: Real Numbers
 **Talking Points (1 minute):**
-- Web UI dashboard. You can interact with it in real time.
-- CLI tools: `wheeler-store` (store a memory), `wheeler-recall` (recall), `wheeler-temps` (check temperatures), `wheeler-scrub` (delete old memories).
-- Darman chatbot agent. Ask it questions; watch it auto-recall memories.
-- Sleep consolidation. Spreading activation via offline consolidation.
-- Semantic embeddings. Optional; core recall works without ML.
-- GPU auto-fallback. Tries GPU; falls back to CPU gracefully.
-- Everything is local.
+- 44 modules, **775 tests**, 16 CLI commands.
+- ~3 ms/tick CPU, 71× speedup on RX 9070 XT at batch=1000.
+- Pure Python; numpy/scipy/matplotlib/psutil only in the core.
+- CC BY-NC 4.0. Public on GitHub.
 
 ---
 
-### Slide 19: Why This Excites Us
-**Talking Points (1.5 minutes):**
-- This is the first architecture to combine cellular automata with associative recall for AI.
-- It's rooted in theory: Wheeler's information dynamics, cellular automata, cognitive science.
-- It's validated in practice: thousands of tests, real-world performance metrics.
-- It gives AI a mind that remembers like you do: imperfectly, associatively, context-dependently.
-- It's open-source. It's local. It's yours.
+### Slide 15: What We Have *Not* Built
+**Talking Points (1 minute):**
+- No multimodal (no images, no audio).
+- No federated memory.
+- No browser runtime.
+- No web dashboard right now (the prior `wheeler-ui` was retired in v0.3.6 because it had drifted out of date with the core).
+- We mention this on purpose. The pitch is honest, not heroic.
 
 ---
 
-### Slide 20: Closing
+### Slide 16: Why It Matters
+**Talking Points (1 minute):**
+- AI should remember the way you do — imperfectly, associatively, context-dependent.
+- Vector DBs retrieve. Wheeler Memory reconstructs.
+- Epistemic states are *emergent* from interference, not hand-coded. That's "It from Bit" applied to epistemology.
+- **Convergence is ground truth.**
+
+---
+
+### Slide 17: Closing
 **Talking Points (45 seconds):**
-- "The formula is the foundation. Everything else is commentary."
-- Wheeler Memory isn't a search engine. It's not a retrieval system.
-- It's a reconstruction engine. A mind. An automaton. A voice.
-- Darman remembers.
+- This is real code, real tests, real numbers — pitched without inflation.
+- We'd rather say "L3 was at chance" than fake the win.
+- Wheeler Memory is open-source, local, native. The substrate is yours.
 
 ---
 
@@ -217,246 +187,184 @@ date: March 2026
 
 ### Prerequisites
 
-Before starting the demo, ensure:
-- Web UI is running: `python -m wheeler_memory.web` (or `cd /home/tristan/wheeler\ memory && python -m wheeler_memory.web`)
-- Default data dir: `~/.wheeler_memory/` (or set `WHEELER_DATA_DIR` env var)
-- CLI tools are in PATH or run with `python -m wheeler_memory.scripts.wheeler_store`, etc.
-- Ollama is running (if demoing Darman agent): `ollama serve`
-- Test data is loaded (see troubleshooting)
+```bash
+cd /path/to/wheeler-memory
+source .venv/bin/activate
+pip install -e .                 # core only
+# pip install -e ".[embed]"      # if you want MiniLM available
+```
 
-**Total Demo Time: ~8–10 minutes**
+- Default data dir: `~/.wheeler_memory/`
+- Static demo (browser-only): `docs/demos/demo.html` (open as a local file).
+- Ollama (optional, for the agent): `ollama serve` and `ollama pull qwen2.5:1.5b`.
 
----
+**Total demo time: ~8–10 minutes.**
 
-### Section 1: Web UI Dashboard (2–3 minutes)
-
-**Goal**: Show the UI, store a memory, recall it, observe temperature decay.
-
-#### Step 1.1: Open the Dashboard
-- Open browser to `http://localhost:5000` (or configured port).
-- Show the main dashboard: memory stats, recent memories, temperature gauge.
-- **Talking Point**: "This is your memory system. In real time, you can see all your stored memories, their temperatures, their age."
-
-**Timing: 20 seconds**
-
-#### Step 1.2: Store a Memory
-- Navigate to "Store Memory" form.
-- Input text: *"I learned that cellular automata can encode arbitrary information in stable patterns. This is inspired by work at the Santa Fe Institute."*
-- Optional: Set domain to "science" or "general".
-- Click "Store".
-- **Talking Point**: "We're hashing this text, evolving it through the CA, and storing the stable attractor pattern. Behind the scenes, the automaton is converging. When it settles, we save the pattern."
-
-**Timing: 45 seconds (including evolution time)**
-
-#### Step 1.3: Observe the Stored Memory
-- Refresh the dashboard. The memory appears in "Recent Memories."
-- Show the attractor stats: convergence time, temperature (should be ~0.6–0.8 if just stored), age (0 days).
-- **Talking Point**: "This memory is **hot**. It's just stored. The temperature is high. If I ask about it now, the system will reconstruct it with high confidence."
-
-**Timing: 30 seconds**
-
-#### Step 1.4: Recall the Memory
-- Navigate to "Recall Memory" form.
-- Query: *"What did I learn about cellular automata?"*
-- Click "Recall".
-- Show the result: reconstructed memory blended with query context.
-- **Talking Point**: "The system found the closest stored pattern, blended it with the query, and re-evolved it. Same memory, reconstructed through the lens of 'cellular automata.' If I queried 'What did I learn about the Santa Fe Institute?' the reconstruction would be different."
-
-**Timing: 1 minute**
-
-#### Step 1.5: Check Temperature Over Time (Optional)
-- If time permits, navigate to "Temperature View".
-- Show temperature gauge for the stored memory.
-- **Talking Point**: "Every 7 days without recall, this memory loses temperature (half-life decay). If I never ask about cellular automata again, in a month this memory will be cold, and the system will say 'I vaguely recall...' instead of 'I remember clearly.'"
-
-**Timing: 30 seconds (optional)**
+> Note: there is no `wheeler-ui` web server in v0.3.6. The prior dashboard was retired because the script had drifted out of date with the core. If you want a visual, open `docs/demos/demo.html` as a static page.
 
 ---
 
-### Section 2: CLI Tools (3–4 minutes)
+### Section 1: Static Demo Page (1–2 minutes)
 
-**Goal**: Show the command-line interface for store, recall, temperatures, and scrub.
+**Goal**: Give the audience something visual before any commands.
 
-#### Step 2.1: Wheeler Store (CLI)
-- Open terminal.
-- Run:
-  ```bash
-  python -m wheeler_memory.scripts.wheeler_store \
-    "I went hiking in the mountains last weekend. The trail had wildflowers." \
-    --domain daily_tasks
-  ```
-- Show output: hash, convergence stats, temperature.
-- **Talking Point**: "That's storing a memory via CLI. We get back the hash (the unique ID), convergence time, and temperature. This memory is hot."
+1. Open `docs/demos/demo.html` in a browser.
+2. Walk through the embedded animations: chaos → convergence, three CA rules, attractor formation.
+3. Talking point: "This is the substrate. Everything you see next is built on this."
 
-**Timing: 45 seconds**
-
-#### Step 2.2: Wheeler Recall (CLI)
-- Run:
-  ```bash
-  python -m wheeler_memory.scripts.wheeler_recall \
-    "Where did I go last weekend?" \
-    --top_k 3
-  ```
-- Show results: top 3 closest memories, their temperatures, reconstructed blends.
-- **Talking Point**: "Three memories came back. The hiking memory is the closest match. See the temperature? It's hot, so the recall is confident. If we queried 'What wildflowers are in the mountains?' the reconstruction would emphasize different aspects."
-
-**Timing: 1 minute**
-
-#### Step 2.3: Wheeler Temps (CLI)
-- Run:
-  ```bash
-  python -m wheeler_memory.scripts.wheeler_temps --top_n 5 --sort hot
-  ```
-- Show the 5 hottest memories, their temperatures, ages.
-- **Talking Point**: "This shows the heatmap of your memories. Hot ones are recent or frequently recalled. Cold ones are old or forgotten. The system can use this to prioritize what to consolidate during sleep."
-
-**Timing: 45 seconds**
-
-#### Step 2.4: Wheeler Scrub (CLI, Optional)
-- Show the scrub command (don't execute unless you want to delete demos):
-  ```bash
-  python -m wheeler_memory.scripts.wheeler_scrub --age 30 --confirm
-  ```
-- **Talking Point**: "This deletes memories older than 30 days. Privacy and cleanup in one command. Darman never accumulates stale memories."
-
-**Timing: 20 seconds**
+**Timing: 1–2 minutes.**
 
 ---
 
-### Section 3: Darman Agent (3–4 minutes)
+### Section 2: Core CLI — Store, Recall, Two-Tier (3–4 minutes)
 
-**Goal**: Show the interactive agent loop. Ask it questions, watch it auto-recall, observe epistemic hedging.
+**Goal**: Show that the basic loop works and the v0.3.6 two-tier path is opt-in.
 
-#### Step 3.1: Start Darman
-- Run:
-  ```bash
-  python -m wheeler_memory.agent --interactive --model ollama/mistral
-  ```
-- Show the startup message: agent is ready, memory system is online, Ollama is connected.
-- **Talking Point**: "This is Darman—the voice for Wheeler Memory. It's running locally. It has memory. Ask it something."
+#### 2.1 Store a memory
 
-**Timing: 30 seconds**
+```bash
+wheeler-store "Self-attention computes weighted relationships between every pair of positions in a sequence."
+```
 
-#### Step 3.2: Ask a Hot Memory Question
-- Ask: *"What did I learn about cellular automata?"*
-- Darman auto-recalls the memory (watch the system auto-search and reconstruct).
-- Show the response, which references the memory with confidence: *"You learned that cellular automata can encode arbitrary information in stable patterns, inspired by the Santa Fe Institute..."*
-- **Talking Point**: "The memory is hot, so Darman speaks with confidence. Notice the phrasing: 'You learned...' It's not hedging. The temperature is high."
+Talking point: "We encoded that text into a 64×64 frame, ran ~5–14 ticks of CA evolution, and saved the resulting attractor. The default encoder is `blended` — hippocampus n-gram + language wheeler — no pretrained models."
 
-**Timing: 1 minute**
+#### 2.2 Recall (default three-grid interference path)
 
-#### Step 3.3: Ask a Warm/Cold Memory Question
-- Ask: *"Tell me again about that hike—I forget the details."*
-- Darman auto-recalls the hiking memory (if temperature has cooled, show it).
-- Show the response with hedging: *"I believe you went hiking... the trail had wildflowers, though I'm less certain about other details..."*
-- **Talking Point**: "Temperature affects the phrasing. If this memory is a few days old, the system admits uncertainty. Confidence is honest."
+```bash
+wheeler-recall "how does attention work in transformers"
+```
 
-**Timing: 1 minute**
+Talking point: "That used the default recall path: Pearson pre-filter, then three-grid interference re-scoring (corpus × experiential × SCM-openness). With no experiential memories yet, it degrades cleanly to pure Pearson."
 
-#### Step 3.4: Ask About Something Not in Memory
-- Ask: *"Did I ever attend a conference?"*
-- Darman searches memory, finds nothing close, responds: *"I don't recall you attending a conference. I have no memory of that."*
-- **Talking Point**: "The agent doesn't confabulate. It admits what it doesn't remember. That's epistemic integrity."
+#### 2.3 Two-tier recognition (v0.3.6, opt-in)
 
-**Timing: 1 minute**
+```bash
+wheeler-recall "how does attention work in transformers" --recognize
+```
 
-#### Step 3.5: New Memory During Chat
-- Ask: *"Let me tell you something new: I'm learning about dissipative structures and self-organization."*
-- Darman prompts you to store this, or auto-stores it (depending on configuration).
-- Show the memory stored in real time.
-- **Talking Point**: "Darman is learning. New memories are stored hot. Old memories fade. The system evolves."
+Talking point: "Recognition only. No CA loop on the query — single Pearson scan against stored attractors. Returns a `BasinSeed`. Cheap. We use this when we just need identity, not content."
 
-**Timing: 1 minute**
+#### 2.4 Recognition + per-basin learning
 
-#### Exit Darman
-- Type `exit` or `quit` to exit the agent loop.
+```bash
+wheeler-recall "how does attention work in transformers" --recognize --learn
+```
+
+Talking point: "Same as above, but now the basin's per-basin Temporal Stability `T` accumulates via EMA, and the stored attractor drifts toward the observed pattern at rate `(1−T)·0.02`. Mature basins become rigid; fresh ones absorb new context. T persists in `index.json`."
+
+#### 2.5 Inspect temperatures
+
+```bash
+wheeler-temps --top-n 5
+```
+
+Talking point: "Temperature is decay × access count. Hot at the top, dead at the bottom. Sleep consolidation prunes from below."
+
+**Timing: 3–4 minutes.**
 
 ---
 
-### Section 4: Under the Hood (2–3 minutes)
+### Section 3: Crystallization & MMLU (2–3 minutes)
 
-**Goal**: Show the CA evolution visually and explain convergence.
+**Goal**: Show that the system can ingest a corpus and benchmark on real questions.
 
-#### Step 4.1: Show Evolution GIF
-- Open `/home/tristan/projects/wheeler-memory/docs/assets/diagrams/evolution.gif` in an image viewer or browser.
-- **Talking Point**: "This is a cellular automaton evolving over time. You see chaos at the start (random initial state). As the rules apply, order emerges. Peaks push outward, valleys pull inward, slopes flow uphill. In ~100 ticks, it converges to a stable pattern. That pattern is the memory."
+#### 3.1 Crystallize a small corpus
 
-**Timing: 1 minute**
+```bash
+echo '{"text":"The mitochondrion is the powerhouse of the cell."}' > /tmp/demo.jsonl
+echo '{"text":"Photosynthesis converts CO2 and water into glucose using light."}' >> /tmp/demo.jsonl
+wheeler-crystallize /tmp/demo.jsonl --verbose
+```
 
-#### Step 4.2: Show Reconstruction Demo
-- Open `/home/tristan/projects/wheeler-memory/docs/assets/reports/reconstruction_demo.png` in an image viewer.
-- **Talking Point**: "This shows three reconstructions of the same stored pattern, blended with different query contexts (α=0.3). Same memory, three different reconstructions. The left might be the stored pattern. The middle blends with one query. The right blends with another. Context colors recall."
+Talking point: "JSONL in, attractors out. Resume-safe — re-running skips already-stored entries."
 
-**Timing: 45 seconds**
+#### 3.2 MMLU sanity check (one subject, fast)
 
-#### Step 4.3: Explain Convergence States
-- Open a terminal and run a quick analysis (if available):
-  ```bash
-  python -m wheeler_memory.scripts.wheeler_stats
-  ```
-- Show convergence state distribution: CONVERGED, OSCILLATING, CHAOTIC.
-- **Talking Point**: "Most memories converge to stable patterns (CONVERGED). Some get stuck oscillating between states (OSCILLATING). A few never settle (CHAOTIC). The system tracks all three. Convergence quality matters for recall fidelity."
+```bash
+wheeler-mmlu --subjects high_school_biology --mode cortex --samples 20
+```
 
-**Timing: 45 seconds**
+Talking point: "Three modes worth knowing: `--mode semantic` (default, pure Pearson), `--mode cortex` (L1/L2/L3 stack), `--mode learn` (full learn → consolidate → test cycle)."
+
+**Timing: 2–3 minutes.**
+
+---
+
+### Section 4: Wheeler-Primary Agent (1–2 minutes, optional)
+
+**Goal**: Show Wheeler driving a small LLM as a pure renderer.
+
+Requires Ollama running with a small model:
+
+```bash
+wheeler-primary --interactive --show-state --model qwen2.5:1.5b
+```
+
+Talking point: "The CA decides what the answer should look like. The small model just renders that state into text. Swap the model — Wheeler stays the same. The CA is the mind; the LLM is the voice."
+
+**Timing: 1–2 minutes.**
+
+---
+
+### Section 5: Under the Hood (1–2 minutes)
+
+#### 5.1 Show the CA evolution GIF
+
+Open `docs/assets/diagrams/evolution.gif`.
+
+Talking point: "Frame-by-frame convergence. Chaos to order in tens of ticks."
+
+#### 5.2 Show diversity / paraphrase reports
+
+Open `docs/assets/reports/diversity_report.png`, `paraphrase_report.png`.
+
+Talking point: "20 diverse inputs produce 20 distinct attractors with low cross-correlation. Paraphrases of the same text cluster together. The geometry is real."
+
+**Timing: 1–2 minutes.**
 
 ---
 
 ## Troubleshooting & Contingencies
 
-### Web UI Not Loading
-- Check if service is running: `curl http://localhost:5000`
-- Restart: `pkill -f "python -m wheeler_memory.web"`, then restart.
-- If port 5000 is in use, set `WHEELER_WEB_PORT=5001` and retry.
+### `wheeler-*` not found
+Activate the venv first: `source .venv/bin/activate`. Then `pip install -e .`.
 
-### CLI Tools Not Found
-- Ensure package is installed: `pip install -e /path/to/wheeler_memory`
-- Alternatively, run with full module path: `python -m wheeler_memory.scripts.wheeler_store ...`
+### Ollama not responding (only matters for `wheeler-primary` / `wheeler-agent`)
+Run `ollama serve` in another terminal. Verify with `ollama list`. If you don't have a model, pull one: `ollama pull qwen2.5:1.5b`.
 
-### Ollama Not Connected
-- Ensure Ollama is running: `ollama serve` in a separate terminal.
-- Check Ollama models: `ollama list`. If no models, pull one: `ollama pull mistral`
-- If still failing, demo Darman with `--mock-ollama` flag for demo responses (if available).
+### MMLU dataset not loaded
+The MMLU loader pulls from Hugging Face on first run; expect a one-time download. Or pre-stage the dataset to `~/.cache/huggingface/`.
 
-### No Data in Memories
-- Test data may need to be loaded. Run:
-  ```bash
-  python -m wheeler_memory.scripts.wheeler_load_test_data
-  ```
-- Or manually store a few memories first (Step 2.1).
+### GPU not detected
+`wheeler-info` prints what was detected. If GPU is missing, the system auto-falls back to CPU (~3 ms/tick is fine for live demo).
 
-### GPU Not Detected
-- If running on machine with GPU, check: `python -c "import torch; print(torch.cuda.is_available())"`
-- The system auto-falls back to CPU if GPU unavailable. No manual intervention needed.
-- For demo purposes, CPU is fast enough (~3ms).
+### Image assets missing
+`docs/assets/diagrams/evolution.gif` is generated by `python scripts/tools/generate_evolution_gif.py`. Diversity / paraphrase reports come from `notes/exploration/test_diversity*.py` and `test_paraphrase*.py` — run with `--output docs/assets/reports/...`.
 
-### Image Assets Not Found
-- Verify paths:
-  ```bash
-  ls -la /home/tristan/wheeler\ memory/docs/assets/diagrams/evolution.gif
-  ls -la /home/tristan/wheeler\ memory/docs/assets/reports/reconstruction_demo.png
-  ```
-- If missing, note in demo that these are generated by test runs or can be skipped.
+### "I have no memories"
+You haven't stored anything yet. Run a `wheeler-store "..."` first, or crystallize a small JSONL.
 
 ---
 
 ## Demo Script Summary
 
 | Section | Duration | Key Points |
-|---------|----------|-----------|
-| Web UI | 2–3 min | Dashboard, store, recall, temperature |
-| CLI Tools | 3–4 min | wheeler-store, -recall, -temps, -scrub |
-| Darman Agent | 3–4 min | Hot memory (confident), warm/cold (hedged), confabulation prevention |
-| Under the Hood | 2–3 min | Evolution GIF, reconstruction demo, convergence states |
-| **Total** | **~8–10 min** | Live, interactive, memorable |
+|---|---|---|
+| Static demo page | 1–2 min | Visual substrate, no commands |
+| Core CLI | 3–4 min | store, recall, two-tier `--recognize` / `--learn` |
+| Crystallize + MMLU | 2–3 min | Corpus ingest + benchmark sanity |
+| Wheeler-primary (optional) | 1–2 min | CA as mind, LLM as voice |
+| Under the hood | 1–2 min | GIF + diversity / paraphrase reports |
+| **Total** | **~8–12 min** | Live, honest, reproducible |
 
 ---
 
 ## Notes for Presenter
 
-1. **Pacing**: Move quickly through each section. If a question derails you, note it and move on. You can do deep dives afterward.
-2. **Confidence**: You're showing something real. Use that. This isn't a mockup or a video. It's live code running.
-3. **Human Touch**: Emphasize the reconstruction insight. "Same memory, different recalls" is the core idea. If people only remember that, you've succeeded.
-4. **Local Privacy**: Reinforce that nothing leaves the machine. No cloud, no logs, no third parties. That resonates.
-5. **Temperature Metaphor**: Hot/warm/cold is intuitive. Use it. "This memory is cold because I haven't thought about it in a while. If I recalled it now, I'd hedge. Like you would."
-6. **Questions**: If someone asks about comparison to vector DBs or traditional memory systems, say: "Those retrieve. We reconstruct. Retrieval is fast but static. Reconstruction is slower but adaptive, like human memory."
-
+1. **Pacing**: Move quickly through each section. Park follow-up questions for after.
+2. **Confidence without hype**: This is real code. Lean on that. We are not pitching "the next AGI" — we are pitching a reconstructive memory substrate that admits what it does and does not know.
+3. **The reconstruction insight**: "Same memory, different reconstructions" is the point. If the audience walks away with that one idea, the demo worked.
+4. **Privacy**: Reinforce that nothing leaves the machine. No cloud, no logs, no third parties.
+5. **Two-tier is the v0.3.6 headline**. Don't bury it in the cold path slides — show `--recognize` and `--learn` directly. People understand "cheap probe vs expensive reconstruction" instantly.
+6. **Honesty about MMLU**: If asked, lead with "L3 is at chance, here's why, here's the next move." Investors and engineers both reward that more than they reward inflated numbers.
+7. **vs vector DBs**: "They retrieve, we reconstruct. Retrieval is fast and static. Reconstruction is slower and adaptive — like human memory."

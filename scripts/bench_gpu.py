@@ -23,7 +23,7 @@ def verify_correctness(n=100):
     print(f"{'=' * 55}")
 
     if not gpu_available():
-        print("  GPU not available! Build with: cd wheeler_memory/gpu && make")
+        print("  GPU not available! Build with: cd wheeler_memory/accel/hip && make")
         return False
 
     texts = [f"correctness test input {i} with unique content {i**2}" for i in range(n)]
@@ -118,7 +118,7 @@ def main():
 
     print(f"GPU available: {gpu_available()}")
     if not gpu_available():
-        print("Build the GPU kernel first: cd wheeler_memory/gpu && make")
+        print("Build the GPU kernel first: cd wheeler_memory/accel/hip && make")
         return
 
     if not args.skip_verify:

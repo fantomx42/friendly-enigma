@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wheeler-memory"
-version = "0.3.5"
+version = "0.3.6"
 description = "Cellular automata-based associative memory system"
 requires-python = ">=3.11"
 dependencies = [
@@ -28,7 +28,6 @@ wheeler-agent = "scripts.wheeler_agent:main"
 wheeler-info = "scripts.system_info:main"
 wheeler-bench-gpu = "scripts.bench_gpu:main"
 wheeler-scrub = "scripts.scrub_brick:main"
-wheeler-ui = "scripts.wheeler_ui:main"
 wheeler-crystallize = "scripts.wheeler_crystallize:main"
 wheeler-primary = "scripts.wheeler_primary:main"
 wheeler-bench = "scripts.bench_quality:main"

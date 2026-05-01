@@ -112,14 +112,11 @@ CORTEX_CONTRADICTION_THRESHOLD = 0.3  # negative r for contradiction flag
 CORTEX_SETTLE_MAX_STEPS = 100
 CORTEX_SETTLE_THRESHOLD = 1e-4
 CORTEX_SETTLE_INERTIA = 0.8
-CORTEX_CLASSIFIER_LR = 0.001
-CORTEX_CLASSIFIER_PATH = "cortex_classifier.npz"  # relative to data_dir
 
 # ---------------------------------------------------------------------------
 # Trajectory similarity
 # ---------------------------------------------------------------------------
 TRAJECTORY_ALPHA = 0.7  # weight of attractor sim vs trajectory sim in hybrid retrieval
-TRAJECTORY_CURVE_LEN = 10  # fixed-length downsampled curves
 TRAJECTORY_SIG_DIR = "signatures"  # subdirectory under each chunk for .npz files
 
 # ---------------------------------------------------------------------------
@@ -134,7 +131,6 @@ TERNARY_THRESHOLD_NEG = -0.33
 # ---------------------------------------------------------------------------
 RECALL_K = 10  # top-K recalled facts for letter extraction
 RECALL_MIN_SIM = 0.15  # minimum similarity to count a vote (0 = accept all)
-RECALL_ENCODER = "hippocampus"  # encoder for recall queries
 
 # ---------------------------------------------------------------------------
 # Word encoder (word-level random indexing)
@@ -172,7 +168,6 @@ CORPUS_SLOPE_FLOW = SLOPE_FLOW_STRENGTH   # 0.55 — moderate mixing
 EXPERIENTIAL_MAX_PUSH = 0.35              # weaker push → looser basins
 EXPERIENTIAL_SLOPE_FLOW = 0.70            # stronger flow → faster convergence
 EXPERIENTIAL_HALF_LIFE_DAYS = 2.0         # aggressive decay
-EXPERIENTIAL_HIT_SATURATION = 5           # fewer hits to saturate
 
 # SCM grid — learned trust topology (permission, not content)
 SCM_LEARNING_RATE = 0.05                  # base update step per feedback event
