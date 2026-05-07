@@ -84,7 +84,7 @@ CA dynamics: 3-state rule — local maxima push toward +1, minima toward -1, slo
 | Group | Files | Role |
 |-------|-------|------|
 | Encoding | `hashing.py`, `hippocampus.py`, `embedding.py`, `word_encoder.py` | Text → 64×64 frame |
-| CA Engine | `dynamics.py`, `gpu_dynamics.py`, `oscillation.py`, `rotation.py` | Frame → attractor evolution |
+| CA Engine | `dynamics.py`, `oscillation.py`, `rotation.py` | Frame → attractor evolution |
 | Storage | `storage.py`, `chunking.py`, `brick.py`, `cache.py` | Attractor persistence + retrieval |
 | Lifecycle | `temperature.py`, `warming.py`, `consolidation.py`, `eviction.py`, `attention.py` | Memory freshness, spreading activation, sleep, capacity |
 | Cortex | `cortex.py`, `cortex_scm.py`, `cortex_classifier.py` | L1 graph → L2 settlement CA → L3 classifier |

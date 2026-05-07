@@ -288,13 +288,17 @@ osc = detect_oscillation(history)
 # osc["oscillating_cells"] → count of cycling cells
 ```
 
-### GPU Backend (HIP/ROCm)
+### GPU Backend (HIP/ROCm) — batch acceleration only
 
-All GPU code lives under `wheeler_memory/accel/`. HIP kernel sources are in
-`accel/hip/`, Python ctypes bindings in `accel/ca.py`. The high-level
-`evolve_batch()` function in `dynamics.py` dispatches to GPU when available,
-falling back to serial CPU evolution otherwise. All major call sites (SimLex,
-benchmarks, crystallization) use batch dispatch.
+**Per canon §1.4, CA semantics are CPU-targeted.** No CUDA, no ROCm, no Vulkan
+paths inside the recall engine. The HIP kernels in `wheeler_memory/accel/`
+accelerate **batch operations** (crystallization, SimLex sweeps, large-batch
+evolution), not the per-query recall path.
+
+HIP kernel sources live in `accel/hip/`; Python ctypes bindings in `accel/ca.py`.
+The high-level `evolve_batch()` function in `dynamics.py` dispatches to GPU when
+available, falling back to serial CPU evolution otherwise. All major batched
+call sites (SimLex, benchmarks, crystallization) use batch dispatch.
 
 ```bash
 cd wheeler_memory/accel/hip && make all
@@ -388,9 +392,12 @@ wheeler_memory/
 ├── trajectory.py        Trajectory similarity for retrieval
 ├── trajectory_cache.py  Trajectory signature caching
   SUBPACKAGES
-├── theories/            Production-supporting helpers (basin, metrics, synthesis)
-└── gpu/                 DEPRECATED — migrated to accel/hip/
+└── theories/            Production-supporting helpers (basin, metrics, synthesis)
 ```
+
+(The legacy `gpu/` directory was removed in v0.3.6 cleanup; archived theory
+modules `lichtenberg.py`, `resonance.py`, `structured.py` moved to
+`notes/theories/` in the same pass.)
 
 ---
 
@@ -410,7 +417,7 @@ Answer(i,j) = Corpus(i,j) × Experiential(i,j) × (1 - |SCM(i,j)|)
 |------|------|----------|
 | **Corpus** | Crystallized knowledge | Tight attractors (push=0.57, slope=0.55), barely decays |
 | **Experiential** | Episodic memory | Loose attractors (push=0.35, slope=0.70), 2-day half-life |
-| **SCM** | Trust topology | 64×64 persistent map, hardening over time, only written by self-consistency loop |
+| **SCM** (Map) | Trust topology | 64×64 persistent map, hardening over time. Two write paths: self-consistency erosion (`update()`) and recall-driven κ feedback (`update_from_recall()`) — see canon §3.3.1 |
 
 ### Four epistemic states
 
@@ -430,11 +437,28 @@ Decoder output → re-encode → re-evolve under corpus rules → Pearson vs ori
   └── hardening accumulates: LR / (1 + hardening_count)
 ```
 
+### SCM feedback loop closure (canon §3.3.5)
+
+Earlier framings called this the "sleeping giant problem" — the worry that the
+SCM topology had no live feedback path from recall outcomes. Canon §3.3.5
+records it as resolved: the recall-driven `κ` feedback path
+(`update_from_recall()`) **is** the closed loop, and its gradient direction is
+verified by `tests/test_scm_gradient_direction.py`. The SCM does not run
+autonomous CA dynamics — there is no evolution rule on the trust grid; it is
+feedback-driven only.
+
 ---
 
 ## 9. Cortex System (Semantic Scoring)
 
 Three-tier scoring pipeline — all native, no pretrained models.
+
+> **SCM acronym disambiguation (canon §3.5.1).** `cortex_scm.py` defines a
+> Structural Coherence **Measure** — a scoring function classifying recall
+> outputs as `SYNTHESIS / NOVEL / HALLUCINATION`. This is a different object
+> from `scm_grid.py`, which is the Structural Coherence **Map** (the trust
+> topology in §8 above). Same acronym, different objects. Canon distinguishes
+> them by full name; code does not.
 
 ### L1: Graph Reasoning (`cortex.py`)
 

@@ -1,5 +1,59 @@
 # Changelog
 
+## Documentation audit (2026-05-06)
+
+Documentation-only pass. No code changes. Aligns user-facing docs with
+`CANON.md` (the 2026-05-04 audit pass that became architectural
+source-of-truth via the canon-precedence rule in `CLAUDE.md`).
+
+### README
+
+- Rewritten to canon's sober, status-tagged style
+  (`[BUILT]` / `[DESIGNED]` / `[PARTIAL]` / `[OPEN]` / `[SPECULATIVE]` /
+  `[ACTIVE RESEARCH]`).
+- Canon pointer added at the top with explicit precedence rule.
+- **GPU repositioned as batch acceleration only** (canon §1.4). HIP kernels
+  accelerate crystallization and SimLex sweeps, not the recall CA. The 71×
+  batch=1000 number now lives in a dedicated "Acceleration" section, properly
+  contextualized.
+- **MMLU framed as `[CHANCE FLOOR]`** per canon §8.2 — corpus-limited, not
+  architecture-limited. Treat MMLU as a corpus-health metric, not a
+  recall-quality metric.
+- **SCM Map vs Measure** disambiguated explicitly per canon §3.5.1
+  (`scm_grid.py` is the trust-topology Map; `cortex_scm.py` is the scoring
+  Measure).
+- **Encoder layer** reframed as `[ACTIVE RESEARCH]` per canon §1.2: primary
+  surface (hash, hippocampus, embedding, blended) vs. research variants
+  (in `scripts/wheeler_simlex.py:60` `ALL_ENCODERS`).
+- **FCAS introduced** per canon §6 — (hash, depth) tuple addresses, SHA256
+  triple-role, build status table.
+- **Naming history** acknowledged: Ralph → Darman → Wheeler Memory (canon §14.1).
+- **Open work** section mirrors canon §9 priorities.
+- Stale claims fixed: removed `gpu/` from project structure (directory gone
+  since v0.3.6 cleanup); test count 43 (was 44 — drift since cleanup);
+  `notes/` (`exploration/`, `experiments/`, `theories/`) added as first-class;
+  SimLex now cites canon's "ρ ≈ 0.22–0.26 and climbing" range rather than a
+  pinned `+0.255`.
+- Acknowledged the known `interference_score` global-scalar collapse issue.
+- Dropped redundant "Suggested Reading Order" (lives in `docs/INDEX.md`).
+
+### Other docs
+
+- `CLAUDE.md` module map: removed deleted `gpu_dynamics.py` reference
+  (CA Engine row).
+- `docs/INDEX.md`: added "Canon" section pointing at `CANON.md` as the first
+  thing readers should open.
+- `docs/architecture.md`: SCM table now records both write paths
+  (self-consistency erosion + recall-driven κ) per canon §3.3.1; added
+  §3.3.5 closure note ("sleeping giant resolved"); GPU Backend section
+  reframed as batch-acceleration-only per canon §1.4; SCM Map vs Measure
+  callout in Cortex section; removed deleted `gpu/` directory from module
+  tree.
+- `docs/future.md`: now leads with canon §9 priorities (FCAS resolution,
+  Wheeler-native eval, corpus population, cross-cube interference). GPU
+  roadmap retained but properly framed as batch acceleration. Known
+  `interference_score` issue surfaced.
+
 ## v0.3.6 — Cleanup pass (2026-04-29)
 
 A separate cleanup commit on top of the v0.3.6 release. No behaviour change to the running system; everything tested green (775 tests passing, down from 808 only because three theory test files moved to the archive — the production paths still test the same code).

@@ -1,5 +1,11 @@
 # Wheeler Memory Documentation
 
+## Canon
+
+| Guide | Description |
+|-------|-------------|
+| [Canon](../CANON.md) | Architectural source-of-truth — read this first |
+
 ## Getting Started
 
 | Guide | Description |

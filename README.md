@@ -1,607 +1,407 @@
 # Wheeler Memory
 
-**A cellular automaton-based associative memory system with real semantic topology** — no LLM, no external models. Pure generative architecture where meaning emerges from attractor dynamics.
+A cellular-automaton associative memory engine. Memory is reconstruction under perturbation, not lookup.
+
+> *Darman doesn't retrieve. Darman reconstructs.*
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Platform](https://img.shields.io/badge/platform-CPU%20%7C%20GPU-green.svg)]()
+
+> **Architectural source-of-truth lives in [CANON.md](CANON.md).** This README is the public-facing introduction. When canon and this README disagree, canon wins on architecture; this file wins on framing for new readers.
+
+Project also called **Project Darman** and **Project Ralph** — three names for the same repository (canon §14.1). Solo project; pure-Python core; no LLM in the loop.
 
 ---
 
-## Overview
+## Core axiom
 
-Wheeler Memory is a **learning architecture**, not a language model. It encodes text through native encoders (Hippocampus n-gram, Context-RI distributional, or blended) into a 64x64 cellular automaton (CA) grid, evolves it through 3-state dynamics until convergence (~5-14 ticks with tuned parameters), and stores the resulting pattern. A Cortex system with three tiers (L1 Graph topology, L2 Settlement CA, L3 Native Classifier) handles semantic scoring and reconstruction.
+> Meaning is what survives symbolic pressure.
 
-Similar concepts produce similar attractors. Query evolution followed by three-grid interference scoring (corpus + experiential + SCM trust gating) enables recall. The Language Wheeler component renders CA states as natural language without independent reasoning.
-
-| Component | Role |
-|-----------|------|
-| **Hippocampus Encoder** | Native semantic embedding via character n-gram random indexing (no pretrained models) |
-| **Context-RI Encoder** | Distributional semantics via context-window random indexing (trained on WikiText-103 + OpenWebText, 601M words) |
-| **CA Dynamics** | 3-state evolution to stable attractors |
-| **Cortex** | L1 semantic topology, L2 settlement stability, L3 classifier scoring |
-| **Language Wheeler** | Renders attractor state as text (decoder, not LLM) |
-
-Memories have **temperature** - frequently recalled memories stay warm, stale ones cool. Recall is **reconstructive**: stored attractors blend with query context and re-evolve.
-
-As of v0.3.6, an opt-in two-tier recall path is available: a recognition tier that matches against stored attractors with no CA convergence loop on the query, and a reconstruction tier that warm-starts CA from the stored attractor. The default `wheeler-recall` path is unchanged (three-grid interference).
-
-**Benchmark goal:** MMLU against frontier models, measured as **learning gain** (train → consolidate → test), not as language modeling.
+A stable attractor is what "remembering" means. Unstable patterns collapse and are forgotten. Recall is reconstruction: the system blends a stored attractor with current context and re-evolves under cellular-automaton dynamics. Two queries for the same memory return *similar but not identical* patterns — this is by design.
 
 ---
 
-## Quick Start
+## Status tag legend
+
+Used throughout this README, mirroring canon. A claim with no tag is descriptive prose; a claim with a tag describes a build state.
+
+| Tag | Meaning |
+|---|---|
+| `[BUILT]` | Exists in code, working |
+| `[PARTIAL]` | Implementation started, not complete |
+| `[DESIGNED]` | Specified, not yet implemented |
+| `[OPEN]` | Known unsolved problem with current best thinking |
+| `[SPECULATIVE]` | Direction, not yet specified |
+| `[ACTIVE RESEARCH]` | Surface under sweep — numbers and choices change |
+
+---
+
+## Quick start
 
 ```bash
 git clone https://github.com/fantomx42/wheeler-memory.git
 cd wheeler-memory
-pip install -e ".[embed]"
+pip install -e ".[embed]"           # with sentence-transformers (MiniLM baseline)
+pip install -e .                    # minimal: numpy, scipy, matplotlib, psutil
 ```
 
-**No GPU required.** CPU works fine. Python 3.11+ required.
-
-### Store and recall memories
+Python 3.11+. CPU is the target; the recall path does not require a GPU.
 
 ```bash
 wheeler-store "self-attention computes relationships between all positions"
 wheeler-recall "how does attention work in transformers"
 ```
 
-Recall uses three-grid interference scoring by default (corpus + experiential + SCM gating). Add `--no-interference` for Pearson-only mode. Use `--encoder context` for distributional semantics or `--embed` for MiniLM sentence-transformer.
-
-### Train context-RI vectors (distributional semantics)
-
-```bash
-# Download corpora (gitignored — ~3.5GB total)
-python datasets/download_wikitext.py          # WikiText-103 (101M words)
-python datasets/download_openwebtext.py       # OpenWebText subsample (500M words)
-cat datasets/wikitext103.jsonl datasets/openwebtext_500m.jsonl > datasets/combined_corpus.jsonl
-
-# Train context-RI vectors on combined corpus
-python -m scripts.wheeler_learn_words --method context-ri --corpus datasets/combined_corpus.jsonl
-```
-
-### Pre-train from a corpus
-
-```bash
-wheeler-crystallize corpus.jsonl --verbose
-```
-
-### Run the Wheeler-primary agent (requires Ollama)
-
-```bash
-wheeler-primary --interactive --show-state --verbose
-```
-
-### Run the MMLU benchmark
-
-```bash
-# Zero-shot cortex evaluation (no stored knowledge)
-wheeler-mmlu --all --mode cortex
-
-# Full learn → consolidate → test cycle
-wheeler-mmlu --subjects high_school_physics conceptual_physics --mode learn
-
-# With trained L3 classifier
-wheeler-mmlu --all --mode cortex --classifier-weights cortex_classifier.npz
-
-# All 57 subjects, save results
-wheeler-mmlu --all --mode cortex --output results.tsv
-```
-
----
-
-## Recognition vs Reconstruction
-
-The default recall path (three-grid interference) is unchanged. v0.3.6 adds an opt-in two-tier API:
-
-- **Recognition** — single-pass match against stored attractors, no CA convergence loop on the query. Returns top-1 (or top-k) with a stability score.
-- **Reconstruction** — warm-start CA evolution from a named stored attractor. ~2x fewer ticks than cold-start across near/mid/far input-distance bands.
-
-CLI:
-
-```bash
-wheeler-recall "how does attention work in transformers" --recognize         # recognition tier only
-wheeler-recall "how does attention work in transformers" --recognize --learn # also accumulate per-basin T (Temporal Stability)
-```
-
-Python:
-
-```python
-from wheeler_memory import recognize, recognize_top_k, reconstruct_from_seed
-
-seed = recognize("how does attention work in transformers")  # Optional[BasinSeed]
-if seed is not None:
-    pattern = reconstruct_from_seed(seed, query="how does attention work in transformers")
-    print(pattern.text, pattern.convergence_ticks)
-
-# Top-k seeds for ranked identity-only use
-seeds = recognize_top_k("how does attention work in transformers", k=5)
-```
-
-Each basin carries a Temporal Stability `T` in `index.json` (T=0 fresh, T→1 rigid). With `--learn`, recognition applies an EMA update to T and drifts the stored attractor toward the observed pattern at rate `(1 - T) * BASIN_DRIFT_BASE_RATE`.
+Recall uses three-grid interference scoring by default. Add `--no-interference` for Pearson-only mode, or `--recognize` for the cheap recognition tier (no CA convergence loop on the query).
 
 ---
 
 ## Architecture
 
+### State space — balanced ternary `[BUILT]`
+
+Cells live on `{-1, 0, +1}`. `+1` is assertion, `-1` is negation, `0` is the **reconstruction root** — the state from which a pattern can settle into either polarity under interference. Quiescence is potential, not absence. Independently derived; later mapped post-hoc onto Setun (1958) and BitNet b1.58 (2024).
+
+### The three grids `[BUILT]`
+
+The architecture is a tensor product of three same-shaped 64×64 grids with different temporal dynamics. Implementation: `wheeler_memory/scm_grid.py`, `experiential.py`, `interference.py`.
+
+| Grid | Temperature | Update rate | Role |
+|---|---|---|---|
+| Corpus | Cold | Slow / batch | Stable durable knowledge |
+| Experiential | Hot | Fast / per-event | Recent activation, working memory |
+| SCM (Map) | Glacial | Hardens with use | Trust topology — *where* interference is permitted |
+
+**SCM Map vs Measure — acronym collision (canon §3.5.1).** The codebase has two unrelated objects sharing the SCM acronym:
+
+- **`scm_grid.py`** — Structural Coherence **Map**. A 64×64 trust topology controlling where interference is permitted. This is the SCM in the answer equation.
+- **`cortex_scm.py`** — Structural Coherence **Measure**. A scoring function classifying recall outputs as `SYNTHESIS / NOVEL / HALLUCINATION`. Operates post-recall.
+
+Different objects, same acronym. Canon distinguishes by full name; code does not. When reading "SCM" in commit messages or comments, check which file is in scope.
+
+### Recall — the interference formula `[BUILT]`
+
 ```
-ENCODING PIPELINE
------------------
-Text ---> Encoder (--encoder flag, default: blended)
-            ├── hippocampus  character n-gram random indexing (native)
-            ├── context      context-window RI (distributional, 601M words, 2M vocab)
-            ├── blended      hippocampus(0.7) + language_wheeler(0.3) ← DEFAULT
-            ├── embedding    MiniLM sentence-transformer (requires .[embed])
-            └── hash/word/word-blended
-                    |
-                    v
-          Random Projection (to 4096 dims) → Reshape to 64x64 grid
-                    |
-                    v
-          CA Evolution (~5-14 ticks to convergence, tuned dynamics)
-                    |
-                    v
-          Attractor (64x64 stable pattern)
-
-THREE-GRID INTERFERENCE ARCHITECTURE (v0.3.1 — default recall path)
-----------------------------------------------
-Answer(i,j) = Corpus(i,j) * Experiential(i,j) * (1 - |SCM(i,j)|)
-
-Grid 1: CORPUS (Cold)           Grid 2: EXPERIENTIAL (Hot)
-  - Crystallized knowledge         - Episodic memory
-  - Tight attractors (push=0.57)   - Loose attractors (push=0.35)
-  - Barely decays                  - Aggressive decay (2-day half-life)
-  - All existing memories          - Temporal context bundled
-                    \                 /
-                     v               v
-            Grid 3: SCM (Structural Coherence Map)
-              - 64x64 persistent trust topology
-              - WHERE interference is permitted
-              - Hardening: early updates have outsized influence
-              - Two feedback pathways:
-                  update()             — self-consistency sculpting (primary writer)
-                  update_from_recall() — outcome-driven κ adjustment (tuning layer)
-              - Per-step JSONL telemetry → scm_telemetry.jsonl (v0.3.4)
-
-Four Interference States:
-  GROUNDED       Corpus peak + Experiential peak + SCM open
-  ABSORBED       Corpus peak + no Experiential   + SCM open
-  UNCONSOLIDATED No Corpus   + Experiential peak + SCM open
-  CONTESTED      Corpus peak + Experiential peak + SCM closed
-
-CORTEX SYSTEM (Semantic Scoring & Topology)
--------------------------------------------
-Stored Attractors ---> L1 Graph: Semantic topology (Hippocampus native encoder)
-                              |
-                              v
-                    L2 Settlement CA: Stability-driven settlement & consolidation
-                              |
-                              v
-                    SCM: Soft Constraint Satisfaction for coherence
-                              |
-                              v
-                    L3 Classifier: Native semantic scorer (trainable, 11K params)
-
-QUERY & RECALL
---------------
-Query ---> Same encoding pipeline ---> Query attractor
-                    |
-                    v
-          Pearson correlation pre-filter (top-2K candidates)
-                    |
-                    v
-          Three-grid interference re-scoring (default since v0.3.1):
-            - Corpus Pearson similarity
-            - Experiential Pearson similarity
-            - SCM openness gating
-            - Degrades to pure Pearson when no experiential data exists
-                    |
-                    v
-          Top-K hits ranked by interference score
-                    |
-                    v
-          [Optional] Reconstructive recall: blend stored attractor with query
-          context, re-evolve through CA -> reconstructed memory
-                    |
-                    v
-          Language Wheeler renders CA state as text
-
-SELF-CONSISTENCY FEEDBACK LOOP
-------------------------------
-Decoder output ---> Re-encode ---> Re-evolve under corpus rules
-        |                                    |
-        v                                    v
-  Compare to original               Pearson correlation
-  corpus attractor                         |
-        |                                    v
-        +--- consistent ---> SCM opens gaps (trust increases)
-        +--- inconsistent -> SCM closes gaps (trust decreases)
-        +--- hardening accumulates: LR / (1 + hardening_count)
-
-MMLU BENCHMARK MODES
---------------------
---mode semantic            : Pure CA attractor Pearson correlation (default)
---mode cortex              : Cortex L3 classifier scoring (no LLM)
---mode recall-text         : Reconstruction + text decode
---mode decode              : Small model decoder for rendering
---mode learn               : Full cycle (learn → consolidate → test)
---mode learn-interference  : Learn + experiential storage + SCM sculpting
+Answer(i, j) = Corpus(i, j) × Experiential(i, j) × (1 - |SCM(i, j)|)
 ```
 
-The CA uses a 3-state rule: local peaks push toward +1 (`MAX_PUSH_STRENGTH=0.57`), valleys toward -1, slopes flow uphill (`SLOPE_FLOW_STRENGTH=0.55`). Convergence takes ~3ms on CPU. Batch evolution via `evolve_batch()` dispatches to GPU when available (71x speedup at batch=1000 on RX 9070 XT); all major call sites (SimLex, benchmarks, crystallization) use batch dispatch. Evolution produces one of four terminal states: CONVERGED (stable attractor), OSCILLATING (epistemic uncertainty), DEGENERATE (<5% alive cells — 0-dominant frame rejected), or CHAOTIC (max iterations exhausted). Multiple native encoders are available — the Hippocampus encoder uses character n-grams (lexical similarity), the Context-RI encoder uses distributional co-occurrence vectors trained on WikiText-103 + OpenWebText (601M words, SimLex-999 rho = +0.255). Cortex eliminates all pretrained model dependencies; all semantic understanding is native to the architecture.
+The SCM acts as a **gate**, not a contributor. Hardened cells (`|SCM| → 1`) become opaque; quiescent cells (`|SCM| → 0`) let interference through. This is the waveguide interpretation: the SCM does not generate signal, it routes it (canon §4).
 
-The three-grid interference system (default since v0.3.1) transforms Wheeler from a content-addressed store into a system with emergent epistemic states. Existing attractors are corpus by default (ABSORBED state). The SCM starts fully permissive (all zeros) and is sculpted only by the self-consistency feedback loop — no external reward signal. This is "it from bit" applied to epistemology: convergence IS ground truth.
+Per-cell state classification (`interference.py`):
 
-As of v0.3.4, every SCM grid event emits a JSONL row to `scm_telemetry.jsonl` (gradient magnitude, entropy, connected-component count, alive fraction, event source). A closed-loop A/B evaluation script (`scripts/scm_ab_eval.py`) validates recall quality across Pearson, frozen-SCM, and learning-SCM arms using a two-phase design: warmup (exact queries to settle kappa_base) + paraphrase eval (content-word-shuffled queries to trigger seeding via negative advantage). As of v0.3.5, the cold-start seeding path is verified by a spatial alignment test (`test_cold_start_spatial_alignment`), and an architectural issue has been identified: `interference_score` currently collapses the 64×64 SCM to a global scalar mean_openness, making rank ordering identical between frozen and learning arms regardless of SCM state. The fix (spatial product per candidate) is tracked in the roadmap.
+| State | Condition |
+|---|---|
+| `GROUNDED` | Corpus peak + Experiential peak + SCM open |
+| `ABSORBED` | Corpus peak + no Experiential + SCM open |
+| `UNCONSOLIDATED` | No Corpus + Experiential peak + SCM open |
+| `CONTESTED` | Corpus peak + Experiential peak + SCM closed |
+
+### SCM feedback loop `[BUILT]`
+
+Two pathways write into the SCM grid (canon §3.3.1):
+
+1. **Self-consistency erosion** (`scm_grid.py:112` `update()`) — opens or closes cells based on output fidelity through the corpus rules.
+2. **Recall-driven feedback** (`scm_grid.py:151` `update_from_recall()`) — adjusts gate magnitude (`κ`) based on recall quality.
+
+The recall-driven `κ` path is the closed loop that earlier framings called the "sleeping giant problem". Canon §3.3.5 records it as resolved; gradient direction is verified by `tests/test_scm_gradient_direction.py`. SCM does not run autonomous CA dynamics — there is no evolution rule on the trust grid; it is feedback-driven only.
+
+> **Known issue.** `interference.py:158` collapses the 64×64 SCM to a global scalar `mean_openness`, making rank ordering identical between frozen and learning arms regardless of spatial SCM state. Tracked under "Open work"; the spatial-product fix is straightforward but changes score semantics from normalized Pearson to weighted mean, so calibration vs. existing recall paths needs care before merging.
+
+### Encoder layer `[ACTIVE RESEARCH]`
+
+The encoder layer is plural and contested. Wheeler runs multiple encoder backends and treats their relative SimLex-999 performance as the live signal of architectural progress. The architectural claim is that meaning can be reconstructed natively if the encoder is good enough; MiniLM is the bar to clear, not the canonical answer (canon §1.2).
+
+**Primary surface:**
+
+| Encoder | Role |
+|---|---|
+| `hash` | Deterministic SHA-256 seed; default for `wheeler-recall` and reproducible benchmarks |
+| `hippocampus` | Wheeler-native character n-gram random indexing; default for `wheeler-simlex`; active production target |
+| `embedding` | MiniLM via sentence-transformers; the external baseline to clear (requires `.[embed]`) |
+| `blended` | Convex combination; default for user-facing surfaces |
+
+**Research variants** live in `scripts/wheeler_simlex.py:60` `ALL_ENCODERS`: `word`, `hippo-word`, `context`, `context-blended`, `word-blended`, `language`. They compete in sweeps; survivors get promoted.
+
+For live SimLex numbers, run `wheeler-simlex --sweep` rather than trusting a pinned figure in this README.
+
+### Cortex — three-tier semantic scoring `[BUILT]`
+
+A scoring layer over retrieved attractors, structurally separate from the three grids (canon §3.5):
+
+1. **L1 — Correlation graph** (`cortex.py`): Pearson correlation adjacency over the retrieved attractor set, with BFS clustering to identify coherent neighborhoods.
+2. **L2 — Settlement CA** (`cortex.py`): Opinion diffusion on the correlation graph until convergence. This is a *second* CA in the system, distinct from the three-grid CA — it runs on graph topology, not the 64×64 grid.
+3. **L3 — Native classifier** (`cortex_classifier.py`): ~11K-parameter numpy SGD network. Trained via `train_cortex_classifier.py`.
+
+Output is a `SCMResult` (the *Measure*) classifying recall as `SYNTHESIS / NOVEL / HALLUCINATION` with ten layer scores and a net warrant.
+
+### Two-tier recall `[BUILT]` (v0.3.6)
+
+Default `wheeler-recall` is unchanged (three-grid interference). v0.3.6 added an opt-in API that splits identity from content (`wheeler_memory/recall_api.py`):
+
+- **Recognition tier** — `recognize(query)` does a single-pass Pearson scan against stored attractors using the **raw** query frame. No CA convergence loop on the query. Returns a `BasinSeed` if max similarity ≥ `RECOGNITION_THRESHOLD`, else `None`.
+- **Reconstruction tier** — `reconstruct_from_seed(seed, query=str)` warm-starts CA from the stored attractor blended with the raw query frame. The warm start is exactly the savings vs. cold path (~2× ticks reduction across near/mid/far input-distance bands per `scripts/bench/bench_recall_warm_vs_cold.py`).
+
+```python
+from wheeler_memory import recognize, recognize_top_k, reconstruct_from_seed
+
+seed = recognize("how does attention work in transformers")
+if seed is not None:
+    pattern = reconstruct_from_seed(seed, query="how does attention work in transformers")
+    print(pattern.text, pattern.convergence_ticks)
+```
+
+**Per-basin Temporal Stability (T)** — each basin carries a float in `[0, 1]` in `index.json` (`metadata.t_stability`). With `--learn`, recognition applies an EMA update to `T` and drifts the stored attractor toward the observed pattern at rate `(1 - T) × BASIN_DRIFT_BASE_RATE`. Mature basins (T → 1) are near-rigid; fresh basins absorb input rapidly.
+
+### CA dynamics
+
+3-state rule on a Von Neumann 4-neighborhood with wrapping boundaries. Local maxima push toward `+1` (`MAX_PUSH_STRENGTH`), minima toward `-1`, slopes flow uphill (`SLOPE_FLOW_STRENGTH`). Convergence detected by `percentile(|delta|, 99) < threshold` with an `alive_fraction ≥ 0.05` floor. All tunables — including the autoresearch parameter sweep targets — live in `wheeler_memory/constants.py`; current values move under `wheeler-bench`-driven tuning so are not pinned here. Evolution produces one of four terminal states: `CONVERGED`, `OSCILLATING` (period-2..10 role-space cycle), `DEGENERATE` (<5% alive cells, frame is 0-dominant), or `CHAOTIC` (max iterations exhausted).
 
 ---
 
-## Empirical Results
+## Acceleration
 
-Validated on a corpus of **2,711 memories** (26.9% grid saturation):
+**CA semantics are CPU-targeted (canon §1.4).** No CUDA, no ROCm, no Vulkan paths inside the recall engine. The CA is the reasoning engine, not a GPU shader.
 
-### MMLU Benchmark (learn → consolidate → test)
+HIP kernels in `wheeler_memory/accel/hip/` accelerate **batch operations** — crystallization, SimLex sweeps, large-batch evolution. `evolve_batch()` in `dynamics.py` dispatches to GPU when available and falls back to serial CPU otherwise. Recall itself remains CPU.
 
-Wheeler has a full learning loop: store correct Q&A facts from dev+validation splits, run sleep consolidation, then test on the held-out test split. Results use the native Cortex encoder (no external models). Full logs in `results/`.
+Honest number, properly contextualized: ~3 ms/tick CPU; **71× speedup at batch=1000 on RX 9070 XT (RDNA4, gfx1201)** for batched offline operations. See [docs/gpu.md](docs/gpu.md) for setup.
 
-**All 57 subjects — 14,042 questions (test split):**
+---
 
-| Run | Mode | Score | Notes |
-|-----|------|-------|-------|
-| Zero-shot Cortex | `--mode cortex` (0 stored memories) | 24.3% (3,418/14,042) | At chance — no knowledge to retrieve |
-| Cortex + Learned Facts | `--mode cortex` (1,812 science attractors stored) | 25.3% (3,557/14,042) | +1.0% over zero-shot |
-| Cortex + L3 Classifier | `--mode cortex --classifier-weights cortex_classifier.npz` | 25.9% (3,643/14,042) | +1.6% over zero-shot |
+## Empirical results
 
-Random chance for 4-choice MCQ is **25.0%**. Encoder: blended (hippocampus 0.7 + language wheeler 0.3). The L3 classifier is trained with numpy SGD (11K params) — loss barely moved from chance, needs more training data or richer features.
+### MMLU `[CHANCE FLOOR]`
 
-**Previous MiniLM semantic baseline (removed):** 27.5% — used external pretrained model (`all-MiniLM-L6-v2`), no longer the default encoder.
+Currently sits near 25% (chance for 4-option multiple choice). **Diagnosis: corpus-limited, not architecture-limited (canon §8.2).** Treat MMLU as a *corpus health* metric, not a *recall quality* metric. The Corpus grid has not been populated with sufficient world-knowledge structure; MMLU will move when corpus does.
 
-**Next step:** Reconstruction scoring. Evolve the query → let the CA settle → read back what the attractor is saying → compare that to the choices as text. This is the path where "it from bit" becomes the scoring mechanism, not just the storage philosophy.
+All 57 subjects, 14,042 questions (test split):
 
-### SimLex-999 (Semantic Similarity)
+| Run | Mode | Score | Stored memories |
+|---|---|---|---|
+| Zero-shot Cortex | `--mode cortex` | 24.3% (3,418/14,042) | 0 |
+| Cortex + Learned Facts | `--mode cortex` after `--mode learn` | 25.3% (3,557/14,042) | 1,812 science attractors |
+| Cortex + L3 Classifier | `--mode cortex --classifier-weights cortex_classifier.npz` | 25.9% (3,643/14,042) | 1,812 + L3 trained |
 
-SimLex-999 measures how well an encoder captures genuine semantic similarity (not just relatedness). Evaluated with `wheeler-simlex --encoder <type> --mode pearson`.
+Encoder: blended (hippocampus 0.7 + language wheeler 0.3). The L3 classifier is trained with numpy SGD (~11K params); loss barely moves from chance — needs more training data or richer features. Full logs in `results/`; recorded baselines in `results/BASELINES.md`. The previous MiniLM semantic baseline (27.5%) used an external pretrained model and is no longer the default encoder.
 
-| Encoder | Spearman rho | Notes |
-|---------|:------------:|-------|
-| Context-RI (evolved) | **+0.255** | Distributional RI, trained on WikiText-103 + OpenWebText (601M words, 2M vocab) |
-| Context-RI (raw frames) | +0.046 | Before CA evolution — CA dynamics partially erode signal |
-| Hippocampus | -0.032 | Character n-grams have no semantic signal (expected) |
-| MiniLM (external ceiling) | +0.446 | Pretrained sentence-transformer, reference only |
+The right eval for an attractor-reconstruction memory is not a multiple-choice benchmark. Wheeler-native eval design — perturb a known attractor, measure settling time and final-state fidelity — is `[SPECULATIVE]` (canon §8.3).
 
-The context-RI encoder is the first native (no pretrained models) encoder to show positive semantic signal — now at **57% of MiniLM's ceiling**. Trained on WikiText-103 + OpenWebText (1.77M documents, 601M words, 2M vocab, 384-dim vectors). Decontamination via all-but-the-top singular component removal (K=4) and Word2Vec-style subsampling. Per-POS: nouns rho=+0.331, adjectives rho=+0.267, verbs rho=+0.050 (verbs remain the hard case for bag-of-words distributional methods).
+### SimLex-999 `[ACTIVELY TRACKED]`
 
-### Semantic Apple Test
+Live numbers come from `wheeler-simlex --sweep`. Don't pin them in docs. As of v0.3.3:
 
-Exclude a concept from its domain, crystallize all neighbours, then query for the excluded concept. Does the topology predict the missing node? Uses hippocampus encoder on both sides — no external models, pure "it from bit."
+- `hippocampus` / `context-RI`: ρ ≈ 0.22–0.26 and climbing
+- `MiniLM` (external ceiling): ρ ≈ 0.43
 
-| Domain | Verdict | Top Similarity | Embedding Advantage |
-|--------|---------|---------------|---------------------|
-| ML Architecture | **weak topology** | 0.173 | +0.159 over hash control |
+Context-RI is the first native (no pretrained models) encoder to show positive semantic signal. Trained on WikiText-103 + OpenWebText (1.77M docs, 601M words, 384-dim vectors). Decontamination via all-but-the-top singular component removal (K=4) plus Word2Vec-style subsampling. Per-POS: nouns lead, verbs remain the hard case for bag-of-words distributional methods.
+
+### Apple test (semantic holdout)
+
+Exclude a concept from its domain, crystallize neighbours, query for the excluded concept. Hippocampus encoder, no external models.
+
+| Domain | Verdict | Top similarity | Embedding advantage |
+|---|---|---|---|
+| ML architecture | weak topology | 0.173 | +0.159 over hash control |
 | Physics | silent | 0.077 | +0.069 over hash control |
 | Biology | silent | 0.090 | +0.083 over hash control |
 
-Hippocampus n-gram encoding produces real signal above the hash control in all domains. ML architecture shows the strongest topology: the holdout "Transformer architecture combines self-attention with feed-forward layers and residual connections" correctly fires feed-forward networks (0.173), layer normalization (0.135), and residual connections (0.106) — the three component concepts named in the holdout. The frontier is in CA dynamics that preserve more of this structure through evolution.
-
-### Decoder Confidence Gradient
-
-| Attractor Depth | Avg Top Similarity | Uncertain |
-|----------------|-------------------|-----------:|
-| Deep (crystallized) | 0.409 | 0% |
-| Shallow (related) | 0.248 | 0% |
-| Missing (out of domain) | 0.193 | 67% |
-
-The system knows what it knows, knows what it doesn't, and knows the difference.
-
-### Co-Activation Topology
-
-Bridge sentences - text discussing multiple concepts together - create measurable attractor overlap:
-
-| Concept Pair | Before Bridge | After Bridge |
-|-------------|:------------:|:------------:|
-| quantum superposition / entanglement | 1.000 | 1.000 (natural) |
-| photosynthesis / mitochondria | 0.000 | 0.250 |
-| self-attention / transformer | 0.000 | 0.111 |
-| BERT / GPT | 0.000 | 0.111 |
-| cross-domain (ML / physics) | 0.000 | 0.000 (correct isolation) |
+ML architecture shows the strongest topology: the holdout *"Transformer architecture combines self-attention with feed-forward layers and residual connections"* correctly fires feed-forward networks, layer normalization, and residual connections. The frontier is CA dynamics that preserve more of this structure through evolution.
 
 ---
 
-## Corpus Crystallization
+## CLI reference
 
-Pre-train Wheeler by feeding text corpora through the full pipeline at scale:
+All 16 commands registered in `pyproject.toml [project.scripts]`. Common flags: `--data-dir`, `--chunk`, `--encoder`, `--salience`, `--verbose`.
 
-```bash
-# Prepare a corpus (JSONL, CSV, TXT, or Parquet)
-echo '{"text": "concept description here"}' > corpus.jsonl
-
-# Crystallize with semantic embeddings
-wheeler-crystallize corpus.jsonl --verbose --batch-size 64
-
-# Resume support - re-running skips already-stored entries
-wheeler-crystallize corpus.jsonl --verbose  # only processes new items
-```
-
-**Supported input formats:** JSONL (`{"text": "..."}` per line), CSV (column named `text`), TXT (one entry per line), Parquet (auto-detects text column).
-
-The included corpus preparation script extracts from SWE-bench, mbpp, LongBench, and curated domain entries:
-
-```bash
-python scripts/tools/prepare_corpus.py
-# -> datasets/corpus.jsonl (2711 entries)
-```
-
----
-
-## CLI Reference
-
-### Core Operations
+### Core operations
 
 | Command | Description |
-|---------|-------------|
-| `wheeler-store "text"` | Store a memory (use `--encoder` to select encoding strategy) |
-| `wheeler-store "text" --experiential` | Store as episodic memory (loose attractors, temporal context) |
-| `wheeler-recall "text"` | Find similar memories (three-grid interference scoring by default) |
-| `wheeler-recall "text" --no-interference` | Pearson-only recall (skip experiential + SCM gating) |
-| `wheeler-recall "text" --recognize` | Recognition tier — single-pass match, no CA convergence loop on the query |
-| `wheeler-recall "text" --recognize --learn` | Recognition + accumulate per-basin Temporal Stability (T) and drift |
+|---|---|
+| `wheeler-store "text"` | Store a memory |
+| `wheeler-store "text" --experiential` | Store as episodic memory (loose attractors, 2-day half-life) |
+| `wheeler-recall "text"` | Three-grid interference recall (default) |
+| `wheeler-recall "text" --no-interference` | Pearson-only recall |
+| `wheeler-recall "text" --recognize` | Recognition tier — single-pass match, no convergence loop |
+| `wheeler-recall "text" --recognize --learn` | Recognition + per-basin T accumulation + drift |
 | `wheeler-forget --text "text"` | Delete a specific memory |
-| `wheeler-temps` | View all memories with temperature/freshness |
-| `wheeler-sleep` | Archive cold memories to save space |
+| `wheeler-temps` | List memories with temperature/freshness |
+| `wheeler-sleep` | Archive cold memories |
 
-### Agents
-
-| Command | Description |
-|---------|-------------|
-| `wheeler-agent` | LLM chat agent with Wheeler context (requires Ollama) |
-| `wheeler-primary` | Wheeler-primary agent - small model as pure decoder (requires Ollama) |
-| `wheeler-primary --interactive` | Interactive conversation mode |
-| `wheeler-primary --show-state` | Display attractor state alongside responses |
-
-### Pre-Training
+### Pre-training
 
 | Command | Description |
-|---------|-------------|
-| `wheeler-crystallize corpus.jsonl` | Crystallize a text corpus into attractor landscape |
-| `wheeler-crystallize --no-embed` | Use hash-based encoding instead of embeddings |
-| `wheeler-crystallize --max-items 1000` | Cap processing for validation runs |
+|---|---|
+| `wheeler-crystallize corpus.jsonl` | Crystallize a text corpus into the attractor landscape |
+| `wheeler-crystallize --no-embed` | Hash encoding instead of embeddings |
+| `wheeler-crystallize --max-items N` | Cap processing for validation runs |
 
 ### Diagnostics
 
 | Command | Description |
-|---------|-------------|
-| `wheeler-scrub --text "text"` | Visualise how a memory formed (brick inspector) |
+|---|---|
+| `wheeler-scrub --text "text"` | Brick inspector — visualise how a memory formed |
 | `wheeler-info` | System info (hardware, GPU, paths) |
-| `wheeler-bench` | Quality score benchmark for CA dynamics tuning |
-| `wheeler-bench-gpu` | Benchmark GPU vs CPU evolution speed |
-| `wheeler-generate` | Generative text engine (IT from BIT mode) |
-| `wheeler-scm` | Inspect SCM trust topology (openness, heatmap, reset) |
-| `wheeler-simlex` | SimLex-999 semantic similarity benchmark |
+| `wheeler-bench` | CA quality benchmark (lower is better) |
+| `wheeler-bench-gpu` | CPU vs GPU evolution-speed benchmark |
+| `wheeler-generate` | Generative engine (IT-from-BIT mode) |
+| `wheeler-scm` | Inspect SCM trust topology |
+| `wheeler-simlex` | SimLex-999 semantic-similarity benchmark |
+
+### Agents
+
+| Command | Description |
+|---|---|
+| `wheeler-agent` | LLM chat agent with Wheeler context (requires Ollama) |
+| `wheeler-primary` | Wheeler-primary — small LLM as pure decoder (requires Ollama) |
 
 ### Benchmark
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `wheeler-mmlu --subjects SUBJECT` | Run MMLU on specific subjects |
 | `wheeler-mmlu --all` | Run all 57 MMLU subjects |
 | `wheeler-mmlu --mode cortex` | Cortex L3 classifier scoring |
-| `wheeler-mmlu --mode semantic` | Pure CA Pearson correlation (default) |
 | `wheeler-mmlu --mode learn` | Learn dev+val → consolidate → test on test split |
-| `wheeler-mmlu --mode learn-interference` | Learn + experiential storage + SCM sculpting |
-| `wheeler-mmlu --mode decode --model qwen2.5:1.5b` | Decoder mode (requires Ollama) |
 | `wheeler-mmlu --classifier-weights cortex_classifier.npz` | Use trained L3 classifier |
-| `wheeler-mmlu --list-subjects` | Print all 57 available subjects |
 
-### Training
-
-| Command | Description |
-|---------|-------------|
-| `python scripts/train_cortex_classifier.py` | Train the L3 cortex classifier (numpy SGD) |
-
-### Evaluation Scripts
-
-```bash
-python scripts/bench/apple_test_semantic.py   # Semantic holdout test
-python scripts/bench/eval_decoder.py          # Decoder quality by attractor depth
-python scripts/bench/eval_decoder.py --decode # Also run small model (requires Ollama)
-python scripts/bench/bench_associative.py     # Associative recall benchmarks
-python scripts/tools/topology_map.py          # Co-activation adjacency map
-python scripts/tools/generate_evolution_gif.py # Regenerate the CA evolution GIF
-```
+See [docs/cli.md](docs/cli.md) for every flag.
 
 ---
 
-## Key Concepts
+## Project structure
 
-### Attractor Landscape
+```
+wheeler_memory/                  Core library
+  ENCODING                       hashing.py, hippocampus.py, embedding.py,
+                                 word_encoder.py, brick.py
+  CA ENGINE                      dynamics.py, oscillation.py, rotation.py
+  STORAGE & RECALL               storage.py, reconstruction.py, recall_api.py,
+                                 t_metadata.py, cache.py
+  THREE-GRID INTERFERENCE        scm_grid.py, experiential.py, interference.py,
+                                 similarity.py, trajectory.py, trajectory_cache.py
+  CORTEX                         cortex.py, cortex_scm.py, cortex_classifier.py
+  AGENTS & RENDERING             decoder.py, language_wheeler.py, agent.py,
+                                 generation.py
+  LIFECYCLE                      temperature.py, attention.py, warming.py,
+                                 consolidation.py, eviction.py
+  UTILITIES                      crystallization.py, chunking.py, hardware.py,
+                                 polarity.py, constants.py
+  theories/                      Production-supporting helpers [BUILT]:
+                                 basin.py, metrics.py, synthesis.py
+  accel/                         GPU acceleration (batch ops only)
+    hip/                         HIP kernel sources + Makefile (RDNA4-aware)
+    ca.py                        Python ctypes bindings
+  npu/                           NPU/TPU scaffolding (future); OpenVINO + Coral stubs
 
-Every stored memory is a fixed-point in CA dynamics. The collection of all stored attractors forms a landscape with topological structure - semantically related concepts occupy nearby basins. This topology is not designed; it **emerges** from the interaction between semantic embeddings, random projection, and CA evolution.
+scripts/                         CLI entry points + benchmarks
+  bench/                         apple_test_semantic.py, eval_decoder.py,
+                                 bench_associative.py, bench_recall_warm_vs_cold.py,
+                                 train_projection.py, measure_separation.py
+  tools/                         prepare_corpus.py, topology_map.py,
+                                 generate_evolution_gif.py, build_hip.sh,
+                                 install_hip_hook.sh, corpus_cleanup.py
+  wheeler_simlex.py              ALL_ENCODERS lives here (line 60+)
+  train_cortex_classifier.py     L3 cortex classifier training (numpy SGD)
 
-### Temperature System
+notes/                           Research scratch — not part of pytest, not CLI
+  exploration/                   9 research-notebook scripts (ex-scripts/exploration/)
+  experiments/                   6 per-theory exercises (ex-scripts/experiments/)
+  theories/                      Archived theory modules: lichtenberg.py,
+                                 resonance.py, structured.py + their tests
 
-Memories have temperature based on access frequency and time decay (7-day half-life). Hot memories are prioritised during recall. Cold memories can be archived via `wheeler-sleep`.
+tests/                           pytest suite (run `pytest --collect-only -q` for current count)
+results/                         Benchmark logs; BASELINES.md is the textual record
+docs/                            Technical documentation; INDEX.md is the entry point
+plans/                           Active research & implementation plans
+pitch_pack/                      Investor / developer pitch materials
+datasets/                        Training corpora (gitignored, ~4 GB)
+```
 
-Temperature tiers: `hot (≥0.6) > warm (≥0.3) > cold (≥0.05) > fading (≥0.01) > dead (<0.01)`
+Note the live/archived split for `theories/`:
 
-### Reconstructive Recall (Darman)
+- `wheeler_memory/theories/` (production-supporting, imported by agent / decoder / wheeler_mmlu / apple-test)
+- `notes/theories/` (archived: `lichtenberg.py`, `resonance.py`, `structured.py` — moved in v0.3.6 cleanup)
 
-Recall is not retrieval. When a stored attractor is recalled, it blends with the query context at a configurable alpha and re-evolves through the CA. The result is a reconstruction shaped by current context - **the same memory comes back differently depending on what you're thinking about.**
-
-### Chunked Storage
-
-Memories are auto-routed to domain chunks (`code`, `science`, `hardware`, `daily_tasks`, `meta`, `general`) via keyword matching. Each chunk maintains its own attractor index, enabling domain-specific recall and capacity management. Maximum capacity: 10,000 attractors.
-
-### Confidence Signal
-
-In Wheeler-primary mode, confidence is derived from the top Pearson similarity of recalled attractors (floor: 0.18). The CA evolution compresses the similarity range relative to raw embedding space - thresholds are calibrated to CA-space values, not embedding-space intuitions.
-
-### Bridge Sentences
-
-Corpus entries that discuss multiple concepts together create measurable attractor overlap (co-activation bridges). Isolated definitions produce strong individual attractors but weak inter-concept connections. Effective corpus design requires connective tissue - textbook prose, not dictionary entries.
+The `wheeler-ui` CLI was retired in v0.3.6 (orphaned since March 2026); static demo HTML remains under `docs/demos/`.
 
 ---
 
-## Project Structure
+## Open work
 
-```
-wheeler_memory/          Core library
-  ENCODING
-    dynamics.py          CA engine (3-state evolution, GPU dispatch)
-    embedding.py         MiniLM sentence embedding + JL random projection (optional)
-    hippocampus.py       Native encoder: character n-gram random indexing (default)
-    hashing.py           SHA-256 deterministic encoding
-    word_encoder.py      Context-window random indexing (distributional semantics)
-    brick.py             Memory brick format (.npz archives)
-  CORTEX SYSTEM
-    cortex.py            Cortex orchestration & L1 graph topology
-    cortex_scm.py        L2 Settlement CA + Soft Constraint Satisfaction
-    cortex_classifier.py L3 Native semantic classifier (trainable, numpy SGD)
-  STORAGE & RECALL
-    storage.py           Store/recall with chunked Pearson search
-    reconstruction.py    Reconstructive recall (Darman philosophy)
-    recall_api.py        Two-tier recall (recognize / reconstruct_from_seed) + T-gated drift
-    t_metadata.py        Per-basin Temporal Stability (T) lazy backfill + EMA helpers
-    cache.py             JSON file-based caching layer
-  THREE-GRID INTERFERENCE
-    scm_grid.py          SCM persistent 64x64 trust topology with hardening
-    experiential.py      Episodic memory encoding with temporal context
-    interference.py      Three-grid interference engine + self-consistency loop
-    similarity.py        Pearson + spatial similarity helpers
-    trajectory.py        Trajectory signatures (curve-based hybrid retrieval)
-    trajectory_cache.py  Cached trajectory signatures per chunk
-  AGENTS & RENDERING
-    decoder.py           Language Wheeler decoder (text rendering)
-    language_wheeler.py  Language Wheeler component (CA state → text)
-    agent.py             LLM agent wrapper (Wheeler context seasoning)
-    generation.py        Generative engine (IT from BIT)
-  UTILITIES
-    crystallization.py   Corpus pre-training pipeline (GPU batch-aware)
-    temperature.py       Temperature/warmth tracking
-    chunking.py          Domain routing (keyword-based)
-    hardware.py          Hardware detection & optimal device selection
-    attention.py         Salience-weighted recall warming
-    warming.py           Association tracking
-    oscillation.py       Epistemic uncertainty via oscillation detection
-    rotation.py          Rotation retry to escape bad attractor basins
-    polarity.py          Dual-polarity encoding (antipodal CA states)
-    consolidation.py     Sleep consolidation (prune redundant keyframes)
-    eviction.py          Three-phase graceful degradation
-    constants.py         Tunable system constants
-  theories/              Production-supporting theory helpers (basin, metrics, synthesis)
-                         Archived siblings (lichtenberg, resonance, structured) live under notes/theories/
-  accel/                 GPU acceleration (primary)
-    __init__.py          gpu_available(), accel_info(), device routing
-    _common.py           Shared ctypes helpers, buffer pool
-    ca.py                Python bindings for HIP CA evolution kernel
-    hip/                 HIP kernel sources + unified Makefile
-      ca_evolve.hip      v2 kernel (variable grid, global memory)
-      ca_evolve_v1.hip   v1 legacy kernel (64x64, shared memory)
-      Makefile           Auto-detects GPU arch, builds all .so targets
-  npu/                   NPU/TPU scaffolding (future)
-    __init__.py          npu_available(), device_info()
-    openvino_bridge.py   Intel NPU stub (OpenVINO INT8 inference)
-    coral/               Google Coral Edge TPU (future hardware)
-      tpu_bridge.py      PyCoral inference + dual-TPU pipeline stubs
-  gpu/                   DEPRECATED — migrated to accel/hip/
+In priority order (canon §9):
 
-scripts/                 CLI entry points
-  bench/                 Benchmarks & evaluation
-    apple_test_semantic.py   Semantic holdout test
-    eval_decoder.py          Decoder quality by attractor depth
-    bench_associative.py     Associative recall benchmarks
-    bench_recall_warm_vs_cold.py  Warm-start vs cold-recall ticks across 3 distance bands
-    train_projection.py      Learn an optimised JL projection matrix
-  (exploration/ and experiments/ moved to notes/ — research notebooks, not part of pytest)
-  tools/                 Data prep, corpus cleanup, HIP build utilities
-    prepare_corpus.py    Corpus preparation (SWE-bench, mbpp, LongBench)
-    topology_map.py      Co-activation adjacency map
-    generate_evolution_gif.py   Regenerate docs/assets/diagrams/evolution.gif
-    build_hip.sh / install_hip_hook.sh   HIP kernel build scripts
-  train_cortex_classifier.py   L3 cortex classifier training (numpy SGD)
-  wheeler_store.py / wheeler_recall.py / wheeler_forget.py / ...
+1. **FCAS address resolution** `[DESIGNED]` — wire `(hash, depth)` tuple keys into the recall path. See FCAS section below.
+2. **Wheeler-native eval design** `[SPECULATIVE]` — reconstruction-fidelity benchmark to replace reliance on MMLU as architecture signal (perturb a known attractor, measure settling time and final-state fidelity).
+3. **Corpus population strategy** `[OPEN]` — what gets ingested, how it gets ternarized, how to budget across the grid. Affects MMLU directly.
+4. **Cross-cube interference semantics** `[SPECULATIVE]` — what does it mean for a nested cube³:0 to interfere with its parent? Speculative until FCAS resolution is done.
+5. **`interference_score` spatial-product fix** `[OPEN]` — replace global `mean_openness` scalar with per-cell spatial product so frozen vs. learning SCM arms can differentiate. Requires score-semantics calibration.
 
-tests/                   pytest suite (775 tests across 44 modules)
-  test_accel_init.py     Accelerator module imports & device detection
-  test_accel_ca.py       Batch evolution correctness, GPU vs CPU match
-  test_cortex.py         Cortex system unit tests
-  test_hallucination.py  Hallucination classification tests
-  test_generation.py     Trajectory resonance tests
-  test_recall_api.py     Two-tier recall: recognize/reconstruct + T-gated drift
-  ... (dynamics, storage, brick, chunking, consolidation, eviction, etc.)
+---
 
-results/                 Benchmark logs & baselines
-  BASELINES.md           Recorded MMLU baseline runs with notes
-  mmlu_cortex_*.log      Per-run MMLU logs
+## FCAS — Fractal Cube Address Space
 
-docs/                    Technical documentation
-  VISION.md              Project Ralph — full architecture vision
-  INDEX.md               Guide listing with suggested reading order
-  architecture.md        CA dynamics, encoders, interference, cortex, chunked storage
-  concepts.md            Theoretical foundation, reconstructive recall
-  design.md              The Darman philosophy
-  cli.md                 Every flag documented
-  api.md                 Python library usage
-  gpu.md                 HIP/ROCm and CUDA setup
-  install.md             venv setup, platform-specific notes
-  future.md              Active research and planned features
-  assets/                Diagrams and media
-  demos/                 Archived HTML demos (chat, dashboard, CA demo)
-  reports/               Generated assessment reports
+`[DESIGNED]`. Hash primitives `[BUILT]`; address resolution and fractal nesting not yet wired.
 
-plans/                   Research & implementation plans
-pitch_pack/              Investor/developer pitch materials
-datasets/                Training corpora (gitignored, ~4GB: WikiText-103 + OpenWebText)
-program.md               Autoresearch tuning program and constants guide
-results.tsv              Latest benchmark summary (TSV)
-```
+Addresses are tuples `(hash, depth)`. The SHA256 of a terminal attractor serves *simultaneously* as:
+
+1. **Coordinate** — the address at which this attractor lives.
+2. **Reconstruction seed** — the initialization for re-instantiating the attractor under perturbation.
+3. **Origin of a new cube³:0** — the (0, 0, 0) of a fresh sub-grid nested at this address.
+
+This collapse-of-roles is the load-bearing trick. Every attractor is also a coordinate, which is also a new origin — the address space becomes fractal.
+
+Build status (canon §6.3):
+
+| Component | Status |
+|---|---|
+| Hash primitives | `[BUILT]` |
+| Attractor identification | `[PARTIAL]` |
+| Address resolution | `[DESIGNED]` |
+| Fractal nesting | `[DESIGNED]` |
+| Cross-cube interference | `[SPECULATIVE]` |
+
+---
+
+## Key concepts (short form)
+
+- **Attractor landscape** — every stored memory is a fixed point in CA dynamics. The collection of all stored attractors forms a topology with structure that emerges, rather than is designed.
+- **Temperature** — memories carry a temperature in `[0, 1]` based on access frequency and time decay (7-day half-life). Tiers: `hot ≥ 0.6 > warm ≥ 0.3 > cold ≥ 0.05 > fading ≥ 0.01 > dead`.
+- **Reconstructive recall** — recall is not retrieval. The stored attractor blends with the query at a configurable α and re-evolves; the same memory comes back differently depending on what you're thinking about.
+- **Chunked storage** — memories auto-route to domain chunks (`code`, `science`, `hardware`, `daily_tasks`, `meta`, `general`) by keyword. Capacity: 10,000 attractors.
+- **Bridge sentences** — entries that discuss multiple concepts together create measurable attractor overlap. Effective corpus design needs textbook prose, not dictionary entries.
+
+---
+
+## Naming history
+
+Canon §14.1: **Project Ralph** (original; began as a QR-code-to-Coral-TPU hardware idea) → **Project Darman** (middle-period name, used in some commits and the reconstructive-recall philosophy doc) → **Wheeler Memory** (current canonical name; honours Wheeler pregeometry). All three names refer to the same project.
 
 ---
 
 ## Documentation
 
-See [docs/INDEX.md](docs/INDEX.md) for a full guide listing with suggested reading order.
-
-### Getting Started
+[docs/INDEX.md](docs/INDEX.md) is the entry point.
 
 | Guide | Description |
-|-------|-------------|
-| [Installation](docs/install.md) | Python venv setup, platform-specific GPU notes, Ollama |
-| [Interactive Demo](docs/demos/demo.html) | See the CA engine in your browser (no server needed) |
-
-### Core Guides
-
-| Guide | Description |
-|-------|-------------|
-| [Architecture](docs/architecture.md) | CA dynamics, encoders, three-grid interference, cortex pipeline, chunked storage |
-| [Concepts](docs/concepts.md) | Theoretical foundation, reconstructive recall, semantic vs exact search |
-| [Design Principles](docs/design.md) | The Darman philosophy — why recall is reconstruction, not retrieval |
-
-### Reference
-
-| Guide | Description |
-|-------|-------------|
-| [CLI Reference](docs/cli.md) | Every command and flag documented with examples |
-| [API Reference](docs/api.md) | Python library usage — store, recall, reconstruct, crystallize, decode |
-| [GPU Acceleration](docs/gpu.md) | HIP/ROCm and CUDA setup, benchmarks |
-
-### Project
-
-| Guide | Description |
-|-------|-------------|
+|---|---|
+| [Canon](CANON.md) | Architectural source-of-truth — read this first |
+| [Installation](docs/install.md) | Python venv setup, GPU notes, Ollama |
+| [Architecture](docs/architecture.md) | CA dynamics, encoders, three-grid interference, cortex |
+| [Concepts](docs/concepts.md) | Theoretical foundation, reconstructive recall |
+| [Design Principles](docs/design.md) | The Darman philosophy |
+| [CLI Reference](docs/cli.md) | Every command and flag |
+| [API Reference](docs/api.md) | Python library usage |
+| [GPU Acceleration](docs/gpu.md) | HIP/ROCm setup, benchmarks |
 | [Vision](docs/VISION.md) | Project Ralph — full architecture vision |
-| [Roadmap](docs/future.md) | Active research and planned features |
+| [Future / Roadmap](docs/future.md) | Active research and planned features |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
 
-### Suggested Reading Order
+---
 
-1. **Installation** — get running
-2. **Concepts** — understand the theory
-3. **Architecture** — understand the implementation
-4. **CLI Reference** — start using it
-5. **API Reference** — integrate into your code
-6. **Design Principles** — understand the philosophy
+## License
+
+CC BY-NC 4.0. Non-commercial use only. See [LICENSE](LICENSE).
 
 ---
 
