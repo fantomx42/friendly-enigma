@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Canon
+
+For architectural source-of-truth (axioms, three-grid model, SCM grid topology, retrieval/reconstruction division, status of every component), read [CANON.md](./CANON.md). When canon and this file conflict, canon wins on architecture and this file wins on operational workflow.
+
 ## Setup
 
 ```bash
