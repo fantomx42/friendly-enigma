@@ -160,7 +160,12 @@ def classify(
     Args:
         settlement: (K,) settled opinion values from cortex L2
         choice_sims: (4,) Pearson similarities of each choice to query attractor
-        scm_layers: (7,) SCM sub-scores [T, S, E, I, P, NW, ERF]
+        scm_layers: (7,) SCMResult fields in order [temperature, salience,
+            energy, integration, polarity, net_warrant, explanation_readiness].
+            See cortex_scm.py:SCMResult. Note: these labels are first-initial
+            abbreviations of SCMResult fields and intentionally distinct from
+            the canonical SCM v2.0 variable namespace (T, E, S, I, P, NW, ERF,
+            FC) — letters collide, concepts do not. See CANON §3.5.2.
         weights: ClassifierWeights
         coevo_layers: (3,) optional coevolution layer features
 

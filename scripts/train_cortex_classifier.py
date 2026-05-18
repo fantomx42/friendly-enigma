@@ -201,7 +201,10 @@ def load_training_data(
                         choice_similarity=best_choice_sim,
                     )
 
-                    # Extract SCM layers: [T, S, E, I, P, NW, ERF]
+                    # Extract SCMResult fields in classifier's expected order:
+                    # [temperature, salience, energy, integration, polarity,
+                    #  net_warrant, explanation_readiness]. Distinct from
+                    # canonical SCM v2.0 namespace — see CANON §3.5.2.
                     scm_layers = np.array(
                         [
                             scm_result.temperature,
