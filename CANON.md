@@ -238,64 +238,143 @@ update the classifier and trainer docstrings to use the full field names
 rather than letter-pair labels that collide with canon. Tracked as a
 separate small commit; no architectural change required.
 
-## 3.6 Substrate vs above-substrate stability variables `[CLARIFICATION]`
+## 3.6 T as substrate clock; the other SCM v2.0 variables ride on top `[CLARIFICATION]`
 
 The canonical SCM v2.0 namespace (T, E, S, I, P, NW, ERF, FC) was
 specified before all of its variables had load-bearing implementations.
-This section records the audit (2026-05-18) of which variables actually
-live at the substrate level — i.e., are consulted by the per-tick
-`apply_ca_dynamics` rule — versus which live above it.
+The 2026-05-18 audit recorded "only T is substrate-level; the rest are
+not" — that fact is correct, but framing T as one peer of eight
+flattens a dependency relationship and undersells T's role. The
+corrected framing follows.
 
-**Only T (Temporal Stability) crosses into the substrate. The other
-seven do not.**
+**T is the substrate clock. The other seven are content axes that
+operate at the rate T determines.** They are not peers of T; they are
+downstream of T's dynamics. T being the only substrate-level variable
+is not a coverage gap — it is the architecture telling the truth about
+its own structure. T was always going to be the only substrate-level
+variable, because **T is the variable that defines what "substrate-level"
+even means**.
 
-| Variable | Status | Where it lives |
-|----------|--------|----------------|
-| **T**  (Temporal Stability)      | `[BUILT]` per-basin only | `wheeler_memory/t_metadata.py`, `recall_api.py:308` — `plasticity = (1 − T) · BASIN_DRIFT_BASE_RATE`. Stored in `index.json` metadata as `t_stability`. The local variable name `plasticity` is canon's `drift_rate`; rename deferred to recall-wiring ticket. |
-| **E**  (Environmental Stability) | not implemented as substrate variable | letter collides with `SCMResult.energy` (§3.5.2), different concept |
-| **S**  (Semantic Stability)      | not implemented as substrate variable | letter collides with `SCMResult.salience` (§3.5.2), different concept |
-| **I**  (Integration Coherence)   | not implemented as substrate variable | letter collides with `SCMResult.integration` (§3.5.2), partial concept overlap |
-| **P**  (Pressure Sensitivity)    | not implemented as substrate variable | letter collides with `SCMResult.polarity` (§3.5.2), different concept |
-| **NW** (Nostalgia Weight)        | not implemented                       | additive in canon; no code surface |
-| **ERF**(Emotional Resonance Field)| not implemented                      | additive in canon; no code surface |
-| **FC** (Fusion Coefficient)      | not implemented                       | core-var blending in canon; no code surface |
+### 3.6.1 What "substrate clock" means mechanically
 
-### 3.6.1 Empirical confirmation via the read-only diagnostic
+T (Temporal Stability) is a per-basin float in `[0, 1]` accumulated by
+EMA across recalls (`recall_api.py:300-302`). Its load-bearing role is
+the master plasticity gain on the whole substrate:
 
-`wheeler_memory/diagnostics.py:decompose_tick` (added v0.3.6) is a
-pure-analytical decomposition of one `apply_ca_dynamics` step into
-5W1H components. It returns observable values for **What** (cell
-state), **Where** (neighbor stack), **Who** (neighbor identity via
-argmax), and **How** (delta + clipped next-frame), and explicit
-`None` for **When** and **Why**, with module-level documentation
-explaining the gap:
+```
+drift_rate = (1 − T) × BASIN_DRIFT_BASE_RATE     (recall_api.py:308)
+```
 
-- **When** (drift contribution from T) is `None` because the per-tick
-  rule does not consult T. T acts at the basin level via
-  `recall_api.py:279–308`, not per-tick.
-- **Why** (SCM gradient pressure) is `None` because the per-tick rule
-  does not consult SCM. SCM gates the answer equation at recall time
-  in `compute_interference`, not per-tick. The SCM gradient itself
-  (§3.3.5) is feedback-driven post-recall, not per-tick.
+At `T = 0` the basin absorbs new input fully on every recall (fully
+plastic); at `T = 1` the basin refuses to update (fully rigid). Every
+other substrate-touching adjustment — SCM gradient `ΔM_i`, basin drift,
+attractor crystallization, κ-feedback (§3.3.5) — inherits this rate.
+Even when T does not appear in a formula directly, the rate at which
+the formula takes effect *across recalls* is gated by T. T is in every
+substrate operation by being in the timestep itself.
 
-If T or SCM operated at the substrate level, `decompose_tick` would
-have to read them per-cell. Its structural inability to do so — without
-synthesizing data the rule never reads — is the load-bearing evidence
-that the canonical SCM v2.0 variables E/S/I/P/NW/ERF/FC are
-above-substrate concepts, not substrate ones.
+In Wheeler-physics terms (§12.2): **T is the observer participation
+rate**. Wheeler's universe has no clock external to observation events;
+the clock *is* the rate of observation. Wheeler Memory inherits that.
+T isn't a parameter the system has — T is what the system *does*. Every
+recall is one tick of the clock the system *is*. There is no Wheeler
+Memory time outside T's accumulation.
 
-### 3.6.2 Implication for future planning
+The accumulation curve — T moves from 0 toward ~0.56 over the first ~8
+recalls in early basin lifecycles — *is* the substrate's measure of its
+own self-consistency. T isn't measuring stability from outside; T is the
+variable whose value *is* the substrate's current degree of settled-ness.
 
-The next ultraplan should treat the canonical SCM v2.0 variables as
-**above-substrate concepts** unless explicitly redesigning the per-tick
-rule. Substrate changes touch `apply_ca_dynamics` and require benchmark
-re-baselining; above-substrate changes (basin-level T updates,
-post-recall scoring, cortex-layer scoring) do not.
+This connects directly to the core axiom (§1.1) "meaning is what
+survives symbolic pressure." **Survival is measured in T-units.**
+Symbolic pressure acts at the rate T determines; meaning is what
+persists across enough T-clocks to register as stable.
+
+### 3.6.2 The other seven variables are content axes, not peers
+
+Each of the remaining SCM v2.0 variables describes a *kind* of stability
+the substrate exhibits — a content axis, a description of *what* pressure
+the substrate resists. T governs *the rate at which* the substrate can
+exhibit any stability at all. The seven can live in scoring, gradient,
+or readout layers (anywhere the substrate is measured) but they cannot
+live *inside* the substrate, because the substrate's only intrinsic time
+dimension is T.
+
+| Variable | Role | Implementation status |
+|----------|------|-----------------------|
+| **E**   (Environmental Stability)   | content axis: stability against environmental pressure | not yet implemented |
+| **S**   (Semantic Stability)        | content axis: stability against semantic pressure      | not yet implemented |
+| **I**   (Integration Coherence)     | content axis: cross-component coherence                | not implemented as canonical variable; nearest extant is `SCMResult.integration` in the cortex scoring layer (§3.5.2), separate concept |
+| **P**   (Pressure Sensitivity)      | content axis: responsiveness to symbolic pressure      | not yet implemented |
+| **NW**  (Nostalgia Weight)          | additive modulation                                    | not yet implemented |
+| **ERF** (Emotional Resonance Field) | additive modulation                                    | not yet implemented |
+| **FC**  (Fusion Coefficient)        | core-var blending (`Xc = Xp·FCx + Xc·(1−FCx)`)         | not yet implemented |
+
+The L3 classifier's 7-vector (§3.5.2) shares letter abbreviations with
+this group but is a separate vocabulary entirely: `temperature` /
+`salience` / `energy` / `integration` / `polarity` / `net_warrant` /
+`explanation_readiness` are post-recall scoring fields in the cortex
+layer. They are not the canonical content axes and are independent of
+the substrate-clock distinction.
+
+### 3.6.3 Empirical confirmation via the read-only diagnostic
+
+`wheeler_memory/diagnostics.py:decompose_tick` (added v0.3.6) decomposes
+one `apply_ca_dynamics` step into 5W1H components. It returns observable
+values for **What** (cell state), **Where** (neighbor stack), **Who**
+(neighbor identity via argmax), and **How** (delta + clipped
+next-frame), and explicit `None` for **When** and **Why**. The reason
+those two are `None` is *structural*, not a code gap:
+
+- **When** is T's contribution to drift. T governs the *rate at which
+  ticks accumulate into change*, not the content of any one tick. There
+  is no per-tick T because T is a property of the dynamics, not the
+  cell.
+- **Why** is the gradient pressure (κ − κ_base). The gradient runs
+  between recalls; the CA tick is a slice of one settlement run within
+  a single recall. The gradient does not exist at the per-tick layer.
+
+Both are properties of the dynamics T governs, not of any single cell's
+update. The diagnostic correctly cannot expose them at the per-tick
+layer because they do not *exist* at the per-tick layer. They exist at
+the rate T controls. This is the empirically observable consequence of
+T-as-substrate-clock: a faithful read-only decomposition of one tick
+*must* be silent on T and SCM, because those operate at a different
+timescale than the tick itself.
+
+### 3.6.4 Implication for the recall-wiring ticket
+
+The just-landed `interference_score` fix (§4.1, commit `39fb8fce`)
+restored Who-axis sensitivity at the **measurement layer** — one
+T-tick. Whether that sensitivity actually *propagates* across T-clocks
+into accumulated substrate change depends on the recall-wiring ticket
+(the stashed work, its own session).
+
+Specifically: the SCM gradient at §3.3.5 runs once per recall (post
+`interference_score`), but the resulting `ΔM_i` only becomes durable
+substrate change when integrated across many recalls — which is rate-
+gated by `(1 − T)`. If the recall wiring does not preserve T-clock
+semantics — e.g., applies κ-feedback at a frequency uncoupled from
+T-accumulation, or batches recalls in a way that decouples
+`update_from_recall` from per-basin T updates — then per-recall scoring
+will be correct (Who-axis preserved at the leaf) but cumulative
+substrate change will not reflect it (scalar collapse at the root).
+**That is the failure mode the recall-wiring ticket must rule out.**
+
+### 3.6.5 Implication for future ultraplans
 
 A proposal to "wire T into apply_ca_dynamics" should be treated as a
 substrate redesign with full benchmark implications, not a small
-plumbing change. Same for any proposal to make the per-tick rule
-SCM-aware.
+plumbing change. The reason is now sharper: such a wiring would be
+*redefining what T-time is*, not adding T as a feature. T is already in
+`apply_ca_dynamics` by virtue of governing the rate at which
+`apply_ca_dynamics` runs across recalls.
+
+Similarly, a proposal to "implement E/S/I/P/NW/ERF/FC as substrate
+variables" is a category error: they are content axes by design and
+cannot be substrate-level without redefining T's role as system clock.
+They belong in scoring, gradient, or readout layers — anywhere the
+substrate is *measured*, not the substrate itself.
 
 ---
 
@@ -351,6 +430,13 @@ rows pre-`39fb8fce` are not directly comparable.
 Sacred files were untouched by this fix: `storage.py`, `hashing.py`,
 `chunking.py`, `rotation.py`, `dynamics.py`, `scm_grid.py`,
 `constants.py`, `scripts/bench_quality.py`.
+
+**Scope of the fix in T-clock terms (§3.6).** `interference_score`
+runs once per recall — one T-tick at the measurement layer. The fix
+restored Who-axis sensitivity within a tick. Whether that sensitivity
+propagates into cumulative substrate change across T-clocks depends on
+the recall-wiring ticket (§3.6.4). Per-tick correctness at the leaf
+does not by itself guarantee accumulated correctness at the root.
 
 ---
 
