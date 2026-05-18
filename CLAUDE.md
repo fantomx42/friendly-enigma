@@ -4,129 +4,154 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Canon
 
-For architectural source-of-truth (axioms, three-grid model, SCM grid topology, retrieval/reconstruction division, status of every component), read [CANON.md](./CANON.md). When canon and this file conflict, canon wins on architecture and this file wins on operational workflow.
+Architectural source-of-truth: [CANON.md](./CANON.md). When canon and this file conflict, canon wins on architecture; this file wins on operational workflow.
 
 ## Setup
 
 ```bash
-cd "/home/tristan/projects/wheeler-memory"
 source .venv/bin/activate
 pip install -e ".[embed]"   # with sentence-transformers
-pip install -e .             # minimal (numpy/scipy/matplotlib/psutil only)
+pip install -e .            # minimal (numpy/scipy/matplotlib/psutil)
 ```
 
-System Python is externally-managed (Arch/CachyOS) — always use the venv. Formatting: `ruff format` (auto-runs via PostToolUse hook on .py edits).
+System Python is externally-managed (Arch/CachyOS) — always use the venv. `ruff format` auto-runs on `.py` edits via PostToolUse hook.
 
 ## Testing
 
 ```bash
-pytest                          # all tests
-pytest -m "not slow"            # skip slow tests
-pytest -m "not embed"           # skip sentence-transformers tests
-pytest tests/test_dynamics.py   # single file
-pytest tests/test_dynamics.py::test_converges  # single test
+pytest                              # all
+pytest -m "not slow"                # skip slow
+pytest -m "not embed"               # skip sentence-transformers
+pytest tests/test_dynamics.py::test_converges
 ```
 
-Markers: `slow` (long-running), `embed` (requires sentence-transformers).
+Markers: `slow`, `embed`.
 
 ## Benchmarks
 
 ```bash
-wheeler-bench                                          # CA quality score (lower is better)
-wheeler-mmlu --subjects high_school_physics --mode semantic  # MMLU benchmark
+wheeler-bench                       # CA quality (lower better, target < 0.25)
+wheeler-simlex --sweep              # live encoder signal (SimLex-999)
+wheeler-mmlu --subjects high_school_physics --mode cortex
 ```
 
-Quality score formula: `0.6*avg_corr + 0.2*(1-conv_ratio) + 0.1*(ticks/1000) + 0.1*(1-alive)`. Target: < 0.25.
+Quality score: `0.6·avg_corr + 0.2·(1-conv_ratio) + 0.1·(ticks/1000) + 0.1·(1-alive)`.
 
-## Sacred Files — DO NOT MODIFY
+## Sacred files — do not modify without reason
 
-- `wheeler_memory/hashing.py` — deterministic SHA-256 encoding, foundational to all stored data
-- `scripts/bench_quality.py` TEST_INPUTS list — fixed benchmark corpus, results must be comparable across experiments
-- `wheeler_memory/storage.py` — locked storage contract
-- `wheeler_memory/chunking.py` — locked domain routing
-- `wheeler_memory/rotation.py` — locked rotation logic
+| File | Why |
+|---|---|
+| `wheeler_memory/hashing.py` | Deterministic SHA-256 — foundational to stored data |
+| `wheeler_memory/storage.py` | Locked storage contract |
+| `wheeler_memory/chunking.py` | Locked domain routing |
+| `wheeler_memory/rotation.py` | Locked rotation logic |
+| `scripts/bench_quality.py` TEST_INPUTS | Fixed corpus — results must be comparable across runs |
+| `scripts/wheeler_simlex.py` ALL_ENCODERS | Encoder registry that drives sweeps |
 
-## Architecture Constraints
+## Constraints
 
-- **Pure Python.** The CA is the reasoning engine, not a wrapper around language models.
-- **No external LLM/ML dependencies in core.** `sentence-transformers` is optional (`.[embed]`); core must work without it.
-- **No Rust, no conductor, no trauma.py.** These were removed Feb 2026. Do not reintroduce.
-- **`constants.py` is the ONLY file modified during autoresearch** parameter tuning. See `program.md` for the full protocol.
-
-## Anti-Patterns
-
-- Don't add Python dependencies beyond numpy/scipy/matplotlib/psutil to core
-- Don't create wrapper classes around the CA — the dynamics ARE the product
-- Don't add LLM-based scoring or reasoning — native CA intelligence is the point
-- Don't refactor modules you weren't asked to touch
-- Don't create new files when editing existing ones suffices
+- **Pure Python core.** No LLM/ML dependencies beyond numpy/scipy/matplotlib/psutil. `sentence-transformers` is optional (`.[embed]`).
+- **Recall is CPU-only by design** (canon §1.4). HIP kernels in `accel/` accelerate **batch operations only** — never wire GPU into the recall path.
+- **No Rust, no conductor, no `trauma.py`.** Removed Feb 2026; do not reintroduce.
+- **`constants.py` is the ONLY file modified during autoresearch tuning.** See `program.md`.
+- Don't wrap the CA — the dynamics ARE the product. No LLM-based scoring.
 
 ## Architecture
 
-### Data Flow
+### Three-grid interference (the recall equation)
 
 ```
-Text → Encoder → 64×64 frame ([-1,+1]) → CA evolution (~40-50 ticks) → Attractor
-                                                                          ↓
-                                              Chunked storage (~/.wheeler_memory/chunks/<domain>/)
-                                                                          ↓
-Query → Same pipeline → Query attractor → Pearson correlation search → Top-K results
-                                                                          ↓
-                                              [Optional] Reconstructive recall (blend + re-evolve)
+Answer(i, j) = Corpus(i, j) × Experiential(i, j) × (1 − |SCM(i, j)|)
 ```
 
-Encoders: `hash` (deterministic, default for benchmarks), `hippocampus` (native n-gram), `embedding` (sentence-transformers), `blended` (default for user-facing).
+Three same-shaped 64×64 grids with different temporal dynamics:
 
-CA dynamics: 3-state rule — local maxima push toward +1, minima toward -1, slopes flow uphill. Von Neumann (4-neighbor) topology with wrapping boundaries.
+| Grid | Temperature | Role | File |
+|---|---|---|---|
+| Corpus | Cold, slow | Durable knowledge | `storage.py` |
+| Experiential | Hot, fast | Working memory | `experiential.py` |
+| SCM (Map) | Glacial | Trust topology — gates where interference is permitted | `scm_grid.py` |
 
-### Module Map (`wheeler_memory/`)
+SCM is **feedback-only** — no autonomous CA dynamics. Hardened cells (`|SCM|→1`) become opaque; quiescent cells let interference through. Scoring is cell-wise weighted Pearson with `w = 1 − |SCM|`.
 
-| Group | Files | Role |
-|-------|-------|------|
-| Encoding | `hashing.py`, `hippocampus.py`, `embedding.py`, `word_encoder.py` | Text → 64×64 frame |
-| CA Engine | `dynamics.py`, `oscillation.py`, `rotation.py` | Frame → attractor evolution |
-| Storage | `storage.py`, `chunking.py`, `brick.py`, `cache.py` | Attractor persistence + retrieval |
-| Lifecycle | `temperature.py`, `warming.py`, `consolidation.py`, `eviction.py`, `attention.py` | Memory freshness, spreading activation, sleep, capacity |
-| Cortex | `cortex.py`, `cortex_scm.py`, `cortex_classifier.py` | L1 graph → L2 settlement CA → L3 classifier |
-| Agents | `agent.py`, `decoder.py`, `generation.py` | LLM wrapper, Language Wheeler, IT-from-BIT engine |
-| Config | `constants.py` | All tunable parameters (centralized) |
+### SCM acronym collision
 
-### Cortex System (3-tier semantic scoring)
+- `scm_grid.py` — Structural Coherence **Map**. The gate in the answer equation.
+- `cortex_scm.py` — Structural Coherence **Measure**. Post-recall classifier (`SYNTHESIS / NOVEL / HALLUCINATION`).
 
-- **L1**: Pearson correlation adjacency graph over retrieved attractors, BFS clustering
-- **L2**: Settlement CA — opinion diffusion on the correlation graph until convergence
-- **L3**: Native semantic classifier — scores choices without external models
+Different objects. Check which file is in scope when reading "SCM".
 
-### Domain Chunks
+### CA dynamics
 
-Memories auto-route by keyword: `code`, `science`, `hardware`, `daily_tasks`, `meta`, `general` (fallback). Each chunk has independent index, attractors, bricks, and associations.
+3-state rule on Von Neumann 4-neighborhood with wrapping boundaries. Local maxima push toward +1 (`MAX_PUSH_STRENGTH`), minima toward −1, slopes flow uphill (`SLOPE_FLOW_STRENGTH`). Terminal states: `CONVERGED`, `OSCILLATING`, `DEGENERATE`, `CHAOTIC`.
+
+### Two-tier recall (v0.3.6)
+
+`wheeler_memory/recall_api.py` splits identity from content:
+
+- `recognize(query)` — single-pass Pearson against stored attractors on the **raw** query frame. No CA loop. Returns `BasinSeed` or `None`.
+- `reconstruct_from_seed(seed, query)` — warm-starts CA from stored attractor blended with raw query (~2× fewer ticks vs cold path).
+
+Per-basin **Temporal Stability** `T ∈ [0, 1]` lives in `index.json` (`metadata.t_stability`). With `--learn`, mature basins (T → 1) are near-rigid; fresh basins absorb input rapidly.
+
+### Encoders
+
+| Encoder | Use when |
+|---|---|
+| `hash` | Default for `wheeler-recall` and reproducible benchmarks |
+| `hippocampus` | Native n-gram RI — active production target; default for `wheeler-simlex` |
+| `embedding` | MiniLM baseline to clear (requires `.[embed]`) |
+| `blended` | Default for user-facing surfaces |
+
+SimLex-999 is the **live signal** of encoder progress, not MMLU.
+
+### Cortex (3-tier scoring, separate from the three grids)
+
+L1 correlation graph (`cortex.py`) → L2 settlement CA on graph topology → L3 native classifier (`cortex_classifier.py`, ~11K-param numpy SGD).
+
+### Module map
+
+| Group | Files |
+|---|---|
+| Encoding | `hashing.py`, `hippocampus.py`, `embedding.py`, `word_encoder.py`, `brick.py` |
+| CA engine | `dynamics.py`, `oscillation.py`, `rotation.py`, `diagnostics.py` |
+| Storage & recall | `storage.py`, `reconstruction.py`, `recall_api.py`, `t_metadata.py`, `cache.py` |
+| Three-grid interference | `scm_grid.py`, `experiential.py`, `interference.py`, `similarity.py`, `trajectory.py` |
+| Cortex | `cortex.py`, `cortex_scm.py`, `cortex_classifier.py` |
+| Lifecycle | `temperature.py`, `attention.py`, `warming.py`, `consolidation.py`, `eviction.py` |
+| Agents | `agent.py`, `decoder.py`, `generation.py`, `language_wheeler.py` |
+| Accel | `accel/hip/` (batch ops only — recall stays CPU) |
+| Config | `constants.py` (all tunables) |
+
+**Live vs archived `theories/`:** `wheeler_memory/theories/` is production-supporting (imported by agent/decoder/mmlu). `notes/theories/` is archived (`lichtenberg.py`, `resonance.py`, `structured.py` — moved in v0.3.6).
+
+### MMLU framing
+
+Currently ~25% (near chance). **Corpus-limited, not architecture-limited** (canon §8.2). Treat MMLU as a corpus-health metric — do not "fix" it by altering the engine.
 
 ## CLI
 
-All 16 commands registered in `pyproject.toml [project.scripts]`. Run `pip install -e .` after adding new entry points.
+All commands registered in `pyproject.toml [project.scripts]` — run `pip install -e .` after adding entry points. Common flags: `--data-dir`, `--chunk`, `--encoder`, `--salience`, `--verbose`. Full reference: [docs/cli.md](docs/cli.md).
 
-Common flags across commands: `--data-dir`, `--chunk`, `--encoder` (hash|hippocampus|embedding|blended|word), `--salience` (low|medium|high), `--verbose`.
+## Autoresearch
 
-## Autoresearch Protocol
-
-See `program.md` for full details. Summary:
-
-1. Edit only `constants.py` (one or a few params)
-2. Commit the change
-3. Run `wheeler-bench --commit <hash7> --changed "<param>"`
-4. Keep if improved, revert if score worsened >10%
-
-Key parameters: `MAX_PUSH_STRENGTH` (attractor sharpness), `SLOPE_FLOW_STRENGTH` (mixing rate), `SALIENCE_THRESHOLD_MED` (convergence precision), `SALIENCE_MAX_ITERS_MED` (iteration cap).
+See `program.md`. Loop: edit one param in `constants.py` → commit → `wheeler-bench --commit <hash7> --changed "<param>"` → keep if improved, revert if worse by >10%. Key params: `MAX_PUSH_STRENGTH`, `SLOPE_FLOW_STRENGTH`, `SALIENCE_THRESHOLD_MED`, `SALIENCE_MAX_ITERS_MED`.
 
 ## Hooks (auto-configured)
 
-Three PostToolUse hooks fire on Write|Edit:
-1. **ruff format** — auto-formats any edited .py file (10s timeout)
-2. **pytest** — runs full test suite when `wheeler_memory/` or `tests/` files change (60s timeout)
-3. **wheeler-bench** — runs quality benchmark when `constants.py` changes (120s timeout)
+PostToolUse on Write|Edit:
 
-Review/disable via `/hooks` in Claude Code.
+1. `ruff format` on edited `.py` (10s)
+2. `pytest` when `wheeler_memory/` or `tests/` change (60s)
+3. `wheeler-bench` when `constants.py` changes (120s)
 
-## Task Discipline
+Review/disable via `/hooks`.
 
-For any non-trivial request, break work into discrete tasks using TaskCreate before starting. This prevents scope creep and makes progress visible. Complete each task before moving to the next — do not batch unrelated changes into a single edit pass.
+## Open work (canon §9)
+
+1. FCAS address resolution `[DESIGNED]` — wire `(hash, depth)` tuples into recall.
+2. Wheeler-native eval design `[SPECULATIVE]`.
+3. Corpus population strategy `[OPEN]` — gates MMLU.
+4. Cross-cube interference semantics `[SPECULATIVE]`.
+
+See `plans/` for active threads.
