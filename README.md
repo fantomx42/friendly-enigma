@@ -105,7 +105,7 @@ Two pathways write into the SCM grid (canon §3.3.1):
 
 The recall-driven `κ` path is the closed loop that earlier framings called the "sleeping giant problem". Canon §3.3.5 records it as resolved; gradient direction is verified by `tests/test_scm_gradient_direction.py`. SCM does not run autonomous CA dynamics — there is no evolution rule on the trust grid; it is feedback-driven only.
 
-> **Known issue.** `interference.py:158` collapses the 64×64 SCM to a global scalar `mean_openness`, making rank ordering identical between frozen and learning arms regardless of spatial SCM state. Tracked under "Open work"; the spatial-product fix is straightforward but changes score semantics from normalized Pearson to weighted mean, so calibration vs. existing recall paths needs care before merging.
+`interference_score` uses a **cell-wise weighted Pearson** with `w_ij = 1 - |SCM(i,j)|` on each of the corpus and experiential channels. SCM permission topology selects which cells contribute to covariance and variance, so κ feedback into `update_from_recall` carries spatial information into the gradient — at equal mean openness, different SCM patterns produce different scores (the "Who" axis is preserved). Score range is `[-2, 2]` (sum of two ρ values); historical `results.tsv` rows recorded before commit `39fb8fce` are not directly comparable.
 
 ### Encoder layer `[ACTIVE RESEARCH]`
 
@@ -274,7 +274,8 @@ See [docs/cli.md](docs/cli.md) for every flag.
 wheeler_memory/                  Core library
   ENCODING                       hashing.py, hippocampus.py, embedding.py,
                                  word_encoder.py, brick.py
-  CA ENGINE                      dynamics.py, oscillation.py, rotation.py
+  CA ENGINE                      dynamics.py, oscillation.py, rotation.py,
+                                 diagnostics.py
   STORAGE & RECALL               storage.py, reconstruction.py, recall_api.py,
                                  t_metadata.py, cache.py
   THREE-GRID INTERFERENCE        scm_grid.py, experiential.py, interference.py,
@@ -334,7 +335,6 @@ In priority order (canon §9):
 2. **Wheeler-native eval design** `[SPECULATIVE]` — reconstruction-fidelity benchmark to replace reliance on MMLU as architecture signal (perturb a known attractor, measure settling time and final-state fidelity).
 3. **Corpus population strategy** `[OPEN]` — what gets ingested, how it gets ternarized, how to budget across the grid. Affects MMLU directly.
 4. **Cross-cube interference semantics** `[SPECULATIVE]` — what does it mean for a nested cube³:0 to interfere with its parent? Speculative until FCAS resolution is done.
-5. **`interference_score` spatial-product fix** `[OPEN]` — replace global `mean_openness` scalar with per-cell spatial product so frozen vs. learning SCM arms can differentiate. Requires score-semantics calibration.
 
 ---
 
