@@ -175,16 +175,23 @@ class TestInterferenceScore:
         assert state == ABSORBED
 
     def test_closed_scm_reduces_score(self):
-        """Fully closed SCM → score near zero."""
+        """Fully closed SCM (|M|=1) → all weights 0 → score collapses to 0.
+
+        Under weighted-Pearson scoring, the SCM acts as a spatial mask rather
+        than a uniform attenuator. A uniform |M|<1 SCM does not reduce a
+        self-correlation score because weighted Pearson is scale-invariant in
+        uniform weights. The cutoff that actually drops the score is |M|=1,
+        which zeros the weights everywhere.
+        """
         att = np.random.RandomState(42).randn(64, 64).astype(np.float32)
         scm_open = _make_grid(0.0)
-        scm_closed = _make_grid(0.95)  # nearly closed
+        scm_closed = _make_grid(1.0)  # fully closed → all weights 0
 
         score_open, _, _ = interference_score(att, None, att, None, scm_open)
         score_closed, _, _ = interference_score(att, None, att, None, scm_closed)
 
-        assert score_open > score_closed
-        assert score_closed < score_open * 0.2
+        assert score_open > 0.9
+        assert score_closed == pytest.approx(0.0)
 
     def test_experiential_boosts_score(self):
         """Adding experiential signal increases score."""
@@ -197,6 +204,76 @@ class TestInterferenceScore:
         score_with_exp, _, _ = interference_score(corpus, exp, corpus, exp, scm)
 
         assert score_with_exp > score_no_exp
+
+    def test_score_distinguishes_pattern_at_equal_mean_openness(self):
+        """Two SCMs with identical mean(1-|SCM|) but mirrored open regions
+        yield different scores when content agreement is spatially non-uniform.
+
+        Pre-fix the score factored as (content_pearson) * (mean_openness), so
+        both SCMs produced the same score. Post-fix the score is a weighted
+        Pearson where the SCM's spatial pattern selects which cells contribute
+        to covariance and variance — the "Who" axis.
+        """
+        rng = np.random.RandomState(7)
+        stored = rng.randn(64, 64).astype(np.float32)
+        query = stored.copy()
+        # Replace bottom half of query with independent noise — disagreement region
+        query[32:, :] = rng.randn(32, 64).astype(np.float32)
+
+        # SCM_A: top half open, bottom half closed → sees agreement region
+        scm_a = np.zeros((64, 64), dtype=np.float32)
+        scm_a[32:, :] = 1.0
+        # SCM_B: bottom half open, top half closed → sees disagreement region
+        scm_b = np.zeros((64, 64), dtype=np.float32)
+        scm_b[:32, :] = 1.0
+
+        # Identical mean openness — pre-fix collapse made these indistinguishable
+        assert (1.0 - np.abs(scm_a)).mean() == pytest.approx(
+            (1.0 - np.abs(scm_b)).mean()
+        )
+
+        score_a, _, _ = interference_score(query, None, stored, None, scm_a)
+        score_b, _, _ = interference_score(query, None, stored, None, scm_b)
+
+        # Agreement-region score is meaningfully higher than disagreement-region
+        assert score_a > score_b + 0.3, (
+            f"weighted Pearson should distinguish patterns: "
+            f"score_a={score_a:.4f} score_b={score_b:.4f}"
+        )
+
+    def test_score_zero_when_fully_closed_scm(self):
+        """All weights zero → score 0.0 (not NaN). Guards the Σw < ε branch."""
+        rng = np.random.RandomState(1)
+        att = rng.randn(64, 64).astype(np.float32)
+
+        scm_pos = _make_grid(1.0)  # |M|=1 everywhere
+        score_pos, _, _ = interference_score(att, None, att, None, scm_pos)
+        assert score_pos == pytest.approx(0.0)
+        assert not np.isnan(score_pos)
+
+        # Mixed-sign closure still zeroes weights via the abs()
+        scm_mixed = _make_grid(0.0)
+        scm_mixed[:32, :] = 1.0
+        scm_mixed[32:, :] = -1.0
+        score_mixed, _, _ = interference_score(att, None, att, None, scm_mixed)
+        assert score_mixed == pytest.approx(0.0)
+
+    def test_score_recovers_pearson_when_scm_uniform_open(self):
+        """Uniform fully-open SCM (|M|=0 everywhere) → weighted Pearson on
+        each channel equals classical Pearson. Invariance check guards
+        against algebraic drift in the helper.
+        """
+        from scipy.stats import pearsonr
+
+        rng = np.random.RandomState(0)
+        a = rng.randn(64, 64).astype(np.float32)
+        b = rng.randn(64, 64).astype(np.float32)
+        scm = _make_grid(0.0)
+
+        score, _, _ = interference_score(a, None, b, None, scm)
+        classical, _ = pearsonr(a.flatten(), b.flatten())
+
+        assert score == pytest.approx(float(classical), abs=1e-5)
 
 
 # ── InterferenceResult dataclass tests ───────────────────────────────────────

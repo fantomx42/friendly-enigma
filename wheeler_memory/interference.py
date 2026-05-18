@@ -127,6 +127,45 @@ def compute_interference(
     )
 
 
+_WEIGHTED_PEARSON_EPS = 1e-9
+
+
+def _weighted_pearson(x: np.ndarray, y: np.ndarray, w: np.ndarray) -> float:
+    """Weighted Pearson correlation between two flat arrays under non-negative weights.
+
+    ρ_w = Σw·(x-μx)(y-μy) / √( Σw·(x-μx)² · Σw·(y-μy)² )
+
+    where μx = Σw·x / Σw and μy = Σw·y / Σw.
+
+    Returns 0.0 in any degenerate case: weight mass below ε, zero weighted
+    variance in either channel, or non-finite intermediate. These all map to
+    "the SCM permission pattern leaves no signal here" — semantically a
+    null score rather than NaN.
+    """
+    w_sum = float(w.sum())
+    if w_sum < _WEIGHTED_PEARSON_EPS:
+        return 0.0
+
+    mu_x = float((w * x).sum()) / w_sum
+    mu_y = float((w * y).sum()) / w_sum
+
+    dx = x - mu_x
+    dy = y - mu_y
+
+    cov_w = float((w * dx * dy).sum())
+    var_xw = float((w * dx * dx).sum())
+    var_yw = float((w * dy * dy).sum())
+
+    denom_sq = var_xw * var_yw
+    if denom_sq < _WEIGHTED_PEARSON_EPS:
+        return 0.0
+
+    rho = cov_w / np.sqrt(denom_sq)
+    if not np.isfinite(rho):
+        return 0.0
+    return float(rho)
+
+
 def interference_score(
     query_corpus_att: np.ndarray,
     query_experiential_att: np.ndarray | None,
@@ -136,31 +175,33 @@ def interference_score(
 ) -> tuple[float, str, InterferenceResult]:
     """Compute interference-based similarity score between query and stored memory.
 
-    Returns (score, dominant_state) where score combines corpus and experiential
-    Pearson correlations, gated by SCM openness.
+    Uses a cell-wise weighted Pearson correlation with w_ij = 1 - |SCM(i,j)|,
+    so the SCM permission topology shapes which spatial regions contribute to
+    each channel's correlation. This preserves the spatial coupling between
+    content agreement and trust — see the recall pipeline diagram in the
+    interference_score v2 fix notes.
+
+    Returns (score, dominant_state, InterferenceResult).
     """
-    from scipy.stats import pearsonr
+    weights = (1.0 - np.abs(scm_grid)).astype(np.float32).flatten()
 
-    # Corpus similarity
-    c_corr, _ = pearsonr(query_corpus_att.flatten(), stored_corpus_att.flatten())
-    c_sim = float(c_corr) if not np.isnan(c_corr) else 0.0
+    c_sim = _weighted_pearson(
+        query_corpus_att.flatten(),
+        stored_corpus_att.flatten(),
+        weights,
+    )
 
-    # Experiential similarity (0 if either side has no experiential counterpart)
     if query_experiential_att is not None and stored_experiential_att is not None:
-        e_corr, _ = pearsonr(
-            query_experiential_att.flatten(), stored_experiential_att.flatten()
+        e_sim = _weighted_pearson(
+            query_experiential_att.flatten(),
+            stored_experiential_att.flatten(),
+            weights,
         )
-        e_sim = float(e_corr) if not np.isnan(e_corr) else 0.0
     else:
         e_sim = 0.0
 
-    # SCM gating: mean openness across the grid
-    mean_openness = float((1.0 - np.abs(scm_grid)).mean())
+    score = c_sim + e_sim
 
-    # Combined score: both Pearson channels gated by trust
-    score = (c_sim + e_sim) * mean_openness
-
-    # Determine dominant state for this memory pair
     ir = compute_interference(
         stored_corpus_att,
         stored_experiential_att,
