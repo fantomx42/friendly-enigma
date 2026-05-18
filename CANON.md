@@ -206,6 +206,97 @@ Two unrelated objects in the codebase share the SCM acronym:
 Canon distinguishes them by full name. Code does not. When reading
 `SCM` in commit messages or comments, check which file is in scope.
 
+### 3.5.2 L3 classifier 7-vector vs SCM v2.0 namespace `[CLARIFICATION]`
+
+Audited 2026-05-18. The L3 classifier (`cortex_classifier.py:151`
+`classify()`) takes a 7-vector parameter named `scm_layers` with the
+docstring label `[T, S, E, I, P, NW, ERF]`. These letters are
+first-initial abbreviations of `SCMResult` fields in `cortex_scm.py:228`,
+**not** the canonical SCM v2.0 variables:
+
+| Label | `SCMResult` field        | What it measures |
+|-------|--------------------------|------------------|
+| T     | `temperature`            | recall confidence (function of similarity statistics) |
+| S     | `salience`               | convergence sharpness |
+| E     | `energy`                 | `1 − max(\|settled − prev\|)` (settlement stability) |
+| I     | `integration`            | graph-level integration |
+| P     | `polarity`               | ternary balance over adjacency |
+| NW    | `net_warrant`            | product `T·S·E·I·P` |
+| ERF   | `explanation_readiness`  | diagnostic readiness |
+
+The letters happen to collide with canonical SCM v2.0 (Temporal
+Stability / Semantic Stability / Environmental Stability / Integration
+Coherence / Pressure Sensitivity / Nostalgia Weight / Emotional
+Resonance Field) but the underlying *concepts* are entirely different.
+`temperature` here is post-recall confidence, not the per-basin drift
+controller from §3.6.
+
+Verdict: docstring-vs-canon namespace drift, not an implementation gap.
+All 7 inputs are computed and supplied by callers (`scripts/wheeler_mmlu.py:913`,
+`scripts/train_cortex_classifier.py:205`). The conventional fix is to
+update the classifier and trainer docstrings to use the full field names
+rather than letter-pair labels that collide with canon. Tracked as a
+separate small commit; no architectural change required.
+
+## 3.6 Substrate vs above-substrate stability variables `[CLARIFICATION]`
+
+The canonical SCM v2.0 namespace (T, E, S, I, P, NW, ERF, FC) was
+specified before all of its variables had load-bearing implementations.
+This section records the audit (2026-05-18) of which variables actually
+live at the substrate level — i.e., are consulted by the per-tick
+`apply_ca_dynamics` rule — versus which live above it.
+
+**Only T (Temporal Stability) crosses into the substrate. The other
+seven do not.**
+
+| Variable | Status | Where it lives |
+|----------|--------|----------------|
+| **T**  (Temporal Stability)      | `[BUILT]` per-basin only | `wheeler_memory/t_metadata.py`, `recall_api.py:308` — `plasticity = (1 − T) · BASIN_DRIFT_BASE_RATE`. Stored in `index.json` metadata as `t_stability`. The local variable name `plasticity` is canon's `drift_rate`; rename deferred to recall-wiring ticket. |
+| **E**  (Environmental Stability) | not implemented as substrate variable | letter collides with `SCMResult.energy` (§3.5.2), different concept |
+| **S**  (Semantic Stability)      | not implemented as substrate variable | letter collides with `SCMResult.salience` (§3.5.2), different concept |
+| **I**  (Integration Coherence)   | not implemented as substrate variable | letter collides with `SCMResult.integration` (§3.5.2), partial concept overlap |
+| **P**  (Pressure Sensitivity)    | not implemented as substrate variable | letter collides with `SCMResult.polarity` (§3.5.2), different concept |
+| **NW** (Nostalgia Weight)        | not implemented                       | additive in canon; no code surface |
+| **ERF**(Emotional Resonance Field)| not implemented                      | additive in canon; no code surface |
+| **FC** (Fusion Coefficient)      | not implemented                       | core-var blending in canon; no code surface |
+
+### 3.6.1 Empirical confirmation via the read-only diagnostic
+
+`wheeler_memory/diagnostics.py:decompose_tick` (added v0.3.6) is a
+pure-analytical decomposition of one `apply_ca_dynamics` step into
+5W1H components. It returns observable values for **What** (cell
+state), **Where** (neighbor stack), **Who** (neighbor identity via
+argmax), and **How** (delta + clipped next-frame), and explicit
+`None` for **When** and **Why**, with module-level documentation
+explaining the gap:
+
+- **When** (drift contribution from T) is `None` because the per-tick
+  rule does not consult T. T acts at the basin level via
+  `recall_api.py:279–308`, not per-tick.
+- **Why** (SCM gradient pressure) is `None` because the per-tick rule
+  does not consult SCM. SCM gates the answer equation at recall time
+  in `compute_interference`, not per-tick. The SCM gradient itself
+  (§3.3.5) is feedback-driven post-recall, not per-tick.
+
+If T or SCM operated at the substrate level, `decompose_tick` would
+have to read them per-cell. Its structural inability to do so — without
+synthesizing data the rule never reads — is the load-bearing evidence
+that the canonical SCM v2.0 variables E/S/I/P/NW/ERF/FC are
+above-substrate concepts, not substrate ones.
+
+### 3.6.2 Implication for future planning
+
+The next ultraplan should treat the canonical SCM v2.0 variables as
+**above-substrate concepts** unless explicitly redesigning the per-tick
+rule. Substrate changes touch `apply_ca_dynamics` and require benchmark
+re-baselining; above-substrate changes (basin-level T updates,
+post-recall scoring, cortex-layer scoring) do not.
+
+A proposal to "wire T into apply_ca_dynamics" should be treated as a
+substrate redesign with full benchmark implications, not a small
+plumbing change. Same for any proposal to make the per-tick rule
+SCM-aware.
+
 ---
 
 # 4. Recall — the interference formula `[BUILT]`
@@ -227,6 +318,39 @@ Mechanically:
 This is the waveguide interpretation: SCM does not generate signal,
 it routes it. Hardened SCM regions become opaque; quiescent ones
 become transparent.
+
+## 4.1 Scoring — `interference_score` `[BUILT]`
+
+The κ signal fed back into `SCMGrid.update_from_recall` (§3.3.5) is
+computed by `wheeler_memory/interference.py:interference_score()`. Per
+the v0.3.6 fix (commit `39fb8fce`):
+
+```
+score = ρ_w(C_q, C_s | w) + ρ_w(X_q, X_s | w)
+    where w_ij = 1 − |SCM(i, j)|
+    and   ρ_w  = Σw·δx·δy / √(Σw·δx² · Σw·δy²)
+```
+
+`ρ_w` is the weighted Pearson correlation between query and stored
+attractors on the corpus (C) and experiential (X) channels, with the
+SCM permission topology entering as per-cell weights.
+
+The pre-fix implementation factored as `(c_pearson + e_pearson) ×
+mean_openness` — collapsing the 64×64 SCM to a scalar. Equal-mean-openness
+SCM configurations produced identical scores regardless of spatial pattern,
+so the gradient update at §3.3.5 received a spatially blind `advantage =
+κ − κ_base` and could not differentiate frozen vs. learning SCM arms.
+
+The fix preserves what the SCM v2.0 design calls the "Who" axis: which
+cells get to vote on the score. Hardened cells (`|M| → 1`) contribute
+weight ≈ 0 and effectively recuse themselves from the correlation;
+quiescent cells (`|M| → 0`) contribute weight ≈ 1 and shape the score
+fully. Score range is `[−2, 2]` (sum of two ρ); historical `results.tsv`
+rows pre-`39fb8fce` are not directly comparable.
+
+Sacred files were untouched by this fix: `storage.py`, `hashing.py`,
+`chunking.py`, `rotation.py`, `dynamics.py`, `scm_grid.py`,
+`constants.py`, `scripts/bench_quality.py`.
 
 ---
 
