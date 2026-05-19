@@ -78,9 +78,11 @@ def apply_recall_learning(
         pass True (legacy behavior). recall_with_interference will pass
         False once it is wired up — interference path is T-clock-only.
     scm, scm_top_corpus, scm_top_exp, scm_top_kappa : optional SCM context
-        for the SCM update channel. Accepted but not yet acted on in this
-        commit; the next commit moves the inline SCM update from
-        ``recall_with_interference`` into here.
+        for the SCM update channel. When ``scm`` and ``scm_top_corpus``
+        and ``scm_top_kappa`` are all provided, ``scm.update_from_recall``
+        is invoked with those values (``scm_top_exp`` falls back to zeros
+        if None, matching the pre-unification inline behavior) and
+        ``scm.save()`` persists the grid.
 
     With ``drift_basin=True`` and no SCM kwargs, this function is
     byte-equivalent to the legacy ``recall_api._apply_recall_learning``.
@@ -125,3 +127,10 @@ def apply_recall_learning(
 
         bump_access(entry)
         _save_index_with_lock(chunk_dir, index)
+
+    if scm is not None and scm_top_corpus is not None and scm_top_kappa is not None:
+        top_exp_safe = (
+            scm_top_exp if scm_top_exp is not None else np.zeros_like(scm_top_corpus)
+        )
+        scm.update_from_recall(scm_top_corpus, top_exp_safe, scm_top_kappa)
+        scm.save()

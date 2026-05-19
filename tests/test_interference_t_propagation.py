@@ -28,28 +28,24 @@ def _read_index_metadata(data_dir, chunk: str, hex_key: str) -> dict:
     return _load_index(chunk_dir).get(hex_key, {}).get("metadata", {})
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "CANON §3.6.4: recall_with_interference writes the SCM substrate "
-        "but does not advance per-basin T-clock metadata. T-clock updates "
-        "are only triggered via recall_api._apply_recall_learning (i.e. "
-        "recognize(..., learning_enabled=True)). Test exists to flag the "
-        "gap; remove xfail once T-clock wiring lands."
-    ),
-)
-def test_recall_with_interference_does_not_advance_t_clock(tmp_data_dir):
-    """N driving recalls through `recall_with_interference` must advance the
-    per-basin T-clock if Who-axis correctness is to propagate to T-gated
-    cumulative state. They currently do not.
+def test_recall_with_interference_advances_t_clock(tmp_data_dir):
+    """N driving recalls through `recall_with_interference` advance the
+    per-basin T-clock exactly N times — strict per-recall semantics.
+
+    The strict count equality guards against false-green: if the assertion
+    passed with `>` but not `== LOOP_COUNT`, the wiring would be advancing
+    T-clock for the wrong reason (session-end side effects, cache flushes,
+    finalizer artifacts) rather than per-recall as intended.
     """
+    LOOP_COUNT = 8
+
     key = store_test_memory("alpha bravo charlie", tmp_data_dir)
 
     meta_before = _read_index_metadata(tmp_data_dir, "general", key)
     t_recall_before = meta_before.get("t_recall_count", 0)
     t_stability_before = meta_before.get("t_stability")
 
-    for _ in range(8):
+    for _ in range(LOOP_COUNT):
         recall_with_interference(
             "alpha bravo charlie", top_k=3, data_dir=tmp_data_dir
         )
@@ -58,8 +54,10 @@ def test_recall_with_interference_does_not_advance_t_clock(tmp_data_dir):
     t_recall_after = meta_after.get("t_recall_count", 0)
     t_stability_after = meta_after.get("t_stability")
 
-    assert t_recall_after > t_recall_before, (
-        "T-clock recall count did not advance under recall_with_interference."
+    assert t_recall_after - t_recall_before == LOOP_COUNT, (
+        f"Expected exactly {LOOP_COUNT} T-clock advancements (one per recall); "
+        f"got {t_recall_after - t_recall_before}. "
+        "If this fails, T-clock advancement is not firing per-recall."
     )
     if t_stability_before is not None and t_stability_after is not None:
         assert t_stability_after != pytest.approx(t_stability_before)

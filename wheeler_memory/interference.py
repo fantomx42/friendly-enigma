@@ -339,13 +339,25 @@ def recall_with_interference(
         state_counts[st] = state_counts.get(st, 0) + 1
     dominant = max(state_counts, key=state_counts.get) if state_counts else SILENT
 
-    # Step 5: recall-driven SCM feedback from top result
+    # Step 5: unified substrate update (T-clock + SCM) for the top hit.
+    # Routes through apply_recall_learning instead of the old inline SCM call.
+    # drift_basin=False — interference path is T-clock + SCM only, no attractor mutation.
     if scored:
-        top_score, _, _, top_corpus, top_exp = scored[0]
+        top_score, _, top_hit, top_corpus, top_exp = scored[0]
         if top_corpus is not None:
-            top_exp_safe = top_exp if top_exp is not None else np.zeros_like(top_corpus)
-            scm.update_from_recall(top_corpus, top_exp_safe, top_score)
-            scm.save()
+            from .recall_learning import apply_recall_learning
+
+            top_chunk_dir = d / "chunks" / top_hit.get("chunk", "general")
+            apply_recall_learning(
+                top_chunk_dir,
+                top_hit["hex_key"],
+                query_frame,
+                drift_basin=False,
+                scm=scm,
+                scm_top_corpus=top_corpus,
+                scm_top_exp=top_exp,
+                scm_top_kappa=top_score,
+            )
 
     return results, dominant, scm.openness()
 
