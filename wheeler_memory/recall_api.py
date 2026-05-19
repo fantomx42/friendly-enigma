@@ -13,7 +13,6 @@ EMA when learning_enabled=True.
 
 from __future__ import annotations
 
-import fcntl
 import heapq
 import json
 from dataclasses import dataclass
@@ -24,19 +23,16 @@ from scipy.stats import pearsonr
 
 from .chunking import list_existing_chunks, select_recall_chunks, touch_chunk_metadata
 from .constants import (
-    BASIN_DRIFT_BASE_RATE,
     RECOGNITION_THRESHOLD,
     SALIENCE_DEFAULT,
-    T_EMA_RATE,
 )
 from .dynamics import (
     apply_ca_dynamics,
     compute_attractor_features,
     evolve_and_interpret,
 )
-from .t_metadata import ensure_t_fields, update_t_stability
+from .t_metadata import ensure_t_fields
 from .temperature import (
-    bump_access,
     effective_temperature,
     ensure_access_fields,
     temperature_tier,
@@ -271,52 +267,6 @@ def _build_seed(
     )
 
 
-def _apply_recall_learning(
-    chunk_dir: Path,
-    hex_key: str,
-    query_frame: np.ndarray,
-) -> None:
-    """Update T (EMA) and drift the stored basin in-place. Bumps hit_count.
-
-    Holds the chunk's index.json.lock for the entire transaction. Re-reads
-    the index inside the lock so the EMA is computed against the freshest T.
-    """
-    lock_path = chunk_dir / "index.json.lock"
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        index = _load_index(chunk_dir)
-        if hex_key not in index:
-            return
-        entry = index[hex_key]
-        ensure_t_fields(entry)
-        ensure_access_fields(entry, entry["timestamp"])
-
-        attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
-        stored = np.load(attractor_path)
-
-        one_step = apply_ca_dynamics(stored)
-        observed_stability = _basin_stability(stored, one_step)
-
-        old_t = float(entry["metadata"]["t_stability"])
-        new_t = update_t_stability(old_t, observed_stability, T_EMA_RATE)
-        entry["metadata"]["t_stability"] = new_t
-        entry["metadata"]["t_recall_count"] = int(entry["metadata"].get("t_recall_count", 0)) + 1
-
-        # Drift: observed = query_frame after one CA step. Captures direction
-        # of pull from the query without paying for a full evolve.
-        observed = apply_ca_dynamics(query_frame.astype(np.float32))
-        plasticity = (1.0 - old_t) * BASIN_DRIFT_BASE_RATE
-        new_attractor = (stored.astype(np.float32) + plasticity * (observed - stored.astype(np.float32))).astype(stored.dtype)
-
-        np.save(attractor_path, new_attractor)
-        flat = new_attractor.flatten()
-        entry["metadata"]["att_mean"] = float(flat.mean())
-        entry["metadata"]["att_std"] = float(flat.std())
-
-        bump_access(entry)
-        _save_index_with_lock(chunk_dir, index)
-
-
 def recognize(
     query: str,
     *,
@@ -360,7 +310,9 @@ def recognize(
     seed = _build_seed(hex_key, chunk_name, sim, meta, chunk_dir, d, warmth)
 
     if learning_enabled:
-        _apply_recall_learning(chunk_dir, hex_key, query_frame)
+        from .recall_learning import apply_recall_learning
+
+        apply_recall_learning(chunk_dir, hex_key, query_frame)
 
     return seed
 
@@ -405,8 +357,10 @@ def recognize_top_k(
         seeds.append(_build_seed(hex_key, chunk_name, sim, meta, chunk_dir, d, warmth))
 
     if learning_enabled and seeds:
+        from .recall_learning import apply_recall_learning
+
         winner = seeds[0]
-        _apply_recall_learning(d / "chunks" / winner.chunk, winner.hex_key, query_frame)
+        apply_recall_learning(d / "chunks" / winner.chunk, winner.hex_key, query_frame)
 
     return seeds
 
