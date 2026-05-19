@@ -61,6 +61,9 @@ def compute_interference(
     scm_grid: np.ndarray,
     peak_threshold: float = INTERFERENCE_PEAK_THRESHOLD,
     gap_threshold: float = SCM_GAP_THRESHOLD,
+    *,
+    scm_openness: np.ndarray | None = None,
+    scm_open: np.ndarray | None = None,
 ) -> InterferenceResult:
     """Compute the three-grid interference pattern.
 
@@ -70,6 +73,11 @@ def compute_interference(
     experiential_att : (64, 64) float32 — experiential attractor, or None
         if no experiential counterpart exists (defaults to zeros → ABSORBED).
     scm_grid : (64, 64) float32 — SCM trust topology.
+    scm_openness, scm_open : optional precomputed ``1 - |scm_grid|`` and
+        ``|scm_grid| < gap_threshold``. Hot-loop callers (e.g.
+        ``recall_with_interference``) hoist these out of the per-hit
+        loop since ``scm_grid`` is constant; the precomputed ``scm_open``
+        must agree with ``gap_threshold``.
 
     Returns
     -------
@@ -78,14 +86,17 @@ def compute_interference(
     if experiential_att is None:
         experiential_att = np.zeros_like(corpus_att)
 
+    if scm_openness is None:
+        scm_openness = 1.0 - np.abs(scm_grid)
+    if scm_open is None:
+        scm_open = np.abs(scm_grid) < gap_threshold
+
     # The answer equation
-    scm_openness = 1.0 - np.abs(scm_grid)
     pattern = corpus_att * experiential_att * scm_openness
 
     # Per-cell state classification
     c_peak = np.abs(corpus_att) > peak_threshold
     e_peak = np.abs(experiential_att) > peak_threshold
-    scm_open = np.abs(scm_grid) < gap_threshold
 
     state_map = np.zeros(corpus_att.shape, dtype=np.uint8)
     state_map[c_peak & e_peak & scm_open] = InterferenceResult.STATE_CODES[GROUNDED]
@@ -172,29 +183,37 @@ def interference_score(
     stored_corpus_att: np.ndarray,
     stored_experiential_att: np.ndarray | None,
     scm_grid: np.ndarray,
+    *,
+    weights: np.ndarray | None = None,
+    scm_openness: np.ndarray | None = None,
+    scm_open: np.ndarray | None = None,
 ) -> tuple[float, str, InterferenceResult]:
     """Compute interference-based similarity score between query and stored memory.
 
     Uses a cell-wise weighted Pearson correlation with w_ij = 1 - |SCM(i,j)|,
     so the SCM permission topology shapes which spatial regions contribute to
     each channel's correlation. This preserves the spatial coupling between
-    content agreement and trust — see the recall pipeline diagram in the
-    interference_score v2 fix notes.
+    content agreement and trust.
+
+    ``weights``/``scm_openness``/``scm_open`` are optional precomputes for
+    hot-loop callers where ``scm_grid`` is constant across many hits;
+    omit them for one-off scoring.
 
     Returns (score, dominant_state, InterferenceResult).
     """
-    weights = (1.0 - np.abs(scm_grid)).astype(np.float32).flatten()
+    if weights is None:
+        weights = (1.0 - np.abs(scm_grid)).ravel()
 
     c_sim = _weighted_pearson(
-        query_corpus_att.flatten(),
-        stored_corpus_att.flatten(),
+        query_corpus_att.ravel(),
+        stored_corpus_att.ravel(),
         weights,
     )
 
     if query_experiential_att is not None and stored_experiential_att is not None:
         e_sim = _weighted_pearson(
-            query_experiential_att.flatten(),
-            stored_experiential_att.flatten(),
+            query_experiential_att.ravel(),
+            stored_experiential_att.ravel(),
             weights,
         )
     else:
@@ -206,6 +225,8 @@ def interference_score(
         stored_corpus_att,
         stored_experiential_att,
         scm_grid,
+        scm_openness=scm_openness,
+        scm_open=scm_open,
     )
 
     return score, ir.dominant_state, ir
@@ -265,6 +286,12 @@ def recall_with_interference(
         query_frame, EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
     )["attractor"]
 
+    # SCM-derived intermediates are constant across hits — hoist out of the loop.
+    abs_scm = np.abs(scm.grid)
+    scm_openness_grid = 1.0 - abs_scm
+    scm_weights = scm_openness_grid.ravel()
+    scm_open_mask = abs_scm < SCM_GAP_THRESHOLD
+
     # Step 3: re-score each corpus hit through interference
     scored = []
     for hit in corpus_results:
@@ -284,7 +311,14 @@ def recall_with_interference(
         stored_exp = np.load(exp_path) if exp_path.exists() else None
 
         score, state, ir = interference_score(
-            q_corpus, q_experiential, stored_corpus, stored_exp, scm.grid
+            q_corpus,
+            q_experiential,
+            stored_corpus,
+            stored_exp,
+            scm.grid,
+            weights=scm_weights,
+            scm_openness=scm_openness_grid,
+            scm_open=scm_open_mask,
         )
         hit["interference_score"] = round(score, 4)
         hit["interference_state"] = state
@@ -356,7 +390,7 @@ def self_consistency_check(
     re_attractor = result["attractor"]
 
     # 3. Check convergence to original basin
-    corr, _ = pearsonr(re_attractor.flatten(), original_corpus_att.flatten())
+    corr, _ = pearsonr(re_attractor.ravel(), original_corpus_att.ravel())
     sim = float(corr) if not np.isnan(corr) else 0.0
     consistent = sim >= HALLUCINATION_THRESHOLD
 
