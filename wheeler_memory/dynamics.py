@@ -21,6 +21,36 @@ from .constants import (
 from .oscillation import detect_oscillation
 
 
+def _cell_roles(
+    frame: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Single source of truth for neighbor stack and role masks.
+
+    Used by apply_ca_dynamics, apply_ca_dynamics_parameterized, and
+    diagnostics.decompose_tick — keeping one definition ensures the
+    read-only diagnostic cannot drift from the substrate rule.
+
+    Returns ``(neighbors, max_neighbor, is_max, is_min, is_flat)``.
+    """
+    n_up = np.roll(frame, 1, axis=0)
+    n_down = np.roll(frame, -1, axis=0)
+    n_left = np.roll(frame, 1, axis=1)
+    n_right = np.roll(frame, -1, axis=1)
+
+    neighbors = np.stack([n_up, n_down, n_left, n_right])
+    max_neighbor = neighbors.max(axis=0)
+
+    is_max = (
+        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
+    )
+    is_min = (
+        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
+    )
+    is_flat = is_max & is_min  # uniform plateau — no gradient, no movement
+
+    return neighbors, max_neighbor, is_max, is_min, is_flat
+
+
 def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
     """Apply a single CA iteration using 3-state logic.
 
@@ -29,22 +59,7 @@ def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
       - Local min (<= all 4 neighbors): delta = (-1 - cell) * 0.35
       - Slope (neither): delta = (max_neighbor - cell) * 0.20
     """
-    n_up = np.roll(frame, 1, axis=0)
-    n_down = np.roll(frame, -1, axis=0)
-    n_left = np.roll(frame, 1, axis=1)
-    n_right = np.roll(frame, -1, axis=1)
-
-    is_max = (
-        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
-    )
-    is_min = (
-        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
-    )
-
-    neighbors = np.stack([n_up, n_down, n_left, n_right])
-    max_neighbor = np.max(neighbors, axis=0)
-
-    is_flat = is_max & is_min  # all neighbours equal — no gradient, no movement
+    _, max_neighbor, is_max, is_min, is_flat = _cell_roles(frame)
 
     delta = np.zeros_like(frame)
     delta = np.where(is_max & ~is_flat, (1 - frame) * MAX_PUSH_STRENGTH, delta)
@@ -52,7 +67,6 @@ def apply_ca_dynamics(frame: np.ndarray) -> np.ndarray:
     delta = np.where(
         ~is_max & ~is_min, (max_neighbor - frame) * SLOPE_FLOW_STRENGTH, delta
     )
-    # is_flat cells: delta stays 0 — uniform plateau is a stable fixed point
 
     return np.clip(frame + delta, -1, 1)
 
@@ -68,22 +82,7 @@ def apply_ca_dynamics_parameterized(
     enabling corpus (tight) and experiential (loose) evolution regimes
     from the same engine.
     """
-    n_up = np.roll(frame, 1, axis=0)
-    n_down = np.roll(frame, -1, axis=0)
-    n_left = np.roll(frame, 1, axis=1)
-    n_right = np.roll(frame, -1, axis=1)
-
-    is_max = (
-        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
-    )
-    is_min = (
-        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
-    )
-
-    neighbors = np.stack([n_up, n_down, n_left, n_right])
-    max_neighbor = np.max(neighbors, axis=0)
-
-    is_flat = is_max & is_min
+    _, max_neighbor, is_max, is_min, is_flat = _cell_roles(frame)
 
     delta = np.zeros_like(frame)
     delta = np.where(is_max & ~is_flat, (1 - frame) * push_strength, delta)

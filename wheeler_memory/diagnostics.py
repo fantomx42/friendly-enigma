@@ -32,6 +32,7 @@ from __future__ import annotations
 import numpy as np
 
 from .constants import MAX_PUSH_STRENGTH, SLOPE_FLOW_STRENGTH
+from .dynamics import _cell_roles
 
 NEIGHBOR_NAMES: tuple[str, str, str, str] = ("up", "down", "left", "right")
 
@@ -61,21 +62,7 @@ def decompose_tick(frame: np.ndarray) -> dict:
         ``apply_ca_dynamics(frame)`` byte-for-byte.
     ``is_max``, ``is_min``, ``is_flat`` : (H, W) bool — local-extremum masks.
     """
-    n_up = np.roll(frame, 1, axis=0)
-    n_down = np.roll(frame, -1, axis=0)
-    n_left = np.roll(frame, 1, axis=1)
-    n_right = np.roll(frame, -1, axis=1)
-
-    neighbors = np.stack([n_up, n_down, n_left, n_right])
-    max_neighbor = neighbors.max(axis=0)
-
-    is_max = (
-        (frame >= n_up) & (frame >= n_down) & (frame >= n_left) & (frame >= n_right)
-    )
-    is_min = (
-        (frame <= n_up) & (frame <= n_down) & (frame <= n_left) & (frame <= n_right)
-    )
-    is_flat = is_max & is_min
+    neighbors, max_neighbor, is_max, is_min, is_flat = _cell_roles(frame)
 
     delta = np.zeros_like(frame)
     delta = np.where(is_max & ~is_flat, (1 - frame) * MAX_PUSH_STRENGTH, delta)
