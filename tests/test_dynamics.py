@@ -231,7 +231,7 @@ class TestStabilityWindow:
         from wheeler_memory.constants import STABILITY_WINDOW
 
         # Patch GPU away so we test the CPU path's stability window
-        with patch("wheeler_memory.dynamics._GPU_READY", False):
+        with patch("wheeler_memory.dynamics.gpu_available", return_value=False):
             frame = hash_to_frame("insufficient iters test")
             result = evolve_and_interpret(
                 frame,
@@ -260,7 +260,7 @@ class TestZeroDominantConvergence:
         frame[0:4, 0:4] = np.linspace(-0.8, 0.8, 16).reshape(4, 4)
         frame[60:64, 60:64] = np.linspace(0.3, -0.5, 16).reshape(4, 4)
 
-        with patch("wheeler_memory.dynamics._GPU_READY", False):
+        with patch("wheeler_memory.dynamics.gpu_available", return_value=False):
             result = evolve_and_interpret(
                 frame, max_iters=500, stability_threshold=1e-4
             )
@@ -294,7 +294,7 @@ class TestZeroDominantConvergence:
             dtype=np.float32,
         )
 
-        with patch("wheeler_memory.dynamics._GPU_READY", False):
+        with patch("wheeler_memory.dynamics.gpu_available", return_value=False):
             result = evolve_and_interpret(
                 frame, max_iters=500, stability_threshold=1e-4
             )

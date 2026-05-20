@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 
 import numpy as np
 
@@ -102,7 +103,14 @@ def _load_lib():
 
 
 def gpu_available() -> bool:
-    """Check if the GPU backend is ready."""
+    """Check if the GPU backend is ready.
+
+    Honors the WHEELER_DISABLE_GPU env var: set to "1"/"true"/"yes" to
+    force False without probing hardware (used for reproducible CPU-only
+    bench runs across kernel binary rebuilds).
+    """
+    if os.environ.get("WHEELER_DISABLE_GPU", "").lower() in ("1", "true", "yes"):
+        return False
     return _load_lib() is not None
 
 

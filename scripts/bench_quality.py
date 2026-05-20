@@ -32,7 +32,11 @@ avg_alive_fraction  : mean fraction of non-neutral cells per attractor
 
 import argparse
 import csv
+import hashlib
 import json
+import os
+import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -71,10 +75,63 @@ TEST_INPUTS = [
 ]
 
 _RESULTS_TSV = Path(__file__).parent.parent / "results.tsv"
+_REPO_ROOT = Path(__file__).parent.parent
 _TSV_HEADER = (
     "iteration\ttimestamp\tscore\tavg_correlation\tconvergence_ratio"
     "\tmedian_ticks\talive_fraction\telapsed_s\timproved\tcommit\tchanged\tnotes\n"
 )
+
+
+def _detect_git_head() -> str:
+    """Return short-8 hash of HEAD, or '' if not a git repo / git missing."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
+def _hash_accel_binaries() -> str:
+    """SHA-256 of all .so files under wheeler_memory/accel/, truncated to 8 chars.
+
+    The kernel binaries are not tracked by git; their hash is the only way
+    to disambiguate bench runs across rebuilds with different compiler flags.
+    Returns 'none' when no .so files are present (CPU-only install).
+    """
+    accel_root = _REPO_ROOT / "wheeler_memory" / "accel"
+    if not accel_root.exists():
+        return "none"
+    so_files = sorted(accel_root.rglob("*.so"))
+    if not so_files:
+        return "none"
+    h = hashlib.sha256()
+    for f in so_files:
+        h.update(f.read_bytes())
+    return h.hexdigest()[:8]
+
+
+def _collect_env_info() -> str:
+    """Return a one-line env summary for the notes column.
+
+    Captures the four facts most likely to explain bench drift that git
+    can't see: GPU dispatch state, numpy version, Python version, and a
+    fingerprint of the compiled accel/.so artifacts.
+    """
+    from wheeler_memory.accel.ca import gpu_available
+
+    py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    return (
+        f"[env: gpu={gpu_available()} np={np.__version__} "
+        f"py={py} accel={_hash_accel_binaries()}]"
+    )
 
 
 def _next_iteration(path: Path) -> int:
@@ -219,12 +276,24 @@ def main() -> None:
     parser.add_argument(
         "--no-save", action="store_true", help="Do not append to results.tsv"
     )
-    parser.add_argument("--commit", default="", help="Git commit hash for results.tsv")
+    parser.add_argument(
+        "--cpu-only",
+        action="store_true",
+        help="Force CPU dispatch (sets WHEELER_DISABLE_GPU=1) for reproducible baseline",
+    )
+    parser.add_argument(
+        "--commit",
+        default="",
+        help="Git commit hash for results.tsv (auto-detected from HEAD if empty)",
+    )
     parser.add_argument(
         "--changed", default="", help="Parameter(s) changed for results.tsv"
     )
     parser.add_argument("--notes", default="", help="Free-text notes for results.tsv")
     args = parser.parse_args()
+
+    if args.cpu_only:
+        os.environ["WHEELER_DISABLE_GPU"] = "1"
 
     verbose = not args.json
     if verbose:
@@ -273,8 +342,12 @@ def main() -> None:
     elif improved is False:
         print("  REGRESSION — consider reverting constants.py")
 
+    commit = args.commit or _detect_git_head()
+    env_suffix = _collect_env_info()
+    notes = f"{args.notes} {env_suffix}".strip() if args.notes else env_suffix
+
     if not args.no_save:
-        append_result(result, improved, args.commit, args.changed, args.notes)
+        append_result(result, improved, commit, args.changed, notes)
         print(f"\n  Appended to {_RESULTS_TSV.name}")
 
 

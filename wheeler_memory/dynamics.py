@@ -95,16 +95,17 @@ def apply_ca_dynamics_parameterized(
 
 
 # GPU dispatch — imported after apply_ca_dynamics is defined.
+# gpu_available() is queried at dispatch time (not import time) so the
+# WHEELER_DISABLE_GPU env var can force CPU dispatch dynamically.
 try:
     from .accel.ca import (
         gpu_available,
         gpu_evolve_batch as _gpu_evolve_batch,
         gpu_evolve_single as _gpu_evolve,
     )
-
-    _GPU_READY = gpu_available()
 except ImportError:
-    _GPU_READY = False
+    def gpu_available() -> bool:
+        return False
     _gpu_evolve = None
     _gpu_evolve_batch = None
 
@@ -141,7 +142,7 @@ def evolve_and_interpret(
       - history: list of all frame copies (for brick construction)
       - metadata: additional info (cycle_period, etc.)
     """
-    if _GPU_READY and _gpu_evolve is not None:
+    if gpu_available() and _gpu_evolve is not None:
         try:
             result = _gpu_evolve(
                 frame,
@@ -248,7 +249,7 @@ def evolve_batch(
     if not frames:
         return []
 
-    if _GPU_READY and _gpu_evolve_batch is not None:
+    if gpu_available() and _gpu_evolve_batch is not None:
         try:
             results = _gpu_evolve_batch(
                 frames,
@@ -280,7 +281,7 @@ def evolve_batch_with_params(
     if not frames:
         return []
 
-    if _GPU_READY and _gpu_evolve_batch is not None:
+    if gpu_available() and _gpu_evolve_batch is not None:
         try:
             results = _gpu_evolve_batch(
                 frames,
@@ -324,7 +325,7 @@ def evolve_with_params(
 
     For GPU: ca_evolve_single_v2 already accepts push/slope as runtime params.
     """
-    if _GPU_READY and _gpu_evolve is not None:
+    if gpu_available() and _gpu_evolve is not None:
         try:
             result = _gpu_evolve(
                 frame,
