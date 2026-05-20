@@ -105,11 +105,14 @@ def test_basin_stability_weighted_respects_scm_pattern():
     stability_b = _basin_stability_weighted(stored, one_step, scm_grid=scm_b)
     stability_uniform = _basin_stability_weighted(stored, one_step)
 
-    assert stability_a != stability_b, (
-        f"Mirrored SCMs produced identical stability ({stability_a} == "
+    assert abs(stability_a - stability_b) > 1e-6, (
+        f"Mirrored SCMs produced near-identical stability ({stability_a} ≈ "
         f"{stability_b}). Who-axis collapsed at the observation layer."
     )
-    assert stability_a != stability_uniform or stability_b != stability_uniform, (
+    assert (
+        abs(stability_a - stability_uniform) > 1e-6
+        or abs(stability_b - stability_uniform) > 1e-6
+    ), (
         "SCM-aware observation matches uniform — SCM context not influencing "
         "the reading."
     )
@@ -181,11 +184,72 @@ def test_apply_recall_learning_scm_path_uses_weighted_observation(tmp_data_dir):
     meta_a = _read_meta(arm_a, "general", key_a)
     meta_b = _read_meta(arm_b, "general", key_b)
 
-    assert meta_a["t_stability"] != meta_b["t_stability"], (
-        f"Mirrored-SCM arms produced identical t_stability "
-        f"({meta_a['t_stability']} == {meta_b['t_stability']}). "
+    assert abs(meta_a["t_stability"] - meta_b["t_stability"]) > 1e-6, (
+        f"Mirrored-SCM arms produced near-identical t_stability "
+        f"({meta_a['t_stability']} ≈ {meta_b['t_stability']}). "
         "Who-axis is collapsed at the observation layer despite the "
         "_basin_stability_weighted helper being available — the SCM grid "
         "is not being passed through apply_recall_learning to the observer."
+    )
+
+
+def test_apply_recall_learning_scm_top_exp_none_falls_back_to_zeros(tmp_data_dir):
+    """scm_top_exp=None is byte-equivalent to scm_top_exp=zeros_like(scm_top_corpus).
+
+    Guards the fallback branch at recall_learning.py — the pre-unification
+    inline SCM update accepted a "no experiential counterpart" case by
+    substituting zeros, and the unified entry point preserves that contract.
+    Tested directly because the seeded paths in other tests always write an
+    experiential counterpart and never trigger this branch.
+    """
+    from wheeler_memory.recall_learning import apply_recall_learning
+
+    text = "alpha bravo charlie delta echo"
+
+    arm_none = tmp_data_dir / "arm_none"
+    arm_zeros = tmp_data_dir / "arm_zeros"
+    arm_none.mkdir()
+    arm_zeros.mkdir()
+
+    key_n = store_test_memory(text, arm_none)
+    key_z = store_test_memory(text, arm_zeros)
+    assert key_n == key_z, "Hash encoder is deterministic; keys must match."
+
+    chunk_n = arm_none / "chunks" / "general"
+    chunk_z = arm_zeros / "chunks" / "general"
+
+    rng = np.random.default_rng(7)
+    seed_mask = rng.random((64, 64)) < 0.3
+    scm_n = SCMGrid.load_or_create(arm_none)
+    scm_z = SCMGrid.load_or_create(arm_zeros)
+    scm_n.grid[seed_mask] = 0.4
+    scm_z.grid[seed_mask] = 0.4
+    scm_n.save()
+    scm_z.save()
+
+    rng2 = np.random.RandomState(5)
+    query_frame = rng2.standard_normal((64, 64)).astype(np.float32)
+    top_corpus = rng2.standard_normal((64, 64)).astype(np.float32)
+    top_kappa = 0.5
+
+    apply_recall_learning(
+        chunk_n, key_n, query_frame,
+        drift_basin=False, scm=scm_n,
+        scm_top_corpus=top_corpus, scm_top_exp=None, scm_top_kappa=top_kappa,
+    )
+    apply_recall_learning(
+        chunk_z, key_z, query_frame,
+        drift_basin=False, scm=scm_z,
+        scm_top_corpus=top_corpus,
+        scm_top_exp=np.zeros_like(top_corpus), scm_top_kappa=top_kappa,
+    )
+
+    scm_n_after = SCMGrid.load_or_create(arm_none).grid
+    scm_z_after = SCMGrid.load_or_create(arm_zeros).grid
+
+    assert np.array_equal(scm_n_after, scm_z_after), (
+        "scm_top_exp=None did not match scm_top_exp=zeros — the fallback "
+        "at recall_learning.py has drifted from the pre-unification "
+        "inline behavior."
     )
 

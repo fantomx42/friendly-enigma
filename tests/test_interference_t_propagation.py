@@ -1,15 +1,18 @@
 """Characterize the per-recall → cumulative-substrate wiring of recall_with_interference.
 
-These tests probe the state of CANON §3.6.4 propagation as of 2026-05-18:
-whether the Who-axis correctness restored in `interference_score`
-(commit 39fb8fce, weighted Pearson) actually reaches the two cumulative
-substrate channels that compose "the substrate change":
+These tests guard both substrate channels that compose CANON §3.6.4
+propagation now that the wiring is unified through ``apply_recall_learning``:
 
-  1. SCM grid mutation (interference.py:343-348 via SCMGrid.update_from_recall)
-  2. Per-basin T-clock (recall_api._apply_recall_learning → t_metadata.update_t_stability)
+  1. SCM grid mutation — ``interference.recall_with_interference`` routes the
+     SCM update through ``apply_recall_learning`` rather than the old inline
+     ``SCMGrid.update_from_recall`` call.
+  2. Per-basin T-clock — ``apply_recall_learning`` feeds an SCM-weighted
+     basin-stability observation (``_basin_stability_weighted``) into
+     ``t_metadata.update_t_stability``.
 
-The tests do not modify production code. They document the wiring; any
-fix is a separate session.
+A failure on either assertion is a regression on the §3.6.4 wiring: it means
+one of the substrate channels has fallen back to scalar collapse or stopped
+firing per-recall.
 """
 
 from __future__ import annotations

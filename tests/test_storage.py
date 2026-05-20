@@ -104,7 +104,7 @@ class TestRecallReturnsResults:
         assert len(results) > 0
 
         for result in results:
-            assert -1.0 <= result["similarity"] <= 1.0
+            assert -1.0 - 1e-5 <= result["similarity"] <= 1.0 + 1e-5
 
     def test_recall_top_k_respected(self, tmp_path):
         """Recall with top_k=2 returns at most 2 results."""

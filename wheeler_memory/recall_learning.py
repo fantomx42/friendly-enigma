@@ -11,8 +11,12 @@ kwarg-gated channels:
     attractor toward ``apply_ca_dynamics(query_frame)`` at plasticity
     ``(1 - old_T) * BASIN_DRIFT_BASE_RATE`` and rewrite the .npy file.
     Preserves the legacy behavior used by ``recognize`` / ``recognize_top_k``.
-  - SCM update (``scm`` + SCM kwargs present): not yet implemented in
-    this commit — that's the next step. Accepted but ignored.
+  - SCM update (``scm``, ``scm_top_corpus``, ``scm_top_kappa`` present):
+    invokes ``scm.update_from_recall(scm_top_corpus, scm_top_exp_or_zeros,
+    scm_top_kappa)`` and persists via ``scm.save()``. ``scm_top_exp`` falls
+    back to ``np.zeros_like(scm_top_corpus)`` when omitted, matching the
+    pre-unification inline behavior. Used by ``recall_with_interference``
+    so the interference path shares this single substrate-update route.
 
 Promoted from ``recall_api._apply_recall_learning``; the legacy callsites
 in ``recognize`` and ``recognize_top_k`` now delegate here. With all
@@ -87,8 +91,9 @@ def apply_recall_learning(
     ----------
     drift_basin : if True (default), rewrites the stored attractor blended
         toward ``apply_ca_dynamics(query_frame)``. recognize/recognize_top_k
-        pass True (legacy behavior). recall_with_interference will pass
-        False once it is wired up — interference path is T-clock-only.
+        pass True (legacy behavior). recall_with_interference passes False —
+        the interference path advances T-clock and SCM only, no attractor
+        mutation.
     scm, scm_top_corpus, scm_top_exp, scm_top_kappa : optional SCM context
         for the SCM update channel. When ``scm`` and ``scm_top_corpus``
         and ``scm_top_kappa`` are all provided, ``scm.update_from_recall``

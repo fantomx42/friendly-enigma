@@ -286,6 +286,73 @@ class TestInterferenceResult:
             assert InterferenceResult.CODE_NAMES[code] == name
 
 
+# ── Precomputed-mask hot-path equivalence ────────────────────────────────────
+
+
+class TestPrecomputeEquivalence:
+    """The hot-loop perf path in ``recall_with_interference`` hoists
+    ``scm_openness``, ``scm_open``, and ``weights`` out of the per-hit loop
+    and passes them in as kwargs. These tests assert byte-equivalence with
+    the auto-derive path on the same ``scm_grid`` — silent drift here would
+    mean every interference recall returns subtly different scores than the
+    one-shot API.
+    """
+
+    def test_compute_interference_precomputed_equals_auto(self):
+        """compute_interference: precomputed scm_openness/scm_open match
+        the auto-derived path on the same scm_grid (byte-equivalent)."""
+        rng = np.random.default_rng(7)
+        corpus = rng.standard_normal((64, 64)).astype(np.float32)
+        experiential = rng.standard_normal((64, 64)).astype(np.float32)
+        scm = (rng.standard_normal((64, 64)) * 0.5).astype(np.float32)
+
+        auto = compute_interference(corpus, experiential, scm)
+
+        scm_openness = 1.0 - np.abs(scm)
+        scm_open = np.abs(scm) < SCM_GAP_THRESHOLD
+        precomputed = compute_interference(
+            corpus, experiential, scm,
+            scm_openness=scm_openness, scm_open=scm_open,
+        )
+
+        assert np.array_equal(auto.pattern, precomputed.pattern)
+        assert np.array_equal(auto.state_map, precomputed.state_map)
+        assert auto.dominant_state == precomputed.dominant_state
+        assert auto.grounded_fraction == precomputed.grounded_fraction
+        assert auto.absorbed_fraction == precomputed.absorbed_fraction
+        assert auto.unconsolidated_fraction == precomputed.unconsolidated_fraction
+        assert auto.contested_fraction == precomputed.contested_fraction
+        assert auto.signal_strength == precomputed.signal_strength
+
+    def test_interference_score_precomputed_equals_auto(self):
+        """interference_score: precomputed weights/scm_openness/scm_open match
+        the on-the-fly path on the same scm_grid (byte-equivalent score and
+        state; InterferenceResult arrays also match)."""
+        rng = np.random.default_rng(11)
+        q_corpus = rng.standard_normal((64, 64)).astype(np.float32)
+        q_exp = rng.standard_normal((64, 64)).astype(np.float32)
+        s_corpus = rng.standard_normal((64, 64)).astype(np.float32)
+        s_exp = rng.standard_normal((64, 64)).astype(np.float32)
+        scm = (rng.standard_normal((64, 64)) * 0.5).astype(np.float32)
+
+        score_auto, state_auto, ir_auto = interference_score(
+            q_corpus, q_exp, s_corpus, s_exp, scm,
+        )
+
+        weights = (1.0 - np.abs(scm)).ravel()
+        scm_openness = 1.0 - np.abs(scm)
+        scm_open = np.abs(scm) < SCM_GAP_THRESHOLD
+        score_pre, state_pre, ir_pre = interference_score(
+            q_corpus, q_exp, s_corpus, s_exp, scm,
+            weights=weights, scm_openness=scm_openness, scm_open=scm_open,
+        )
+
+        assert score_auto == score_pre
+        assert state_auto == state_pre
+        assert np.array_equal(ir_auto.pattern, ir_pre.pattern)
+        assert np.array_equal(ir_auto.state_map, ir_pre.state_map)
+
+
 # ── Agent recall wiring tests ────────────────────────────────────────────────
 
 

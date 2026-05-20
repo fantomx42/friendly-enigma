@@ -42,6 +42,7 @@ Repository = "https://github.com/fantomx42/wheeler-memory"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+xfail_strict = true
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "embed: marks tests requiring sentence-transformers (deselect with '-m \"not embed\"')",
