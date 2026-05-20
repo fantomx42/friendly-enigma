@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .constants import BASIN_DRIFT_BASE_RATE, T_EMA_RATE
+from .constants import BASIN_DRIFT_BASE_RATE, SCM_GAP_THRESHOLD, T_EMA_RATE
 from .dynamics import apply_ca_dynamics
 from .t_metadata import ensure_t_fields, update_t_stability
 from .temperature import bump_access, ensure_access_fields
@@ -44,13 +44,25 @@ def _basin_stability_weighted(
 ) -> float:
     """Per-basin stability reading in [0, 1] from a 1-step CA probe.
 
-    Currently uniform: 1 - p99(|one_step - stored|) / 2. The SCM-aware
-    variant (restricting the p99 to cells where the SCM is permissive)
-    is introduced in a later commit. For now, ``scm_grid`` is accepted
-    but ignored — passing it produces the same result as omitting it.
+    Uniform mode (``scm_grid`` is None): 1 - p99(|one_step - stored|) / 2.
+    Matches recall_api._basin_stability exactly — used by recognize/
+    recognize_top_k callers that don't pass SCM context.
+
+    Who-axis mode (``scm_grid`` provided): restricts the p99 calculation
+    to cells where ``|scm_grid| < SCM_GAP_THRESHOLD`` (permissive). The
+    same Who-axis logic that interference_score applies via weighted
+    Pearson at the scoring layer, applied at the observation layer.
+    Returns 1.0 when no cells are permissive (closed SCM → trivially
+    stable basin from the SCM's perspective).
     """
     delta = np.abs(one_step.flatten() - stored.flatten())
-    p99 = float(np.percentile(delta, 99))
+    if scm_grid is None:
+        p99 = float(np.percentile(delta, 99))
+        return float(np.clip(1.0 - p99 / 2.0, 0.0, 1.0))
+    permissive = (np.abs(scm_grid) < SCM_GAP_THRESHOLD).flatten()
+    if not permissive.any():
+        return 1.0
+    p99 = float(np.percentile(delta[permissive], 99))
     return float(np.clip(1.0 - p99 / 2.0, 0.0, 1.0))
 
 
@@ -103,7 +115,9 @@ def apply_recall_learning(
         stored = np.load(attractor_path)
 
         one_step = apply_ca_dynamics(stored)
-        observed_stability = _basin_stability_weighted(stored, one_step)
+        observed_stability = _basin_stability_weighted(
+            stored, one_step, scm_grid=scm.grid if scm is not None else None
+        )
 
         old_t = float(entry["metadata"]["t_stability"])
         new_t = update_t_stability(old_t, observed_stability, T_EMA_RATE)
