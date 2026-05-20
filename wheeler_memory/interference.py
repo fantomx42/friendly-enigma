@@ -240,6 +240,7 @@ def recall_with_interference(
     chunk: str | None = None,
     encoder: str | None = None,
     use_embedding: bool = False,
+    apply_learning: bool = True,
 ) -> tuple[list[dict], str, float]:
     """Recall memories through the three-grid interference pipeline.
 
@@ -342,7 +343,9 @@ def recall_with_interference(
     # Step 5: unified substrate update (T-clock + SCM) for the top hit.
     # Routes through apply_recall_learning instead of the old inline SCM call.
     # drift_basin=False — interference path is T-clock + SCM only, no attractor mutation.
-    if scored:
+    # Gated by apply_learning — set False for substrate-frozen recall (benchmarking,
+    # A/B testing, replay scenarios).
+    if apply_learning and scored:
         top_score, _, top_hit, top_corpus, top_exp = scored[0]
         if top_corpus is not None:
             from .recall_learning import apply_recall_learning
