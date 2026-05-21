@@ -48,8 +48,10 @@ Quality score formula: `0.6*avg_corr + 0.2*(1-conv_ratio) + 0.1*(ticks/1000) + 0
 
 ## Architecture Constraints
 
-- **Pure Python.** The CA is the reasoning engine, not a wrapper around language models.
-- **No external LLM/ML dependencies in core.** `sentence-transformers` is optional (`.[embed]`); core must work without it.
+> Architecture itself lives in [CANON.md](./CANON.md) §1.4 ("What this is not"). These are the enforcement rules that follow:
+
+- **Pure Python in the engine.** No CUDA / ROCm / Vulkan paths inside the recall path. (The HIP kernel under `wheeler_memory/accel/` is batch-dispatch only — see `docs/architecture.md` §6.)
+- **Core works without `sentence-transformers`.** The `.[embed]` extra is optional; core depends only on numpy/scipy/matplotlib/psutil.
 - **No Rust, no conductor, no trauma.py.** These were removed Feb 2026. Do not reintroduce.
 - **`constants.py` is the ONLY file modified during autoresearch** parameter tuning. See `docs/program.md` for the full protocol.
 
@@ -61,23 +63,9 @@ Quality score formula: `0.6*avg_corr + 0.2*(1-conv_ratio) + 0.1*(ticks/1000) + 0
 - Don't refactor modules you weren't asked to touch
 - Don't create new files when editing existing ones suffices
 
-## Architecture
+## Code Layout
 
-### Data Flow
-
-```
-Text → Encoder → 64×64 frame ([-1,+1]) → CA evolution (~40-50 ticks) → Attractor
-                                                                          ↓
-                                              Chunked storage (~/.wheeler_memory/chunks/<domain>/)
-                                                                          ↓
-Query → Same pipeline → Query attractor → Pearson correlation search → Top-K results
-                                                                          ↓
-                                              [Optional] Reconstructive recall (blend + re-evolve)
-```
-
-Encoders: `hash` (deterministic, default for benchmarks), `hippocampus` (native n-gram), `embedding` (sentence-transformers), `blended` (default for user-facing).
-
-CA dynamics: 3-state rule — local maxima push toward +1, minima toward -1, slopes flow uphill. Von Neumann (4-neighbor) topology with wrapping boundaries.
+> Architecture lives in [CANON.md](./CANON.md): three-grid model (§3), recall formula (§4), encoder layer plurality (§1.2), cortex three-tier scoring (§3.5), substrate-clock semantics for T (§3.6). This section is a "where does what live" pointer only.
 
 ### Module Map (`wheeler_memory/`)
 
@@ -90,12 +78,6 @@ CA dynamics: 3-state rule — local maxima push toward +1, minima toward -1, slo
 | Cortex | `cortex.py`, `cortex_scm.py`, `cortex_classifier.py` | L1 graph → L2 settlement CA → L3 classifier |
 | Agents | `agent.py`, `decoder.py`, `generation.py` | LLM wrapper, Language Wheeler, IT-from-BIT engine |
 | Config | `constants.py` | All tunable parameters (centralized) |
-
-### Cortex System (3-tier semantic scoring)
-
-- **L1**: Pearson correlation adjacency graph over retrieved attractors, BFS clustering
-- **L2**: Settlement CA — opinion diffusion on the correlation graph until convergence
-- **L3**: Native semantic classifier — scores choices without external models
 
 ### Domain Chunks
 
