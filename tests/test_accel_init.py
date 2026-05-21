@@ -1,7 +1,5 @@
 """Tests for wheeler_memory.accel module imports and device detection."""
 
-import pytest
-
 
 def test_accel_imports():
     """accel package imports without error."""
@@ -18,9 +16,7 @@ def test_accel_info_returns_dict():
     info = accel_info()
     assert isinstance(info, dict)
     assert "gpu" in info
-    assert "npu" in info
     assert isinstance(info["gpu"], bool)
-    assert isinstance(info["npu"], bool)
 
 
 def test_gpu_available_returns_bool():
@@ -38,33 +34,3 @@ def test_accel_ca_module_imports():
     assert hasattr(ca, "gpu_available")
     assert hasattr(ca, "gpu_evolve_single")
     assert hasattr(ca, "gpu_evolve_batch")
-
-
-def test_npu_imports():
-    """npu package imports without error."""
-    from wheeler_memory import npu
-
-    assert hasattr(npu, "npu_available")
-    assert hasattr(npu, "device_info")
-
-
-def test_npu_available_returns_bool():
-    """npu_available() returns False (no NPU runtime expected in CI)."""
-    from wheeler_memory.npu import npu_available
-
-    result = npu_available()
-    assert isinstance(result, bool)
-
-
-def test_coral_imports():
-    """Coral sub-package imports without error."""
-    from wheeler_memory.npu import coral
-
-    assert hasattr(coral, "coral_available")
-    assert hasattr(coral, "dual_tpu_info")
-
-
-def test_coral_available_returns_bool():
-    from wheeler_memory.npu.coral import coral_available
-
-    assert coral_available() is False  # No Coral hardware expected

@@ -326,17 +326,3 @@ The high-level API is `dynamics.evolve_batch(frames)` — it dispatches to GPU
 when available and falls back to CPU otherwise. No caller needs to check
 `gpu_available()`.
 
----
-
-## NPU / TPU Scaffolding
-
-Future accelerator support is scaffolded under `wheeler_memory/npu/`:
-
-| Module | Status | Hardware |
-|---|---|---|
-| `npu/openvino_bridge.py` | Stub | Intel NPU (Core Ultra, OpenVINO) |
-| `npu/coral/tpu_bridge.py` | Stub | Google Coral Edge TPU (M.2, PyCoral) |
-
-Both raise `NotImplementedError` until hardware integration is complete. See
-`npu/CONTEXT.md` and `npu/coral/CONTEXT.md` for hardware notes and driver
-requirements.

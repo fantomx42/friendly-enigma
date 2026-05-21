@@ -292,7 +292,6 @@ wheeler_memory/                  Core library
   accel/                         GPU acceleration (batch ops only)
     hip/                         HIP kernel sources + Makefile (RDNA4-aware)
     ca.py                        Python ctypes bindings
-  npu/                           NPU/TPU scaffolding (future); OpenVINO + Coral stubs
 
 scripts/                         CLI entry points + benchmarks
   bench/                         apple_test_semantic.py, eval_decoder.py,
@@ -316,7 +315,6 @@ tests/                           pytest suite (run `pytest --collect-only -q` fo
 results/                         Benchmark logs; BASELINES.md is the textual record
 docs/                            Technical documentation; INDEX.md is the entry point
 plans/                           Active research & implementation plans
-pitch_pack/                      Investor / developer pitch materials
 datasets/                        Training corpora (gitignored, ~4 GB)
 ```
 

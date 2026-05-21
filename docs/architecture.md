@@ -355,10 +355,6 @@ wheeler_memory/
 ├── accel/_common.py     Shared ctypes helpers for all HIP bindings
 ├── accel/ca.py          Python bindings for HIP CA evolution kernel
 ├── accel/hip/           HIP kernel sources (.hip) + unified Makefile
-  NPU / TPU (npu/) — future
-├── npu/__init__.py      npu_available(), device_info() (Intel NPU via OpenVINO)
-├── npu/openvino_bridge.py  Stub: INT8 inference on Intel NPU
-├── npu/coral/           Stub: Google Coral Edge TPU dual-chip pipeline
   CORTEX SYSTEM
 ├── cortex.py            L1 graph topology + L2 settlement CA orchestration
 ├── cortex_scm.py        SCM scoring: 7 layers (T, S, E, I, P, NW, ERF)

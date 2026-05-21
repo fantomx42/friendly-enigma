@@ -22,9 +22,6 @@ datasets/
 # Hardware reference PDFs (large binaries)
 docs/*.pdf
 
-# Pitch pack generated PDFs
-pitch_pack/output/
-
 # npm (marp-cli)
 node_modules/
 package-lock.json
