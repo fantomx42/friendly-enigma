@@ -33,8 +33,8 @@
 
 | Guide | Description |
 |-------|-------------|
-| [Vision](VISION.md) | Project Ralph — full architecture vision |
 | [Future / Roadmap](future.md) | Active research and planned features |
+| [Autoresearch Protocol](program.md) | Parameter sweep workflow for constants.py |
 | [Contributing](../CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](../CHANGELOG.md) | Release history |
 

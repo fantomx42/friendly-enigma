@@ -77,8 +77,7 @@ RDNA4-specific tuning notes.
 - **Active learning** — system notices low-SCM gaps and seeks information to
   fill them.
 - **L3 classifier improvements** — batch training, Adam optimizer,
-  regularization, richer features
-  (see `docs/reports/CORTEX_CLASSIFIER_SUMMARY.md`).
+  regularization, richer features.
 - **Intel NPU integration** — offload cortex L3 classifier to NPU via OpenVINO
   (stubs in `npu/openvino_bridge.py`).
 - **Google Coral Edge TPU** — dual M.2 TPU inference for INT8 classifier

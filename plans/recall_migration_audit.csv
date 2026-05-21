@@ -11,8 +11,8 @@ scripts/wheeler_recall.py,138,recall_memory (--no-interference branch default),R
 scripts/wheeler_primary.py,97,recall_memory (debug pipeline),RECONSTRUCTION,_run_with_state needs full hits,deferred,
 scripts/wheeler_mmlu.py,1161,recall_memory (score_decode),RECONSTRUCTION,decoder feeder; extract_state needs text and structural features,deferred,
 scripts/wheeler_ui.py,248,recall_memory (HTTP UI),RECONSTRUCTION,HTTP JSON response with full content,deferred,
-scripts/scm_ab_eval.py,301,recall_memory (warmup_hits),RECOGNITION_ONLY,already used readonly=True; only consumes hex_key/chunk,recognize_top_k(k=top_k threshold=0.0),2026-04-28
-scripts/scm_ab_eval.py,342,recall_memory (pearson_hits),RECOGNITION_ONLY,same shape as warmup_hits; downstream loads attractor by path,recognize_top_k(k=top_k threshold=0.0),2026-04-28
+scripts/bench/scm_ab_eval.py,301,recall_memory (warmup_hits),RECOGNITION_ONLY,already used readonly=True; only consumes hex_key/chunk,recognize_top_k(k=top_k threshold=0.0),2026-04-28
+scripts/bench/scm_ab_eval.py,342,recall_memory (pearson_hits),RECOGNITION_ONLY,same shape as warmup_hits; downstream loads attractor by path,recognize_top_k(k=top_k threshold=0.0),2026-04-28
 scripts/bench/eval_decoder.py,99,recall_memory,RECONSTRUCTION,decoder feeder,deferred,
 scripts/bench/apple_test_semantic.py,140,recall_memory,RECONSTRUCTION,semantic eval consumes text,deferred,
 scripts/exploration/test_eviction.py,41,recall_memory,RECONSTRUCTION,exploration script — leave on existing API,deferred,

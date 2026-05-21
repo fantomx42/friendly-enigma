@@ -394,7 +394,6 @@ Canon §14.1: **Project Ralph** (original; began as a QR-code-to-Coral-TPU hardw
 | [CLI Reference](docs/cli.md) | Every command and flag |
 | [API Reference](docs/api.md) | Python library usage |
 | [GPU Acceleration](docs/gpu.md) | HIP/ROCm setup, benchmarks |
-| [Vision](docs/VISION.md) | Project Ralph — full architecture vision |
 | [Future / Roadmap](docs/future.md) | Active research and planned features |
 | [Contributing](CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](CHANGELOG.md) | Release history |
