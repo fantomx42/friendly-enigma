@@ -51,7 +51,7 @@ Quality score formula: `0.6*avg_corr + 0.2*(1-conv_ratio) + 0.1*(ticks/1000) + 0
 - **Pure Python.** The CA is the reasoning engine, not a wrapper around language models.
 - **No external LLM/ML dependencies in core.** `sentence-transformers` is optional (`.[embed]`); core must work without it.
 - **No Rust, no conductor, no trauma.py.** These were removed Feb 2026. Do not reintroduce.
-- **`constants.py` is the ONLY file modified during autoresearch** parameter tuning. See `program.md` for the full protocol.
+- **`constants.py` is the ONLY file modified during autoresearch** parameter tuning. See `docs/program.md` for the full protocol.
 
 ## Anti-Patterns
 
@@ -109,7 +109,7 @@ Common flags across commands: `--data-dir`, `--chunk`, `--encoder` (hash|hippoca
 
 ## Autoresearch Protocol
 
-See `program.md` for full details. Summary:
+See `docs/program.md` for full details. Summary:
 
 1. Edit only `constants.py` (one or a few params)
 2. Commit the change

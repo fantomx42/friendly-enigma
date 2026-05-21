@@ -49,7 +49,7 @@ Test markers:
 - `results/` — benchmark logs and MMLU baselines
 - `plans/` — research & implementation plans
 - `artifacts/` — experiment artifacts
-- `program.md` — autoresearch tuning program
+- `docs/program.md` — autoresearch tuning program
 
 ## Making Changes
 
