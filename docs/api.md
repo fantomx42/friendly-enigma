@@ -410,7 +410,7 @@ Drift updates apply only to the top-1 winner (consistent with `recognize`),
 not to all `k`. `wheeler_memory/recall_api.py:368`.
 
 Used by `wheeler_memory/theories/structured.py:61` (basin-width measurement)
-and `scripts/scm_ab_eval.py` for warmup and pearson hits — see
+and `scripts/bench/scm_ab_eval.py` for warmup and pearson hits — see
 `plans/recall_migration_audit.csv`.
 
 ---

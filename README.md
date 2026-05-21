@@ -130,7 +130,7 @@ A scoring layer over retrieved attractors, structurally separate from the three 
 
 1. **L1 — Correlation graph** (`cortex.py`): Pearson correlation adjacency over the retrieved attractor set, with BFS clustering to identify coherent neighborhoods.
 2. **L2 — Settlement CA** (`cortex.py`): Opinion diffusion on the correlation graph until convergence. This is a *second* CA in the system, distinct from the three-grid CA — it runs on graph topology, not the 64×64 grid.
-3. **L3 — Native classifier** (`cortex_classifier.py`): ~11K-parameter numpy SGD network. Trained via `train_cortex_classifier.py`.
+3. **L3 — Native classifier** (`cortex_classifier.py`): ~11K-parameter numpy SGD network. Trained via `scripts/tools/train_cortex_classifier.py`.
 
 Output is a `SCMResult` (the *Measure*) classifying recall as `SYNTHESIS / NOVEL / HALLUCINATION` with ten layer scores and a net warrant.
 
@@ -297,12 +297,14 @@ wheeler_memory/                  Core library
 scripts/                         CLI entry points + benchmarks
   bench/                         apple_test_semantic.py, eval_decoder.py,
                                  bench_associative.py, bench_recall_warm_vs_cold.py,
-                                 train_projection.py, measure_separation.py
+                                 scm_ab_eval.py, train_projection.py,
+                                 measure_separation.py
   tools/                         prepare_corpus.py, topology_map.py,
                                  generate_evolution_gif.py, build_hip.sh,
-                                 install_hip_hook.sh, corpus_cleanup.py
+                                 install_hip_hook.sh, corpus_cleanup.py,
+                                 backfill_signatures.py, train_cortex_classifier.py,
+                                 sweep_decontamination.sh
   wheeler_simlex.py              ALL_ENCODERS lives here (line 60+)
-  train_cortex_classifier.py     L3 cortex classifier training (numpy SGD)
 
 notes/                           Research scratch — not part of pytest, not CLI
   exploration/                   9 research-notebook scripts (ex-scripts/exploration/)

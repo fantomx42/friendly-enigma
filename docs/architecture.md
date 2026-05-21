@@ -599,8 +599,8 @@ Existing call sites of `recall_memory` are catalogued in
 - **BOTH** — ambiguous; deferred or kept on `recall_memory`
 
 Migrated as of v0.3.6: `wheeler_memory/theories/structured.py:61`
-(basin-width measurement), `scripts/scm_ab_eval.py:301`,
-`scripts/scm_ab_eval.py:342`. CLI: `scripts/wheeler_recall.py` gains
+(basin-width measurement), `scripts/bench/scm_ab_eval.py:301`,
+`scripts/bench/scm_ab_eval.py:342`. CLI: `scripts/wheeler_recall.py` gains
 `--recognize` and `--learn` flags but defaults are unchanged.
 
 ### What stays in `storage.py`

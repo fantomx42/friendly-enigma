@@ -188,7 +188,7 @@ components together.
    64×64 grid. Distinct dynamics from the three-grid CA.
 3. **L3 — Native classifier.** `wheeler_memory/cortex_classifier.py`
    scores choices without external models. Trained via
-   `train_cortex_classifier.py`.
+   `scripts/tools/train_cortex_classifier.py`.
 
 Output is a `SCMResult` (`cortex_scm.py:228`) with classifications
 `SYNTHESIS / NOVEL / HALLUCINATION`, ten layer scores, and a net
@@ -233,7 +233,7 @@ controller from §3.6.
 
 Verdict: docstring-vs-canon namespace drift, not an implementation gap.
 All 7 inputs are computed and supplied by callers (`scripts/wheeler_mmlu.py:913`,
-`scripts/train_cortex_classifier.py:205`). The conventional fix is to
+`scripts/tools/train_cortex_classifier.py:205`). The conventional fix is to
 update the classifier and trainer docstrings to use the full field names
 rather than letter-pair labels that collide with canon. Tracked as a
 separate small commit; no architectural change required.
