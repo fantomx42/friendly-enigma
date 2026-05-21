@@ -36,10 +36,6 @@ package.json
 .chroma/
 .hebbian_data/
 
-# Autoresearch / overnight run artifacts
-overnight*.log
-overnight*.pid
-overnight_loop.py
+# Autoresearch / overnight run artifacts (defensive rules — files removed)
 run_autoresearch_loop.py
 run_benchmark.sh
-run_overnight.sh
