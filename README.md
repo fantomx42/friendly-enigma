@@ -307,7 +307,7 @@ scripts/                         CLI entry points + benchmarks
 
 notes/                           Research scratch — not part of pytest, not CLI
   exploration/                   9 research-notebook scripts (ex-scripts/exploration/)
-  experiments/                   6 per-theory exercises (ex-scripts/experiments/)
+  experiments/                   7 per-theory exercises (ex-scripts/experiments/)
   theories/                      Archived theory modules: lichtenberg.py,
                                  resonance.py, structured.py + their tests
 
@@ -315,7 +315,7 @@ tests/                           pytest suite (run `pytest --collect-only -q` fo
 results/                         Benchmark logs; BASELINES.md is the textual record
 docs/                            Technical documentation; INDEX.md is the entry point
 plans/                           Active research & implementation plans
-datasets/                        Training corpora (gitignored, ~4 GB)
+datasets/                        Training corpora (gitignored; multi-GB — run `du -sh datasets/` locally)
 ```
 
 Note the live/archived split for `theories/`:
