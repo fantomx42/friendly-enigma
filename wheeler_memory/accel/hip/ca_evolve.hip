@@ -45,12 +45,15 @@
 __global__ void ca_step_kernel(
     const float* __restrict__ grid_src,    /* [B x W x W] */
     float*       __restrict__ grid_dst,    /* [B x W x W] */
-    float*       __restrict__ delta_sums,  /* [B]         */
+    int*         __restrict__ n_active,    /* [B] cells with |delta| >= stability_threshold */
+    int*         __restrict__ n_alive,     /* [B] cells with |new_v|  >  alive_threshold    */
     const int*   __restrict__ status,      /* [B]         */
     int grid_w,
     int grid_cells,  /* grid_w * grid_w */
     float push_strength,
-    float slope_strength)
+    float slope_strength,
+    float stability_threshold,
+    float alive_threshold)
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -97,31 +100,48 @@ __global__ void ca_step_kernel(
     float new_v = fminf(fmaxf(v + delta, -1.0f), 1.0f);
     grid_dst[k] = new_v;
 
-    atomicAdd(&delta_sums[b], fabsf(new_v - v));
+    /* Count cells matching the CPU reference's convergence + alive predicates
+     * (dynamics.py:169-181). A single sum here lets the host check
+     * "≤1% active" (p99 equivalent) and "≥5% alive" without sorting. */
+    if (fabsf(new_v - v) >= stability_threshold) atomicAdd(&n_active[b], 1);
+    if (fabsf(new_v)     >  alive_threshold)     atomicAdd(&n_alive[b],  1);
 }
 
 
 /* ─── Kernel 2: Convergence check + zero accumulator ─────────────────────── */
 
 __global__ void convergence_check_kernel(
-    float*       __restrict__ delta_sums,     /* [B]  */
-    int*         __restrict__ status,         /* [B]  */
-    int*         __restrict__ ticks,          /* [B]  */
-    int*         __restrict__ stable_counts,  /* [B]  */
+    int*         __restrict__ n_active,       /* [B] */
+    int*         __restrict__ n_alive,        /* [B] */
+    int*         __restrict__ status,         /* [B] */
+    int*         __restrict__ ticks,          /* [B] */
+    int*         __restrict__ stable_counts,  /* [B] */
     int grid_cells,
     int current_iter,
-    float stability_threshold)
+    float min_alive_fraction)
 {
     int b = blockIdx.x * blockDim.x + threadIdx.x;
     /* Note: caller must ensure b < batch_size via grid launch config */
 
     if (status[b] != STATUS_RUNNING) {
-        delta_sums[b] = 0.0f;
+        n_active[b] = 0;
+        n_alive[b]  = 0;
         return;
     }
 
-    float mean_delta = delta_sums[b] / (float)grid_cells;
-    if (mean_delta < stability_threshold) {
+    /* Count-based convergence equivalent to CPU's `np.percentile(|delta|, 99) <
+     * threshold`: "at most 1% of cells have |delta| ≥ threshold" — the p99
+     * tail-ignoring criterion the bench was measured under. The previous
+     * mean-delta criterion was dragged out by a few stubborn boundary cells
+     * (see bench-gpu-vs-cpu-convergence-discrepancy memo).
+     *
+     * Plus the alive-fraction gate matching dynamics.py:177-179: reject
+     * convergence on 0-dominant attractors regardless of delta. Both gates
+     * must pass for stable_counts to advance. */
+    float active_fraction = (float)n_active[b] / (float)grid_cells;
+    float alive_fraction  = (float)n_alive[b]  / (float)grid_cells;
+
+    if (active_fraction <= 0.01f && alive_fraction >= min_alive_fraction) {
         stable_counts[b]++;
         if (stable_counts[b] >= 3) {  /* STABILITY_WINDOW */
             status[b] = STATUS_CONVERGED;
@@ -131,7 +151,9 @@ __global__ void convergence_check_kernel(
         stable_counts[b] = 0;
     }
 
-    delta_sums[b] = 0.0f;
+    /* Reset counters for the next tick */
+    n_active[b] = 0;
+    n_alive[b]  = 0;
 }
 
 
@@ -316,12 +338,12 @@ size_t ca_query_vram(int batch_size, int grid_w)
 
     size_t grid_bytes  = B * gc * sizeof(float);         /* one grid plane */
     size_t ring_bytes  = B * OSC_WINDOW * gc * sizeof(int8_t);
-    size_t delta_bytes = B * sizeof(float);
     size_t meta_bytes  = B * sizeof(int);
     size_t osc_bytes   = B * OSC_PERIODS * sizeof(int);
 
-    /* 2 grid planes (ping-pong) + ring + delta + status + ticks + osc + stable_counts */
-    return 2 * grid_bytes + ring_bytes + delta_bytes + 3 * meta_bytes + osc_bytes;
+    /* 2 grid planes (ping-pong) + ring + osc + 5 int[B] arrays:
+     *   status, ticks, stable_counts, n_active, n_alive */
+    return 2 * grid_bytes + ring_bytes + 5 * meta_bytes + osc_bytes;
 }
 
 
@@ -335,10 +357,18 @@ size_t ca_query_vram(int batch_size, int grid_w)
  * @param batch_size          Number of frames
  * @param grid_w              Grid width (64, 128, 256, 512, 1000, etc.)
  * @param max_iters           Max iterations before CHAOTIC
- * @param stability_threshold Convergence threshold for mean |delta|
+ * @param stability_threshold Per-cell |delta| threshold; cells at-or-above count as "active"
  * @param push_strength       CA push strength for local max/min cells (e.g. 0.35)
  * @param slope_strength      CA slope flow strength (e.g. 0.20)
+ * @param alive_threshold     |value| above which a cell counts as "alive" (e.g. 0.33)
+ * @param min_alive_fraction  Minimum alive fraction to allow CONVERGED (e.g. 0.05)
  * @return 0 on success, -1 on HIP error
+ *
+ * Convergence semantics (matches CPU reference dynamics.py:169-181):
+ *   CONVERGED ⇔ for STABILITY_WINDOW=3 consecutive ticks,
+ *               (active cells ≤ 1% of grid)   ∧
+ *               (alive  cells ≥ min_alive_fraction · grid)
+ * The 1% bound is the count-form of `np.percentile(|delta|, 99) < threshold`.
  */
 int ca_evolve_batch_v2(
     const float* frames_in,
@@ -350,7 +380,9 @@ int ca_evolve_batch_v2(
     int          max_iters,
     float        stability_threshold,
     float        push_strength,
-    float        slope_strength)
+    float        slope_strength,
+    float        alive_threshold,
+    float        min_alive_fraction)
 {
     if (batch_size <= 0 || grid_w <= 0) return 0;
 
@@ -360,19 +392,19 @@ int ca_evolve_batch_v2(
 
     size_t grid_bytes  = B * gc * sizeof(float);
     size_t ring_bytes  = B * OSC_WINDOW * gc * sizeof(int8_t);
-    size_t delta_bytes = B * sizeof(float);
     size_t meta_bytes  = B * sizeof(int);
     size_t osc_bytes   = B * OSC_PERIODS * sizeof(int);
 
-    float*  d_grid_A       = nullptr;  /* ping */
-    float*  d_grid_B       = nullptr;  /* pong */
-    int8_t* d_role_ring    = nullptr;
-    float*  d_delta        = nullptr;
-    int*    d_status       = nullptr;
-    int*    d_ticks        = nullptr;
-    int*    d_osc          = nullptr;
+    float*  d_grid_A        = nullptr;  /* ping */
+    float*  d_grid_B        = nullptr;  /* pong */
+    int8_t* d_role_ring     = nullptr;
+    int*    d_n_active      = nullptr;  /* per-batch count of cells with |delta| >= threshold */
+    int*    d_n_alive       = nullptr;  /* per-batch count of cells with |value| > alive_threshold */
+    int*    d_status        = nullptr;
+    int*    d_ticks         = nullptr;
+    int*    d_osc           = nullptr;
     int*    d_stable_counts = nullptr;  /* convergence stability window */
-    int     retval         = 0;
+    int     retval          = 0;
 
     /* Declare all variables before first goto-capable HIP_CHECK */
     dim3 block_2d(16, 16);   /* 256 threads per block */
@@ -387,22 +419,24 @@ int ca_evolve_batch_v2(
     int* h_init_ticks  = (int*)malloc(meta_bytes);
     bool all_done = false;
 
-    HIP_CHECK(hipMalloc(&d_grid_A,    grid_bytes));
-    HIP_CHECK(hipMalloc(&d_grid_B,    grid_bytes));
-    HIP_CHECK(hipMalloc(&d_role_ring, ring_bytes));
-    HIP_CHECK(hipMalloc(&d_delta,     delta_bytes));
-    HIP_CHECK(hipMalloc(&d_status,    meta_bytes));
-    HIP_CHECK(hipMalloc(&d_ticks,     meta_bytes));
-    HIP_CHECK(hipMalloc(&d_osc,       osc_bytes));
+    HIP_CHECK(hipMalloc(&d_grid_A,        grid_bytes));
+    HIP_CHECK(hipMalloc(&d_grid_B,        grid_bytes));
+    HIP_CHECK(hipMalloc(&d_role_ring,     ring_bytes));
+    HIP_CHECK(hipMalloc(&d_n_active,      meta_bytes));
+    HIP_CHECK(hipMalloc(&d_n_alive,       meta_bytes));
+    HIP_CHECK(hipMalloc(&d_status,        meta_bytes));
+    HIP_CHECK(hipMalloc(&d_ticks,         meta_bytes));
+    HIP_CHECK(hipMalloc(&d_osc,           osc_bytes));
     HIP_CHECK(hipMalloc(&d_stable_counts, meta_bytes));
 
     /* Copy input frames to grid A */
     HIP_CHECK(hipMemcpy(d_grid_A, frames_in, grid_bytes, hipMemcpyHostToDevice));
 
     /* Initialize buffers */
-    HIP_CHECK(hipMemset(d_role_ring, 0, ring_bytes));
-    HIP_CHECK(hipMemset(d_delta,     0, delta_bytes));
-    HIP_CHECK(hipMemset(d_osc,       0, osc_bytes));
+    HIP_CHECK(hipMemset(d_role_ring,     0, ring_bytes));
+    HIP_CHECK(hipMemset(d_n_active,      0, meta_bytes));
+    HIP_CHECK(hipMemset(d_n_alive,       0, meta_bytes));
+    HIP_CHECK(hipMemset(d_osc,           0, osc_bytes));
     HIP_CHECK(hipMemset(d_stable_counts, 0, meta_bytes));
 
     /* Set all status to RUNNING, ticks to max_iters (CHAOTIC default) */
@@ -422,17 +456,18 @@ int ca_evolve_batch_v2(
     /* ── Main iteration loop ───────────────────────────────────────────────── */
     for (int iter = 0; iter < max_iters && !all_done; iter++) {
 
-        /* Kernel 1: CA step */
+        /* Kernel 1: CA step (also tallies n_active and n_alive per batch) */
         hipLaunchKernelGGL(ca_step_kernel,
             grid_2d, block_2d, 0, 0,
-            src, dst, d_delta, d_status, grid_w, grid_cells,
-            push_strength, slope_strength);
+            src, dst, d_n_active, d_n_alive, d_status, grid_w, grid_cells,
+            push_strength, slope_strength,
+            stability_threshold, alive_threshold);
 
-        /* Kernel 2: Convergence check (requires STABILITY_WINDOW=3 ticks) */
+        /* Kernel 2: Convergence check (count-based; requires STABILITY_WINDOW=3 ticks) */
         hipLaunchKernelGGL(convergence_check_kernel,
             dim3(conv_blocks), dim3(conv_threads), 0, 0,
-            d_delta, d_status, d_ticks, d_stable_counts,
-            grid_cells, iter, stability_threshold);
+            d_n_active, d_n_alive, d_status, d_ticks, d_stable_counts,
+            grid_cells, iter, min_alive_fraction);
 
         /* Kernel 3: Role compute + ring write (from iter >= OSC_START) */
         if (iter >= OSC_START) {
@@ -495,13 +530,14 @@ cleanup:
     if (h_poll_status)  free(h_poll_status);
     if (h_init_status)  free(h_init_status);
     if (h_init_ticks)   free(h_init_ticks);
-    if (d_grid_A)    (void)hipFree(d_grid_A);
-    if (d_grid_B)    (void)hipFree(d_grid_B);
-    if (d_role_ring) (void)hipFree(d_role_ring);
-    if (d_delta)     (void)hipFree(d_delta);
-    if (d_status)    (void)hipFree(d_status);
-    if (d_ticks)     (void)hipFree(d_ticks);
-    if (d_osc)       (void)hipFree(d_osc);
+    if (d_grid_A)        (void)hipFree(d_grid_A);
+    if (d_grid_B)        (void)hipFree(d_grid_B);
+    if (d_role_ring)     (void)hipFree(d_role_ring);
+    if (d_n_active)      (void)hipFree(d_n_active);
+    if (d_n_alive)       (void)hipFree(d_n_alive);
+    if (d_status)        (void)hipFree(d_status);
+    if (d_ticks)         (void)hipFree(d_ticks);
+    if (d_osc)           (void)hipFree(d_osc);
     if (d_stable_counts) (void)hipFree(d_stable_counts);
 
     return retval;
@@ -520,12 +556,15 @@ int ca_evolve_single_v2(
     int          max_iters,
     float        stability_threshold,
     float        push_strength,
-    float        slope_strength)
+    float        slope_strength,
+    float        alive_threshold,
+    float        min_alive_fraction)
 {
     return ca_evolve_batch_v2(
         frame_in, frame_out, ticks_out, state_out,
         1, grid_w, max_iters, stability_threshold,
-        push_strength, slope_strength);
+        push_strength, slope_strength,
+        alive_threshold, min_alive_fraction);
 }
 
 }  /* extern "C" */

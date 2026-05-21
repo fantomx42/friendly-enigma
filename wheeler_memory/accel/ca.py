@@ -17,7 +17,12 @@ import os
 
 import numpy as np
 
-from ..constants import MAX_PUSH_STRENGTH, SLOPE_FLOW_STRENGTH
+from ..constants import (
+    ALIVE_THRESHOLD,
+    MAX_PUSH_STRENGTH,
+    MIN_ALIVE_FRACTION,
+    SLOPE_FLOW_STRENGTH,
+)
 from ._common import _float_ptr, _int_ptr, _try_load
 
 _lib = None
@@ -45,6 +50,8 @@ def _load_lib():
                 ctypes.c_float,  # stability_threshold
                 ctypes.c_float,  # push_strength
                 ctypes.c_float,  # slope_strength
+                ctypes.c_float,  # alive_threshold
+                ctypes.c_float,  # min_alive_fraction
             ]
             lib.ca_evolve_batch_v2.restype = ctypes.c_int
 
@@ -58,6 +65,8 @@ def _load_lib():
                 ctypes.c_float,  # stability_threshold
                 ctypes.c_float,  # push_strength
                 ctypes.c_float,  # slope_strength
+                ctypes.c_float,  # alive_threshold
+                ctypes.c_float,  # min_alive_fraction
             ]
             lib.ca_evolve_single_v2.restype = ctypes.c_int
 
@@ -130,6 +139,8 @@ def gpu_evolve_single(
     grid_w: int = 64,
     push_strength: float | None = None,
     slope_strength: float | None = None,
+    alive_threshold: float | None = None,
+    min_alive_fraction: float | None = None,
 ) -> dict:
     """Evolve a single frame on GPU.
 
@@ -156,6 +167,10 @@ def gpu_evolve_single(
 
     _push = push_strength if push_strength is not None else MAX_PUSH_STRENGTH
     _slope = slope_strength if slope_strength is not None else SLOPE_FLOW_STRENGTH
+    _alive = alive_threshold if alive_threshold is not None else ALIVE_THRESHOLD
+    _min_alive = (
+        min_alive_fraction if min_alive_fraction is not None else MIN_ALIVE_FRACTION
+    )
 
     if _lib_version == 2:
         ret = lib.ca_evolve_single_v2(
@@ -168,6 +183,8 @@ def gpu_evolve_single(
             ctypes.c_float(stability_threshold),
             ctypes.c_float(_push),
             ctypes.c_float(_slope),
+            ctypes.c_float(_alive),
+            ctypes.c_float(_min_alive),
         )
     else:
         ret = lib.ca_evolve_single(
@@ -197,6 +214,8 @@ def gpu_evolve_batch(
     grid_w: int = 64,
     push_strength: float | None = None,
     slope_strength: float | None = None,
+    alive_threshold: float | None = None,
+    min_alive_fraction: float | None = None,
 ) -> list[dict]:
     """Evolve a batch of frames on GPU in parallel.
 
@@ -223,6 +242,10 @@ def gpu_evolve_batch(
 
     _push = push_strength if push_strength is not None else MAX_PUSH_STRENGTH
     _slope = slope_strength if slope_strength is not None else SLOPE_FLOW_STRENGTH
+    _alive = alive_threshold if alive_threshold is not None else ALIVE_THRESHOLD
+    _min_alive = (
+        min_alive_fraction if min_alive_fraction is not None else MIN_ALIVE_FRACTION
+    )
 
     if _lib_version == 2:
         ret = lib.ca_evolve_batch_v2(
@@ -236,6 +259,8 @@ def gpu_evolve_batch(
             ctypes.c_float(stability_threshold),
             ctypes.c_float(_push),
             ctypes.c_float(_slope),
+            ctypes.c_float(_alive),
+            ctypes.c_float(_min_alive),
         )
     else:
         ret = lib.ca_evolve_batch(

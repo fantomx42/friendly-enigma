@@ -51,20 +51,24 @@ class TestClassifyOutput:
         assert result in ("SYNTHESIS", "NOVEL", "HALLUCINATION")
 
     def test_identical_text_threshold_sensitivity(self):
-        """Identical text → identical attractor → Pearson r ≈ 1.0 → SYNTHESIS at any threshold.
+        """Identical text → identical attractor → Pearson r within float32 noise of 1.0.
 
-        Note: float32 attractor precision makes the computed Pearson slightly
-        above 1.0 (~1 + 1.2e-7), so threshold=1.0 still qualifies as SYNTHESIS.
-        Use threshold > 1.0 to force NOVEL.
+        The attractors are bit-identical, but the manual Pearson formula in
+        classify_output lands within ~1e-6 of 1.0 — on either side, depending
+        on the float32 rounding of the specific attractor values. So the
+        exact threshold=1.0 boundary is brittle. Use threshold=0.999 to
+        capture "near-1.0 robustness" without depending on rounding
+        direction, and threshold>1.0 to force NOVEL via Pearson's natural
+        upper bound.
         """
         text = "newton's first law: an object in motion stays in motion"
         attractor = _make_attractor(text)
         # threshold=0 → any non-negative similarity qualifies as SYNTHESIS
         result_low = classify_output(text, [attractor], threshold=0.0)
         assert result_low == "SYNTHESIS"
-        # threshold=1.0 → identical text still qualifies (r ≈ 1.0 due to float32)
-        result_exact = classify_output(text, [attractor], threshold=1.0)
-        assert result_exact == "SYNTHESIS"
+        # threshold=0.999 → identical text passes; well inside float32 noise of 1.0
+        result_near = classify_output(text, [attractor], threshold=0.999)
+        assert result_near == "SYNTHESIS"
         # threshold above float range → forces NOVEL
         result_high = classify_output(text, [attractor], threshold=1.01)
         assert result_high == "NOVEL"
