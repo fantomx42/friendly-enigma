@@ -39,3 +39,11 @@ package.json
 # Autoresearch / overnight run artifacts (defensive rules — files removed)
 run_autoresearch_loop.py
 run_benchmark.sh
+
+# Benchmark output artifacts
+results/*.tsv
+results/*.jsonl
+results/*.json
+results/archive/*.log
+results/archive/*.jsonl
+artifacts/**/*.tsv
