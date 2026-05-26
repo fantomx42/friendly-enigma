@@ -527,12 +527,21 @@ will move when corpus does.
 
 Treat MMLU as a *corpus health* metric, not a *recall quality* metric.
 
-## 8.3 Wheeler-native eval `[SPECULATIVE]`
+## 8.3 Wheeler-native eval `[BUILT]`
 
 The right eval for an attractor-reconstruction memory is not a
-multiple-choice benchmark. It is something like: perturb a known
-attractor, measure settling time and final-state fidelity.
-Not yet specified or implemented.
+multiple-choice benchmark. It perturbs a known attractor and measures
+settling time and final-state fidelity.
+
+Implemented as `wheeler-recon-bench` (`scripts/bench_reconstruction.py`):
+the fixed `TEST_INPUTS` corpus is evolved to its attractors, each is hit
+with Gaussian noise across an ε sweep, re-evolved, and scored on Pearson
+fidelity to the original plus settling ticks. The fidelity-vs-ε curve
+yields a **basin capture radius** — the largest ε whose mean fidelity
+clears the recovery threshold. Baseline (commit pending): mean fidelity
+≈ 0.85, capture radius ≈ ε≤0.50. This is a pure architecture signal,
+independent of corpus coverage (contrast §8.2). Results log to
+`reconstruction.tsv`.
 
 ---
 
@@ -543,8 +552,9 @@ In priority order:
 1. ~~**FCAS address resolution** — wire the (hash, depth) tuple keys
    into the recall path.~~ `[DONE]` — `wheeler_memory/fcas.py`
    (`recognize_address` bridges recall to a (hash, depth) coordinate). (§6.3)
-2. **Wheeler-native eval design** — reconstruction-fidelity benchmark
-   to replace reliance on MMLU as architecture signal. (§8.3)
+2. ~~**Wheeler-native eval design** — reconstruction-fidelity benchmark
+   to replace reliance on MMLU as architecture signal.~~ `[DONE]` —
+   `wheeler-recon-bench` (`scripts/bench_reconstruction.py`). (§8.3)
 3. **Corpus population strategy** — what gets ingested, how it gets
    ternarized, how to budget across the grid. Affects MMLU directly.
 4. **Cross-cube interference semantics** — what does it mean for a
