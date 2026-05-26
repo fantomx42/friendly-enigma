@@ -448,10 +448,13 @@ Section number kept stable to preserve cross-references.
 
 ---
 
-# 6. Address layer — FCAS `[DESIGNED]`
+# 6. Address layer — FCAS `[PARTIAL]`
 
-Fractal Cube Address Space. Primitives present in the codebase, the
-address layer itself not yet built.
+Fractal Cube Address Space. The core address layer is built in
+`wheeler_memory/fcas.py` (portal/cube primitives, deterministic address
+traversal + resolution, and a `recognize_address` bridge into the recall
+path). Cross-cube interference remains speculative; the 3D fractal-cube
+explorer is unbuilt.
 
 ## 6.1 Key structure
 
@@ -475,8 +478,8 @@ which is also a new origin.
 
 - Hash primitives: `[BUILT]`
 - Attractor identification: `[PARTIAL]`
-- Address resolution: `[DESIGNED]`
-- Fractal nesting: `[DESIGNED]`
+- Address resolution: `[BUILT]` — `fcas.resolve` / `fcas.recognize_address`
+- Fractal nesting: `[BUILT]` — `fcas.portal_hash` / `expand_cube` / `traverse`
 - Cross-cube interference: `[SPECULATIVE]`
 
 ---
@@ -537,15 +540,16 @@ Not yet specified or implemented.
 
 In priority order:
 
-1. **FCAS address resolution** — wire the (hash, depth) tuple keys
-   into the recall path. (§6.3)
+1. ~~**FCAS address resolution** — wire the (hash, depth) tuple keys
+   into the recall path.~~ `[DONE]` — `wheeler_memory/fcas.py`
+   (`recognize_address` bridges recall to a (hash, depth) coordinate). (§6.3)
 2. **Wheeler-native eval design** — reconstruction-fidelity benchmark
    to replace reliance on MMLU as architecture signal. (§8.3)
 3. **Corpus population strategy** — what gets ingested, how it gets
    ternarized, how to budget across the grid. Affects MMLU directly.
 4. **Cross-cube interference semantics** — what does it mean for a
-   nested cube³:0 to interfere with its parent? Speculative until
-   FCAS resolution is done.
+   nested cube³:0 to interfere with its parent? Now unblocked — FCAS
+   resolution is done (§6.3) — but still speculative in design.
 
 ---
 

@@ -124,6 +124,18 @@ from .recall_api import (
 )
 from .recall_api import reconstruct as reconstruct_from_seed
 
+# FCAS — Fractal Cube Address Space (core address layer)
+from .fcas import (
+    Address,
+    address_of,
+    evolve_cube,
+    expand_cube,
+    portal_hash,
+    recognize_address,
+    resolve,
+    traverse,
+)
+
 # LLM agent (optional — requires Ollama running locally)
 from .agent import WheelerAgent
 
@@ -209,6 +221,15 @@ __all__ = [
     "recognize_top_k",
     "reconstruct_from_seed",
     "set_learning_enabled",
+    # FCAS address layer
+    "Address",
+    "address_of",
+    "evolve_cube",
+    "expand_cube",
+    "portal_hash",
+    "recognize_address",
+    "resolve",
+    "traverse",
     # Attention model
     "AttentionBudget",
     "compute_attention_budget",
