@@ -527,6 +527,17 @@ will move when corpus does.
 
 Treat MMLU as a *corpus health* metric, not a *recall quality* metric.
 
+**Confirmed empirically (2026-05-26).** Populating the `science` chunk
+with ~1500 embedding-encoded, ternary-snapped science facts moved
+MMLU science from 24% to 32% (n=120, chance 25%) with no architecture
+change — and took Wheeler-native closed-set recall@1 from 0% to 97%.
+"MMLU moves when corpus does" is now measured, not asserted. See
+[docs/corpus-population-strategy.md](docs/corpus-population-strategy.md)
+and `scripts/bench/corpus_population_proof.py`. Caveat: the payoff
+requires encoder consistency between corpus and query — the stock
+`wheeler-mmlu` semantic path is hash-encoded and cannot yet consume an
+embedding-populated corpus (open follow-up).
+
 ## 8.3 Wheeler-native eval `[BUILT]`
 
 The right eval for an attractor-reconstruction memory is not a
@@ -555,8 +566,11 @@ In priority order:
 2. ~~**Wheeler-native eval design** — reconstruction-fidelity benchmark
    to replace reliance on MMLU as architecture signal.~~ `[DONE]` —
    `wheeler-recon-bench` (`scripts/bench_reconstruction.py`). (§8.3)
-3. **Corpus population strategy** — what gets ingested, how it gets
-   ternarized, how to budget across the grid. Affects MMLU directly.
+3. ~~**Corpus population strategy** — what gets ingested, how it gets
+   ternarized, how to budget across the grid.~~ `[DONE]` — strategy in
+   [docs/corpus-population-strategy.md](docs/corpus-population-strategy.md),
+   validated (§8.2). Follow-up: add an `embedding` encoder to
+   `wheeler-mmlu` so it can score against an embedding-populated corpus.
 4. **Cross-cube interference semantics** — what does it mean for a
    nested cube³:0 to interfere with its parent? Now unblocked — FCAS
    resolution is done (§6.3) — but still speculative in design.
