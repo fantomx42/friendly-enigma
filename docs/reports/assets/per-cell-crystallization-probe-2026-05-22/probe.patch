@@ -1,0 +1,176 @@
+diff --git a/wheeler_memory/constants.py b/wheeler_memory/constants.py
+index 467f3423..5cec8a63 100644
+--- a/wheeler_memory/constants.py
++++ b/wheeler_memory/constants.py
+@@ -191,3 +191,15 @@ RECOGNITION_THRESHOLD = 0.45      # min Pearson(query_frame, stored_attractor) f
+ T_INIT_DEFAULT = 0.0              # initial Temporal Stability for new/legacy basins; basins earn stability through recall
+ T_EMA_RATE = 0.1                  # EMA mixing rate (new-info weight) for T updates: T_new = (1-r)*T_old + r*observed
+ BASIN_DRIFT_BASE_RATE = 0.02      # base drift rate; effective rate = (1-T) * this
++
++# ---------------------------------------------------------------------------
++# Experimental: per-cell crystallization probe (off by default)
++# Tests excitable-media-style dynamics: cells individually harden when settled,
++# erode otherwise, and soft-freeze further updates. See scripts/probe_crystallization.py.
++# ---------------------------------------------------------------------------
++CA_CELL_HARDENING_ENABLED = False  # master flag; False = byte-identical to baseline
++CA_HARDEN_RATE = 0.05              # hardness gain per tick on cells with |delta| < SETTLE_EPSILON
++CA_EROSION_RATE = 0.02             # multiplicative decay per tick on non-settled cells
++CA_SETTLE_EPSILON = 1e-3           # |delta_ij| threshold for "settled this tick"
++CA_FROZEN_THRESHOLD = 0.9          # hardness threshold for the frozen mask (measurement only)
++CA_FREEZE_FRACTION_STOP = 0.80     # early-exit when this fraction of cells exceeds CA_FROZEN_THRESHOLD
+diff --git a/wheeler_memory/dynamics.py b/wheeler_memory/dynamics.py
+index 94abd666..f95ffb0a 100644
+--- a/wheeler_memory/dynamics.py
++++ b/wheeler_memory/dynamics.py
+@@ -8,6 +8,7 @@ import logging
+ 
+ import numpy as np
+ 
++from . import constants as _constants
+ from .constants import (
+     ALIVE_THRESHOLD,
+     CONVERGENCE_PERCENTILE,
+@@ -18,6 +19,8 @@ from .constants import (
+     SLOPE_FLOW_STRENGTH,
+     STABILITY_WINDOW,
+ )
++# Experimental probe constants are read via _constants.* at call time so the
++# probe script can mutate them between runs (see scripts/probe_crystallization.py).
+ from .oscillation import detect_oscillation
+ 
+ 
+@@ -128,6 +131,19 @@ def _enrich_metadata(result: dict) -> None:
+     result["metadata"] = md
+ 
+ 
++def _attach_probe_state(result: dict, hardness: np.ndarray | None) -> dict:
++    """Attach per-cell crystallization probe diagnostics to a result dict.
++
++    No-op when hardness is None (flag-off path stays byte-identical).
++    """
++    if hardness is None:
++        return result
++    result["_probe_hardness"] = hardness
++    result["metadata"]["frozen_fraction"] = float(np.mean(hardness > _constants.CA_FROZEN_THRESHOLD))
++    result["metadata"]["mean_hardness"] = float(hardness.mean())
++    return result
++
++
+ def evolve_and_interpret(
+     frame: np.ndarray,
+     max_iters: int = SALIENCE_MAX_ITERS_MED,
+@@ -142,7 +158,9 @@ def evolve_and_interpret(
+       - history: list of all frame copies (for brick construction)
+       - metadata: additional info (cycle_period, etc.)
+     """
+-    if gpu_available() and _gpu_evolve is not None:
++    use_hardening = _constants.CA_CELL_HARDENING_ENABLED
++    # GPU kernel is unaware of per-cell hardness; force CPU when the probe is on.
++    if not use_hardening and gpu_available() and _gpu_evolve is not None:
+         try:
+             result = _gpu_evolve(
+                 frame,
+@@ -161,10 +179,27 @@ def evolve_and_interpret(
+     history = [frame.copy()]
+     stable_count = 0
+     delta = 0.0
++    hardness = np.zeros_like(frame) if use_hardening else None
++    freeze_stable_count = 0
++    frozen_fraction = 0.0
+ 
+     for i in range(max_iters):
+         frame_old = frame
+-        frame = apply_ca_dynamics(frame)
++        frame_new = apply_ca_dynamics(frame_old)
++        if use_hardening:
++            # raw_delta is post-clip (apply_ca_dynamics ends with np.clip),
++            # so scaling it preserves the [-1, 1] substrate invariant.
++            raw_delta = frame_new - frame_old
++            frame = frame_old + raw_delta * (1.0 - hardness)
++            settled = np.abs(raw_delta) < _constants.CA_SETTLE_EPSILON
++            hardness = np.where(
++                settled,
++                hardness + _constants.CA_HARDEN_RATE,
++                hardness * (1.0 - _constants.CA_EROSION_RATE),
++            )
++            np.clip(hardness, 0.0, 1.0, out=hardness)
++        else:
++            frame = frame_new
+         abs_deltas = np.abs(frame - frame_old)
+         delta = float(np.percentile(abs_deltas, CONVERGENCE_PERCENTILE))
+ 
+@@ -183,7 +218,7 @@ def evolve_and_interpret(
+                     ticks = i + 1
+                     feats = compute_attractor_features(frame)
+                     spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
+-                    return {
++                    return _attach_probe_state({
+                         "state": "CONVERGED",
+                         "attractor": frame,
+                         "convergence_ticks": ticks,
+@@ -193,16 +228,39 @@ def evolve_and_interpret(
+                             "convergence_speed": spd,
+                             "final_delta": round(delta, 6),
+                         },
+-                    }
++                    }, hardness)
+         else:
+             stable_count = 0
+ 
++        if use_hardening:
++            frozen_fraction = float(np.mean(hardness > _constants.CA_FROZEN_THRESHOLD))
++            if frozen_fraction >= _constants.CA_FREEZE_FRACTION_STOP:
++                freeze_stable_count += 1
++                if freeze_stable_count >= STABILITY_WINDOW:
++                    ticks = i + 1
++                    feats = compute_attractor_features(frame)
++                    spd = "F" if ticks <= 50 else ("M" if ticks <= 150 else "S")
++                    return _attach_probe_state({
++                        "state": "CONVERGED",
++                        "attractor": frame,
++                        "convergence_ticks": ticks,
++                        "history": history,
++                        "metadata": {
++                            **feats,
++                            "convergence_speed": spd,
++                            "final_delta": round(delta, 6),
++                            "exit_reason": "freeze_fraction",
++                        },
++                    }, hardness)
++            else:
++                freeze_stable_count = 0
++
+         if i > 50 and i % 10 == 0:
+             osc_result = detect_oscillation(history)
+             if osc_result["oscillating"]:
+                 ticks = i + 1
+                 feats = compute_attractor_features(frame)
+-                return {
++                return _attach_probe_state({
+                     "state": "OSCILLATING",
+                     "attractor": frame,
+                     "convergence_ticks": ticks,
+@@ -215,12 +273,12 @@ def evolve_and_interpret(
+                         "convergence_speed": "?",
+                         "final_delta": round(delta, 6),
+                     },
+-                }
++                }, hardness)
+ 
+     feats = compute_attractor_features(frame)
+     final_alive = feats.get("alive_fraction", 1.0)
+     final_state = "DEGENERATE" if final_alive < MIN_ALIVE_FRACTION else "CHAOTIC"
+-    return {
++    return _attach_probe_state({
+         "state": final_state,
+         "attractor": frame,
+         "convergence_ticks": max_iters,
+@@ -230,7 +288,7 @@ def evolve_and_interpret(
+             "convergence_speed": "?",
+             "final_delta": round(delta, 6),
+         },
+-    }
++    }, hardness)
+ 
+ 
+ def evolve_batch(
