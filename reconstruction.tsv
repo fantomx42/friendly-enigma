@@ -1,0 +1,2 @@
+iteration	timestamp	score	mean_fidelity	capture_radius	mean_ticks	recovery_rate	elapsed_s	notes
+1	2026-05-26T17:39:58.600951+00:00	0.109643	0.850224	0.5	16.0	0.55	0.45	[env: np=2.4.4 py=3.14.5]
