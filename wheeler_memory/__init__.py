@@ -128,6 +128,7 @@ from .recall_api import reconstruct as reconstruct_from_seed
 from .fcas import (
     Address,
     address_of,
+    cross_cube_interference,
     evolve_cube,
     expand_cube,
     portal_hash,
@@ -224,6 +225,7 @@ __all__ = [
     # FCAS address layer
     "Address",
     "address_of",
+    "cross_cube_interference",
     "evolve_cube",
     "expand_cube",
     "portal_hash",

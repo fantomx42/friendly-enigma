@@ -184,7 +184,7 @@ All 57 subjects, 14,042 questions (test split):
 
 Encoder: blended (hippocampus 0.7 + language wheeler 0.3). The L3 classifier is trained with numpy SGD (~11K params); loss barely moves from chance — needs more training data or richer features. Full logs in `results/`; recorded baselines in `results/BASELINES.md`. The previous MiniLM semantic baseline (27.5%) used an external pretrained model and is no longer the default encoder.
 
-The right eval for an attractor-reconstruction memory is not a multiple-choice benchmark. Wheeler-native eval design — perturb a known attractor, measure settling time and final-state fidelity — is `[SPECULATIVE]` (canon §8.3).
+The right eval for an attractor-reconstruction memory is not a multiple-choice benchmark. Wheeler-native eval — perturb a known attractor, measure settling time and final-state fidelity — is `[BUILT]` as `wheeler-recon-bench` (canon §8.3). Baseline: mean fidelity ≈ 0.85, basin capture radius ≈ ε≤0.50.
 
 ### SimLex-999 `[ACTIVELY TRACKED]`
 
@@ -242,6 +242,7 @@ All 16 commands registered in `pyproject.toml [project.scripts]`. Common flags: 
 | `wheeler-scrub --text "text"` | Brick inspector — visualise how a memory formed |
 | `wheeler-info` | System info (hardware, GPU, paths) |
 | `wheeler-bench` | CA quality benchmark (lower is better) |
+| `wheeler-recon-bench` | Reconstruction-fidelity benchmark — basin capture radius (canon §8.3) |
 | `wheeler-bench-gpu` | CPU vs GPU evolution-speed benchmark |
 | `wheeler-generate` | Generative engine (IT-from-BIT mode) |
 | `wheeler-scm` | Inspect SCM trust topology |
@@ -329,18 +330,20 @@ The `wheeler-ui` CLI was retired in v0.3.6 (orphaned since March 2026); static d
 
 ## Open work
 
-In priority order (canon §9):
+The four canon §9 work items are all closed:
 
-1. **FCAS address resolution** `[DESIGNED]` — wire `(hash, depth)` tuple keys into the recall path. See FCAS section below.
-2. **Wheeler-native eval design** `[SPECULATIVE]` — reconstruction-fidelity benchmark to replace reliance on MMLU as architecture signal (perturb a known attractor, measure settling time and final-state fidelity).
-3. **Corpus population strategy** `[OPEN]` — what gets ingested, how it gets ternarized, how to budget across the grid. Affects MMLU directly.
-4. **Cross-cube interference semantics** `[SPECULATIVE]` — what does it mean for a nested cube³:0 to interfere with its parent? Speculative until FCAS resolution is done.
+1. **FCAS address resolution** `[DONE]` — `(hash, depth)` tuples wired into the recall path via `fcas.recognize_address` (canon §6).
+2. **Wheeler-native eval** `[DONE]` — reconstruction-fidelity benchmark `wheeler-recon-bench` (canon §8.3).
+3. **Corpus population strategy** `[DONE]` — strategy + proof in [docs/corpus-population-strategy.md](docs/corpus-population-strategy.md); populating the science corpus moved MMLU science 24%→32% and recall@1 0%→97% (canon §8.2).
+4. **Cross-cube interference semantics** `[DONE]` — resolved as an *orthogonal decomposition*: the portal hash decorrelates a nested cube³:0 from its parent, so they cannot interfere (canon §6.4).
+
+Remaining non-blocking follow-ups: an `embedding` encoder for `wheeler-mmlu` (so it can score against an embedding-populated corpus), and the unbuilt 3D fractal-cube explorer.
 
 ---
 
 ## FCAS — Fractal Cube Address Space
 
-`[DESIGNED]`. Hash primitives `[BUILT]`; address resolution and fractal nesting not yet wired.
+`[PARTIAL]`. Core address layer is built in `wheeler_memory/fcas.py` (portal/cube primitives, deterministic traversal + resolution, `recognize_address` recall bridge, and cross-cube interference semantics). Only attractor identification remains partial.
 
 Addresses are tuples `(hash, depth)`. The SHA256 of a terminal attractor serves *simultaneously* as:
 
@@ -356,9 +359,9 @@ Build status (canon §6.3):
 |---|---|
 | Hash primitives | `[BUILT]` |
 | Attractor identification | `[PARTIAL]` |
-| Address resolution | `[DESIGNED]` |
-| Fractal nesting | `[DESIGNED]` |
-| Cross-cube interference | `[SPECULATIVE]` |
+| Address resolution | `[BUILT]` |
+| Fractal nesting | `[BUILT]` |
+| Cross-cube interference | `[BUILT]` — orthogonal decomposition (§6.4) |
 
 ---
 
