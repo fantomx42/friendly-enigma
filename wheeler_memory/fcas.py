@@ -34,6 +34,10 @@ from .hashing import hash_to_frame
 
 NUM_FACES = 6  # 3 axes × 2 directions — falls out of the ternary geometry.
 
+# Depth-axis interference reuses the three-grid taxonomy with no SCM gate, so
+# only this open-SCM subset of states can fire (CONTESTED needs a closed SCM).
+_DEPTH_SCM = None  # lazily filled with a zero 64×64 grid on first use.
+
 
 # --- Portal primitives ----------------------------------------------------
 
@@ -189,3 +193,72 @@ def recognize_address(query: str, **recognize_kwargs):
     )
     stored = np.load(attractor_path)
     return seed, address_of(stored)
+
+
+# --- Cross-cube interference (CANON §6.4) ---------------------------------
+
+
+def cross_cube_interference(parent: np.ndarray) -> dict:
+    """Interference between a parent attractor and its 6 nested cube³:0 children.
+
+    This is the *depth-axis* counterpart to the three-grid interference of
+    §4. Each child is a fresh cube³:0 spawned through the portal
+    (``evolve_cube(portal_hash(parent))``). We reuse the three-grid taxonomy
+    by mapping the parent onto the corpus channel, the child onto the
+    experiential channel, and a fully-open (zero) SCM — there is no trust gate
+    along depth, so the closed-SCM CONTESTED state never fires.
+
+    Because ``expand_cube`` seeds children via ``sha256(portal_hash + face)``,
+    children are decorrelated from the parent by construction. The returned
+    ``depth_coherence`` (mean ``|Pearson(parent, child)|`` over faces) therefore
+    sits near zero: nested cubes are an *orthogonal decomposition*, not an
+    interfering one. See CANON §6.4.
+
+    Returns
+    -------
+    dict with ``depth_coherence`` (float), aggregate state fractions averaged
+    over the 6 faces, and ``per_face`` mapping face index → per-child readout.
+    """
+    from . import interference
+
+    global _DEPTH_SCM
+    if _DEPTH_SCM is None:
+        _DEPTH_SCM = np.zeros((64, 64), dtype=np.float32)
+
+    parent = np.ascontiguousarray(parent, dtype=np.float32)
+    parent_flat = parent.flatten()
+    ones = np.ones_like(parent_flat)
+
+    children = evolve_cube(portal_hash(parent))
+    per_face: dict[int, dict] = {}
+    coherences: list[float] = []
+    for face, child_result in children.items():
+        child = child_result["attractor"].astype(np.float32)
+        res = interference.compute_interference(parent, child, _DEPTH_SCM)
+        corr = abs(
+            interference._weighted_pearson(parent_flat, child.flatten(), ones)
+        )
+        coherences.append(corr)
+        per_face[face] = {
+            "dominant_state": res.dominant_state,
+            "grounded_fraction": res.grounded_fraction,
+            "absorbed_fraction": res.absorbed_fraction,
+            "unconsolidated_fraction": res.unconsolidated_fraction,
+            "contested_fraction": res.contested_fraction,
+            "signal_strength": res.signal_strength,
+            "correlation": corr,
+        }
+
+    n = len(per_face)
+    return {
+        "depth_coherence": float(np.mean(coherences)),
+        "grounded_fraction": float(np.mean([f["grounded_fraction"] for f in per_face.values()])),
+        "absorbed_fraction": float(np.mean([f["absorbed_fraction"] for f in per_face.values()])),
+        "unconsolidated_fraction": float(
+            np.mean([f["unconsolidated_fraction"] for f in per_face.values()])
+        ),
+        "contested_fraction": float(np.mean([f["contested_fraction"] for f in per_face.values()])),
+        "mean_signal_strength": float(np.mean([f["signal_strength"] for f in per_face.values()])),
+        "n_faces": n,
+        "per_face": per_face,
+    }
