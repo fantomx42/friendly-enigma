@@ -1,0 +1,2 @@
+iteration	timestamp	wheeler_capture	hopfield_capture	wheeler_fidelity	hopfield_fidelity	wheeler_recovery	hopfield_recovery	wheeler_spurious	hopfield_spurious	verdict	elapsed_s	notes
+1	2026-05-29T13:17:25.200873+00:00	0.5000	1.0000	0.8502	1.0000	0.5500	1.0000	0.6000	0.0000	FAIL	2.39	centered Hebbian; pre-registered alpha=0.0049 load [env: np=2.4.6 py=3.11.15]

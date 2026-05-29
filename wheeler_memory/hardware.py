@@ -159,7 +159,7 @@ def check_software_hardware_mismatch() -> list[str]:
 
 def get_system_summary() -> dict:
     """Aggregates all system information."""
-    return {
+    summary = {
         "os": platform.system(),
         "release": platform.release(),
         "cpu": get_cpu_info(),
@@ -169,3 +169,10 @@ def get_system_summary() -> dict:
         "optimal_device": get_optimal_device(),
         "warnings": check_software_hardware_mismatch(),
     }
+    try:
+        from wheeler_memory.accel import accel_info
+
+        summary["accel"] = accel_info()
+    except Exception:
+        summary["accel"] = {"gpu": False, "gpu_version": None}
+    return summary
