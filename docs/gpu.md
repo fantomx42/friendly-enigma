@@ -92,16 +92,28 @@ wheeler-info
 ```
 
 ```
-OS:      Linux 6.19.0-rc6-1-cachyos-rc-lto
-CPU:     x86_64 — 16 physical / 32 logical cores @ 5200 MHz
-RAM:     64.00 GB total, 48.23 GB available
-Storage: / — 931.51 GB total, 212.44 GB used (22.8%)
-GPU/NPU: [00:03.0 VGA compatible controller: AMD/ATI Radeon RX 9070 XT]
-Device:  cpu
-Warnings:
-  Discrete GPU detected but PyTorch is using CPU.
+{ ...full system JSON... }
+
+[ Wheeler Memory Auto-Config ]
+Embedding device (PyTorch): CPU
+CA kernel (HIP):            GPU
+
+[ Warnings ]
+- Discrete GPU detected but PyTorch is using CPU.
   Verify CUDA/ROCm installation matches your hardware.
 ```
+
+The two "device" lines describe different things:
+`Embedding device (PyTorch)` is what `sentence-transformers` uses for
+embeddings; `CA kernel (HIP)` is what the CA evolution engine dispatches
+through. They can disagree — e.g. a working HIP build with a PyTorch wheel
+that lacks ROCm support shows `CPU / GPU`, which is the most common state
+on AMD hosts.
+
+For scripting, use `wheeler-info --json` — that mode emits only the JSON
+object (no footer, no ANSI), so consumers can pipe it through `jq` or
+`json.load` without trimming a trailing colorized footer. `wheeler-info`
+also honours `NO_COLOR=` and suppresses ANSI when stdout is not a TTY.
 
 ---
 
@@ -141,9 +153,10 @@ detects a gap between the hardware and what PyTorch is using:
 1. Confirm ROCm is installed: `rocminfo` should list your GPU.
 2. Confirm `hipcc` is on `$PATH`: `hipcc --version`.
 3. Build the kernel: `cd wheeler_memory/accel/hip && make all`.
-4. Verify: `wheeler-info` — `Device` should still show `cpu` (the HIP kernel
-   is separate from PyTorch's device selection) but `gpu_available()` in Python
-   will return `True` after the build.
+4. Verify: `wheeler-info` — the `Embedding device (PyTorch)` line can stay
+   `CPU` (the HIP kernel is separate from PyTorch's device selection); the
+   `CA kernel (HIP)` line should now read `GPU`, and `accel.gpu` in the JSON
+   output (`wheeler-info --json | jq .accel.gpu`) should be `true`.
 
 **NVIDIA GPU showing as CPU:**
 1. Confirm the driver: `nvidia-smi`.

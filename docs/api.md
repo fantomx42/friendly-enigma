@@ -633,8 +633,9 @@ understanding which accelerator will be used.
 | `memory` | `dict` | `total_gb`, `available_gb`, `used_gb`, `percent_used` |
 | `storage` | `dict` | `total_gb`, `used_gb`, `free_gb`, `percent_used` for `/` |
 | `gpu_npu` | `dict` | `nvidia_gpu` list or string, `pci_devices` list from `lspci` |
-| `optimal_device` | `str` | `"cuda"`, `"mps"`, or `"cpu"` |
+| `optimal_device` | `str` | `"cuda"`, `"mps"`, or `"cpu"` — PyTorch / embedding device |
 | `warnings` | `list[str]` | Mismatch warnings (e.g. GPU found but PyTorch using CPU) |
+| `accel` | `dict` | `gpu` (bool), `gpu_version` (int|None) — CA-kernel availability, independent of `optimal_device` |
 
 **Example**
 
@@ -642,7 +643,8 @@ understanding which accelerator will be used.
 from wheeler_memory.hardware import get_system_summary
 
 info = get_system_summary()
-print(info["optimal_device"])       # cpu / cuda / mps
+print(info["optimal_device"])       # cpu / cuda / mps — embedding device
+print(info["accel"]["gpu"])         # True if CA kernel (HIP) is available
 for w in info["warnings"]:
     print("WARNING:", w)
 ```
