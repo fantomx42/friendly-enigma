@@ -1,0 +1,5 @@
+iteration	timestamp	n	seed	dataset	floor_top1	floor_top5	floor_mrr	ca_top1	ca_top5	ca_mrr	recon_top1	recon_top5	recon_mrr	delta_top1	delta_top5	delta_mrr	floor_mean_s	ca_mean_s	recon_mean_s	commit	changed	notes
+1	2026-05-28T23:13:51.802763+00:00	50	42	sciq	0.92	0.94	0.9348	0.92	0.96	0.9341	0.92	0.96	0.9341	0.0	0.02	-0.0007	0.0278	0.2526	0.5003	fbe9f6c5		[env: gpu=True np=2.4.4 py=3.14.5 accel=95ccd542]
+2	2026-05-28T23:17:07.376448+00:00	50	1	sciq	0.98	1.0	0.99	0.98	1.0	0.99	0.98	1.0	0.99	0.0	0.0	0.0	0.0092	0.2505	0.4931	fbe9f6c5		[env: gpu=True np=2.4.4 py=3.14.5 accel=95ccd542]
+3	2026-05-28T23:17:58.512254+00:00	50	2	sciq	0.96	0.98	0.9725	0.94	0.98	0.9589	0.94	0.98	0.9589	-0.02	0.0	-0.0136	0.0105	0.2403	0.4739	fbe9f6c5		[env: gpu=True np=2.4.4 py=3.14.5 accel=95ccd542]
+4	2026-05-28T23:18:44.548241+00:00	50	3	sciq	1.0	1.0	1.0	1.0	1.0	1.0	1.0	1.0	1.0	0.0	0.0	0.0	0.011	0.2296	0.4693	fbe9f6c5		[env: gpu=True np=2.4.4 py=3.14.5 accel=95ccd542]

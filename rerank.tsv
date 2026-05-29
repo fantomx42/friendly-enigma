@@ -1,0 +1,2 @@
+iteration	timestamp	n_queries	top_k_candidates	n_unique_passages	floor_mrr10	ca_mrr10	delta_mrr10	floor_ndcg10	ca_ndcg10	delta_ndcg10	floor_recall100	ca_recall100	delta_recall100	floor_mean_s	ca_mean_s	populate_s	commit	changed	notes
+1	2026-05-29T03:22:53.018965+00:00	43	100	4129	0.787	0.7739	-0.0131	0.3551	0.3412	-0.0139	0.1101	0.1101	0.0	0.0134	16.1726	41.06	fbe9f6c5		first canonical [env: gpu=True np=2.4.4 py=3.14.5 accel=95ccd542]
