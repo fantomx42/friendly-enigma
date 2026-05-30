@@ -71,13 +71,24 @@ Quality score formula: `0.6*avg_corr + 0.2*(1-conv_ratio) + 0.1*(ticks/1000) + 0
 
 | Group | Files | Role |
 |-------|-------|------|
-| Encoding | `hashing.py`, `hippocampus.py`, `embedding.py`, `word_encoder.py` | Text → 64×64 frame |
+| Encoding | `hashing.py`, `hippocampus.py`, `embedding.py`, `word_encoder.py`, `language_wheeler.py` | Text → 64×64 frame (hashing is SHA-256 deterministic; language_wheeler is POS/grammatical) |
 | CA Engine | `dynamics.py`, `oscillation.py`, `rotation.py` | Frame → attractor evolution |
-| Storage | `storage.py`, `chunking.py`, `brick.py`, `cache.py` | Attractor persistence + retrieval |
-| Lifecycle | `temperature.py`, `warming.py`, `consolidation.py`, `eviction.py`, `attention.py` | Memory freshness, spreading activation, sleep, capacity |
+| Storage | `storage.py`, `chunking.py`, `brick.py`, `cache.py`, `trajectory.py`, `trajectory_cache.py`, `similarity.py`, `polarity.py` | Attractor persistence + retrieval; trajectory fingerprints; pearson/spatial/hybrid similarity; dual-polarity antipodal pairs |
+| Lifecycle | `temperature.py`, `warming.py`, `consolidation.py`, `eviction.py`, `attention.py` | Memory freshness, spreading activation, sleep, capacity, salience budget |
+| Three-grid interference | `interference.py`, `scm_grid.py`, `experiential.py`, `reconstruction.py` | `Answer = Corpus·Experiential·(1−\|SCM\|)`; persistent trust topology; episodic grid; context-blended reconstructive recall |
+| Recall API | `recall_api.py`, `recall_learning.py`, `t_metadata.py` | Two-tier recognize/reconstruct from `BasinSeed`; substrate side-effects (T-clock EMA, basin drift); per-basin Temporal Stability T |
+| FCAS address layer | `fcas.py` | Fractal Cube Address Space (CANON §6) — composes hashing/dynamics/recall_api without touching sacred files |
 | Cortex | `cortex.py`, `cortex_scm.py`, `cortex_classifier.py` | L1 graph → L2 settlement CA → L3 classifier |
-| Agents | `agent.py`, `decoder.py`, `generation.py` | LLM wrapper, Language Wheeler, IT-from-BIT engine |
-| Config | `constants.py` | All tunable parameters (centralized) |
+| Agents / generation | `agent.py`, `decoder.py`, `generation.py`, `crystallization.py` | Ollama tool loop; Wheeler-primary (small model as codec); IT-from-BIT trajectory resonance; offline corpus pre-training |
+| Support | `constants.py`, `hardware.py`, `diagnostics.py` | Centralized tunables; device detection; read-only per-tick 5W1H decomposition |
+
+### Subpackages (`wheeler_memory/`)
+
+| Package | Role |
+|---------|------|
+| `accel/` | GPU/HIP (ROCm) acceleration — batch-dispatch only, lazy `.so` load, falls back to CPU |
+| `theories/` | Production topology helpers: `basin.py`, `metrics.py`, `synthesis.py` |
+| `npu/` | Stub only (`coral/` placeholder) — no active source yet |
 
 ### Domain Chunks
 
@@ -85,7 +96,7 @@ Memories auto-route by keyword: `code`, `science`, `hardware`, `daily_tasks`, `m
 
 ## CLI
 
-All 16 commands registered in `pyproject.toml [project.scripts]`. Run `pip install -e .` after adding new entry points.
+All 19 commands registered in `pyproject.toml [project.scripts]`. Run `pip install -e .` after adding new entry points. Beyond the store/recall/temps/forget/sleep/agent/info/scrub/crystallize/primary core, the benchmark + eval commands are: `wheeler-bench`, `wheeler-bench-gpu`, `wheeler-baseline`, `wheeler-rerank`, `wheeler-recon-bench`, `wheeler-generate`, `wheeler-mmlu`, `wheeler-scm`, `wheeler-simlex`.
 
 Common flags across commands: `--data-dir`, `--chunk`, `--encoder` (hash|hippocampus|embedding|blended|word), `--salience` (low|medium|high), `--verbose`.
 
@@ -100,14 +111,22 @@ See `docs/program.md` for full details. Summary:
 
 Key parameters: `MAX_PUSH_STRENGTH` (attractor sharpness), `SLOPE_FLOW_STRENGTH` (mixing rate), `SALIENCE_THRESHOLD_MED` (convergence precision), `SALIENCE_MAX_ITERS_MED` (iteration cap).
 
-## Hooks (auto-configured)
+## Project Tooling (`.claude/`)
 
-Three PostToolUse hooks fire on Write|Edit:
-1. **ruff format** — auto-formats any edited .py file (10s timeout)
-2. **pytest** — runs full test suite when `wheeler_memory/` or `tests/` files change (60s timeout)
-3. **wheeler-bench** — runs quality benchmark when `constants.py` changes (120s timeout)
+- `.claude/skills/run-wheeler-memory/` — project skill to run, smoke-test, or benchmark the CA (`SKILL.md`, `smoke.sh`).
+- `.claude/agents/` — repo subagents: `directory-organizer`, `testing-engineer`.
+- `.claude/settings.local.json` — currently holds pytest permission allows only (commands run as `.venv/bin/pytest`).
+- `ONBOARDING.md` — new-teammate onboarding guide.
 
-Review/disable via `/hooks` in Claude Code.
+## Hooks (recommended, not currently wired)
+
+These PostToolUse hooks are *recommended* for this repo but are **not** presently
+configured (no `hooks` key exists in `.claude/settings.json` or `~/.claude/settings.json`).
+Set them up via `/update-config` or `/hooks` if you want them active:
+
+1. **ruff format** — auto-format any edited `.py` file (system Python is externally-managed; format via the venv).
+2. **pytest** — run the suite when `wheeler_memory/` or `tests/` files change.
+3. **wheeler-bench** — run the quality benchmark when `constants.py` changes.
 
 ## Task Discipline
 
