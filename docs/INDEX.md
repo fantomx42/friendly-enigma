@@ -38,6 +38,15 @@
 | [Contributing](../CONTRIBUTING.md) | Development setup, testing, code style |
 | [Changelog](../CHANGELOG.md) | Release history |
 
+## Advisories
+
+Recommendation / decision papers (distinct from empirical [reports](reports/)).
+
+| Advisory | Description |
+|----------|-------------|
+| [Advisories index](advisory/README.md) | All recommendation papers + naming convention |
+| [SQLite storage evaluation](advisory/sqlite-storage-evaluation-2026-05-30.md) | Would SQLite (or Turso/D1/LiteFS/Litestream/DuckDB) help the storage layer? Verdict + recommended stock-SQLite + `sqlite-vec` path |
+
 ## Suggested Reading Order
 
 1. **Installation** — get running
