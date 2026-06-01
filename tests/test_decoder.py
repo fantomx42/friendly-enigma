@@ -492,12 +492,14 @@ class TestRunStreamInterference:
 class TestDecoderNoToolLoop:
     @patch("wheeler_memory.decoder._ollama_generate")
     @patch("wheeler_memory.decoder.recall_memory")
-    def test_no_tool_calls_in_response(self, mock_recall, mock_ollama):
+    def test_no_tool_calls_in_response(self, mock_recall, mock_ollama, tmp_path):
         """Decoder should never send tool definitions to the model."""
         mock_recall.return_value = []
         mock_ollama.return_value = {"message": {"content": "response"}}
 
-        agent = WheelerPrimaryAgent()
+        # Isolate to a tmp data dir so the agent doesn't touch the real
+        # ~/.wheeler_memory (and its DB) during the test.
+        agent = WheelerPrimaryAgent(data_dir=tmp_path)
         agent.run("query")
 
         # _ollama_generate should be called without any tools parameter

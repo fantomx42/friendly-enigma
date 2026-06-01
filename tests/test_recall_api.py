@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import numpy as np
 import pytest
 
@@ -16,7 +14,7 @@ from wheeler_memory.recall_api import (
     recognize_top_k,
     reconstruct,
 )
-from wheeler_memory.storage import _load_index
+from wheeler_memory.storage import _load_index, _save_index
 
 from conftest import store_test_memory
 
@@ -98,15 +96,12 @@ def test_recognize_persists_t_with_ema_update(tmp_data_dir):
     idx = _load_index(chunk_dir)
     idx[key]["metadata"]["t_stability"] = 0.6
     idx[key]["metadata"]["t_recall_count"] = 5
-    (chunk_dir / "index.json").write_text(json.dumps(idx, indent=2))
-    # Invalidate the cache so the next read sees the override
-    from wheeler_memory.cache import invalidate
-    invalidate(chunk_dir / "index.json")
+    # Persist through the SQLite backend so recall reads the override.
+    _save_index(chunk_dir, idx)
 
     seed = recognize(text, data_dir=tmp_data_dir, learning_enabled=True)
     assert seed is not None
 
-    invalidate(chunk_dir / "index.json")
     idx2 = _load_index(chunk_dir)
     md = idx2[key]["metadata"]
     assert md["t_recall_count"] == 6
@@ -135,9 +130,8 @@ def test_drift_responds_to_t_with_seeded_values(tmp_data_dir):
         idx[k]["metadata"]["t_stability"] = t
         idx[k]["metadata"]["t_recall_count"] = 0
 
-    (chunk_dir / "index.json").write_text(json.dumps(idx, indent=2))
-    from wheeler_memory.cache import invalidate
-    invalidate(chunk_dir / "index.json")
+    # Persist seeded T values through the SQLite backend so recall reads them.
+    _save_index(chunk_dir, idx)
 
     # Snapshot all stored attractors before drift
     before = {

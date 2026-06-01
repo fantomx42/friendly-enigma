@@ -4,12 +4,12 @@ When a memory fires (is recalled), associated memories receive a temporary
 temperature boost that decays with a half-life of 1 day.  Associations
 are formed at store time (attractor correlation) and by co-recall patterns.
 
-Association graph and warmth state are persisted per-chunk in
-associations.json alongside the existing index.json.
+Association graph and warmth state are persisted in the per-data-dir SQLite
+database (wheeler.db) via the wheeler_memory.db backend.  This module keeps
+operating on the in-memory ``{"edges": ..., "warmth": ...}`` dict shape; the
+load/save helpers translate to and from the relational tables.
 """
 
-import fcntl
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,27 +32,17 @@ from .temperature import (
 
 
 def _load_associations(chunk_dir: Path) -> dict:
-    """Load associations.json for a chunk, returning default if absent."""
-    from .cache import cached_load_json
+    """Load a chunk's association graph + warmth as a dict (from SQLite)."""
+    from . import db
 
-    return cached_load_json(
-        chunk_dir / "associations.json",
-        default={"edges": {}, "warmth": {}},
-    )
+    return db.load_associations(chunk_dir)
 
 
 def _save_associations(chunk_dir: Path, assoc: dict) -> None:
-    """Write associations.json for a chunk (locked + atomic)."""
-    from .cache import invalidate
+    """Reconcile a chunk's edges + warmth in SQLite to match *assoc*."""
+    from . import db
 
-    lock_path = chunk_dir / "associations.json.lock"
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        path = chunk_dir / "associations.json"
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(assoc, indent=2))
-        tmp.replace(path)  # atomic on POSIX
-    invalidate(path)
+    db.save_associations(chunk_dir, assoc)
 
 
 def load_associations(chunk_dir: Path) -> dict:
@@ -60,23 +50,31 @@ def load_associations(chunk_dir: Path) -> dict:
     return _load_associations(chunk_dir)
 
 
+def save_associations(chunk_dir: Path, assoc: dict) -> None:
+    """Public accessor to persist the full associations dict."""
+    _save_associations(chunk_dir, assoc)
+
+
 def load_warmth(chunk_dir: Path) -> dict:
-    """Load the warmth map from associations.json.
+    """Load the warmth map for a chunk.
 
     Returns dict of {hex_key: {"boost": float, "applied_at": str}}.
     Garbage-collects expired entries (below WARMTH_FLOOR).
     """
-    assoc = _load_associations(chunk_dir)
-    warmth = assoc.get("warmth", {})
+    from . import db
+
+    warmth = db.load_warmth_rows(chunk_dir)
     now = datetime.now(timezone.utc)
     cleaned = {}
+    expired = []
     for hk, entry in warmth.items():
         decayed = compute_warmth(entry["boost"], entry["applied_at"], now=now)
         if decayed >= WARMTH_FLOOR:
             cleaned[hk] = entry
-    if len(cleaned) != len(warmth):
-        assoc["warmth"] = cleaned
-        _save_associations(chunk_dir, assoc)
+        else:
+            expired.append(hk)
+    if expired:
+        db.delete_warmth(chunk_dir, expired)
     return cleaned
 
 
@@ -258,17 +256,21 @@ def propagate_warmth(chunk_dir: Path, fired_keys: list[str]) -> dict[str, float]
                 visited.add(n2)
                 warmed[n2] = warmed.get(n2, 0.0) + WARMTH_HOP2
 
-    # Apply warmth, respecting MAX_WARMTH cap
+    # Apply warmth, respecting MAX_WARMTH cap.  Targeted upsert of only the
+    # changed warmth rows — does not rewrite the edge graph.
+    updates: dict[str, dict] = {}
     for hk, boost in warmed.items():
         existing = warmth.get(hk, {})
         existing_boost = existing.get("boost", 0.0)
         if existing_boost > 0 and "applied_at" in existing:
             existing_boost = compute_warmth(existing_boost, existing["applied_at"])
         new_boost = min(existing_boost + boost, MAX_WARMTH)
-        warmth[hk] = {"boost": round(new_boost, 4), "applied_at": now_iso}
+        updates[hk] = {"boost": round(new_boost, 4), "applied_at": now_iso}
 
-    if warmed:
-        _save_associations(chunk_dir, assoc)
+    if updates:
+        from . import db
+
+        db.set_warmth(chunk_dir, updates)
 
     return warmed
 
@@ -281,27 +283,17 @@ _CROSS_CHUNK_INDEX = "cross_chunk_edges.json"
 
 
 def _load_cross_chunk_edges(data_dir: Path) -> dict:
-    """Load cross-chunk edge index from data_dir root."""
-    from .cache import cached_load_json
+    """Load the cross-chunk edge index from SQLite."""
+    from . import db
 
-    return cached_load_json(
-        data_dir / _CROSS_CHUNK_INDEX,
-        default={"edges": {}},
-    )
+    return db.load_cross_chunk_edges(data_dir)
 
 
 def _save_cross_chunk_edges(data_dir: Path, edges: dict) -> None:
-    """Save cross-chunk edge index (locked + atomic)."""
-    from .cache import invalidate
+    """Reconcile cross-chunk edges in SQLite to match *edges*."""
+    from . import db
 
-    path = data_dir / _CROSS_CHUNK_INDEX
-    lock_path = data_dir / "cross_chunk_edges.json.lock"
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(edges, indent=2))
-        tmp.replace(path)
-    invalidate(path)
+    db.save_cross_chunk_edges(data_dir, edges)
 
 
 def build_cross_chunk_co_recall(
@@ -395,19 +387,19 @@ def propagate_warmth_cross_chunk(
     for hk, (chunk, boost) in warmed.items():
         by_chunk.setdefault(chunk, {})[hk] = boost
 
+    from . import db
+
     for chunk_name, boosts in by_chunk.items():
         chunk_dir = data_dir / "chunks" / chunk_name
-        if not chunk_dir.exists():
-            continue
-        assoc = _load_associations(chunk_dir)
-        warmth = assoc.setdefault("warmth", {})
+        existing_warmth = db.load_warmth_rows(chunk_dir)
+        updates: dict[str, dict] = {}
         for hk, boost in boosts.items():
-            existing = warmth.get(hk, {})
+            existing = existing_warmth.get(hk, {})
             existing_boost = existing.get("boost", 0.0)
             if existing_boost > 0 and "applied_at" in existing:
                 existing_boost = compute_warmth(existing_boost, existing["applied_at"])
             new_boost = min(existing_boost + boost, MAX_WARMTH)
-            warmth[hk] = {"boost": round(new_boost, 4), "applied_at": now_iso}
-        _save_associations(chunk_dir, assoc)
+            updates[hk] = {"boost": round(new_boost, 4), "applied_at": now_iso}
+        db.set_warmth(chunk_dir, updates)
 
     return {hk: boost for hk, (_, boost) in warmed.items()}

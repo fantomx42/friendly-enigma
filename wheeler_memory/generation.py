@@ -64,10 +64,9 @@ def _load_chunk_attractors(chunk_dir: Path) -> dict[str, dict]:
       {"text": str, "flat": np.ndarray, "mean": float, "std": float}
     Only entries with existing .npy files and valid shapes are included.
     """
-    from .cache import cached_load_json
+    from . import db
 
-    index_path = chunk_dir / "index.json"
-    index = cached_load_json(index_path, default={})
+    index = db.load_index(chunk_dir)
     if not index:
         return {}
 

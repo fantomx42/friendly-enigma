@@ -58,7 +58,8 @@ def mock_index_data(tmp_path: Path) -> Path:
         },
     }
 
-    (chunk_dir / "index.json").write_text(json.dumps(index, indent=2))
+    from wheeler_memory import db
+    db.save_index(chunk_dir, index)
     return tmp_path
 
 

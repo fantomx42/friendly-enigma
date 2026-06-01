@@ -163,44 +163,25 @@ def build_cooccurrence(
     cooccurrence: dict[tuple[str, str], int] = {}
     vocab_set: set[str] = set()
 
-    # Walk all chunks/*/index.json
-    chunks_dir = data_path / "chunks"
-    if not chunks_dir.exists():
-        return cooccurrence, sorted(vocab_set)
+    # Harvest stored texts from the SQLite catalog.
+    from . import db
 
-    for chunk_dir in chunks_dir.iterdir():
-        if not chunk_dir.is_dir():
-            continue
-        index_file = chunk_dir / "index.json"
-        if not index_file.exists():
-            continue
+    for _chunk, text in db.all_texts(data_path):
+        words = _tokenize(text)
 
-        try:
-            with open(index_file, "r") as f:
-                index_data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            continue
+        # Sliding window of co-occurrences
+        for i in range(len(words)):
+            for j in range(i + 1, min(i + window, len(words))):
+                w1, w2 = words[i], words[j]
+                vocab_set.add(w1)
+                vocab_set.add(w2)
 
-        # index_data is a dict of objects with "text" field
-        for item in index_data.values():
-            if not isinstance(item, dict) or "text" not in item:
-                continue
-            text = item["text"]
-            words = _tokenize(text)
-
-            # Sliding window of co-occurrences
-            for i in range(len(words)):
-                for j in range(i + 1, min(i + window, len(words))):
-                    w1, w2 = words[i], words[j]
-                    vocab_set.add(w1)
-                    vocab_set.add(w2)
-
-                    # Store both directions (symmetric)
-                    key = (w1, w2)
-                    cooccurrence[key] = cooccurrence.get(key, 0) + 1
-                    if w1 != w2:
-                        key_rev = (w2, w1)
-                        cooccurrence[key_rev] = cooccurrence.get(key_rev, 0) + 1
+                # Store both directions (symmetric)
+                key = (w1, w2)
+                cooccurrence[key] = cooccurrence.get(key, 0) + 1
+                if w1 != w2:
+                    key_rev = (w2, w1)
+                    cooccurrence[key_rev] = cooccurrence.get(key_rev, 0) + 1
 
     vocab = sorted(vocab_set)
     return cooccurrence, vocab
@@ -425,23 +406,10 @@ def _collect_texts(
 
     texts: list[str] = []
 
-    # Source 1: stored memories (same iteration as build_cooccurrence)
-    chunks_dir = Path(data_dir) / "chunks"
-    if chunks_dir.exists():
-        for chunk_dir in chunks_dir.iterdir():
-            if not chunk_dir.is_dir():
-                continue
-            index_file = chunk_dir / "index.json"
-            if not index_file.exists():
-                continue
-            try:
-                with open(index_file, "r") as f:
-                    index_data = json.load(f)
-            except (json.JSONDecodeError, IOError):
-                continue
-            for item in index_data.values():
-                if isinstance(item, dict) and "text" in item:
-                    texts.append(item["text"])
+    # Source 1: stored memories (from the SQLite catalog)
+    from . import db
+
+    texts.extend(text for _chunk, text in db.all_texts(Path(data_dir)))
 
     # Source 2: JSONL corpus file
     if corpus_path is not None:

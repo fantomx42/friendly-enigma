@@ -658,14 +658,21 @@ class TestBABILongEmbed:
             if not relevant:
                 continue  # Can't verify without a known-relevant sentence
 
+            # Isolate each item in its own data dir. Since the catalog and the
+            # sqlite-vec vector index live in <data_dir>/wheeler.db (outside
+            # chunks/), partially clearing chunks/ would leave dangling vector
+            # rows pointing at deleted attractor .npy files. A fresh data_dir
+            # per item avoids cross-contamination cleanly.
+            item_dir = tmp_path / f"item{attempts}"
+
             for sentence in sentences:
-                store_test_memory_embed(sentence, tmp_path, chunk="general")
+                store_test_memory_embed(sentence, item_dir, chunk="general")
 
             question = item["question"].strip()
             results = recall_memory(
                 question,
                 top_k=min(len(sentences), 5),
-                data_dir=tmp_path,
+                data_dir=item_dir,
                 chunk="general",
                 use_embedding=True,
             )
@@ -674,11 +681,6 @@ class TestBABILongEmbed:
             if any(rel in retrieved_texts for rel in relevant):
                 successes += 1
             attempts += 1
-
-            # Clear store for next item to avoid cross-contamination
-            import shutil
-
-            shutil.rmtree(tmp_path / "chunks", ignore_errors=True)
 
         assert attempts > 0, "No valid BABILong items found for needle-in-haystack test"
         success_rate = successes / attempts

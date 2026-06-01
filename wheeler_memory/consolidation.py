@@ -177,10 +177,9 @@ def thresholds_for_temperature(temperature: float) -> tuple[float, float] | None
 
 
 def _load_index(chunk_dir: Path) -> dict:
-    index_path = chunk_dir / "index.json"
-    if index_path.exists():
-        return json.loads(index_path.read_text())
-    return {}
+    from . import db
+
+    return db.load_index(chunk_dir)
 
 
 def consolidate_memory(
@@ -526,11 +525,10 @@ def consolidate_experiential_to_corpus(
 
 
 def _save_index(chunk_dir: Path, index: dict) -> None:
-    """Save index atomically (same pattern as storage.py)."""
-    index_path = chunk_dir / "index.json"
-    tmp_path = index_path.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(index, indent=2))
-    tmp_path.replace(index_path)
+    """Persist the chunk catalog through the SQLite backend (mirrors _load_index)."""
+    from . import db
+
+    db.save_index(chunk_dir, index)
 
 
 def consolidation_stats(

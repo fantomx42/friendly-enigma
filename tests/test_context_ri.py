@@ -265,8 +265,8 @@ class TestCollectTexts:
             "abc123": {"text": "hello world", "hash": "abc123"},
             "def456": {"text": "foo bar baz", "hash": "def456"},
         }
-        with open(chunks_dir / "index.json", "w") as f:
-            json.dump(index, f)
+        from wheeler_memory import db
+        db.save_index(chunks_dir, index)
 
         texts = _collect_texts(data_dir=str(tmp_path))
         assert len(texts) == 2

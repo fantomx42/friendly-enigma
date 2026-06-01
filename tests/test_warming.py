@@ -21,6 +21,7 @@ from wheeler_memory.warming import (
     load_associations,
     load_warmth,
     propagate_warmth,
+    save_associations,
 )
 from wheeler_memory.storage import list_memories, recall_memory
 
@@ -204,7 +205,7 @@ class TestWarmthPropagation:
             "created": datetime.now(timezone.utc).isoformat(),
             "source": "test",
         }
-        (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
+        save_associations(chunk_dir, assoc)
 
         # Propagate warmth from key1
         warmed = propagate_warmth(chunk_dir, [key1])
@@ -232,7 +233,7 @@ class TestWarmthPropagation:
             "created": datetime.now(timezone.utc).isoformat(),
             "source": "test",
         }
-        (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
+        save_associations(chunk_dir, assoc)
 
         warmed = propagate_warmth(chunk_dir, [key1])
 
@@ -260,7 +261,7 @@ class TestWarmthPropagation:
             "created": datetime.now(timezone.utc).isoformat(),
             "source": "test",
         }
-        (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
+        save_associations(chunk_dir, assoc)
 
         propagate_warmth(chunk_dir, [key1])
         warmth_on_disk = load_warmth(chunk_dir)
@@ -292,7 +293,7 @@ class TestWarmthInListMemories:
             "created": datetime.now(timezone.utc).isoformat(),
             "source": "test",
         }
-        (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
+        save_associations(chunk_dir, assoc)
 
         propagate_warmth(chunk_dir, [key1])
         memories = list_memories(data_dir=tmp_path)
@@ -335,7 +336,7 @@ class TestWarmthCap:
             "created": datetime.now(timezone.utc).isoformat(),
             "source": "test",
         }
-        (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
+        save_associations(chunk_dir, assoc)
 
         # Propagate multiple times to accumulate warmth
         for _ in range(10):
@@ -371,7 +372,7 @@ class TestFiredExclusion:
             "created": datetime.now(timezone.utc).isoformat(),
             "source": "test",
         }
-        (chunk_dir / "associations.json").write_text(json.dumps(assoc, indent=2))
+        save_associations(chunk_dir, assoc)
 
         # Fire both keys (they won't warm each other)
         warmed = propagate_warmth(chunk_dir, [key1, key2])

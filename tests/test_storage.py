@@ -49,16 +49,13 @@ class TestStoreCreatesFiles:
         assert brick_path.exists()
 
     def test_store_creates_index_entry(self, tmp_path):
-        """After store, index.json contains the hex key."""
+        """After store, the catalog contains the hex key."""
+        from wheeler_memory.storage import _load_index
+
         text = "test storage 4"
         key = store_test_memory(text, tmp_path)
 
-        index_path = tmp_path / "chunks" / "general" / "index.json"
-        assert index_path.exists()
-
-        import json
-
-        index = json.loads(index_path.read_text())
+        index = _load_index(tmp_path / "chunks" / "general")
         assert key in index
         assert index[key]["text"] == text
 
@@ -162,9 +159,8 @@ class TestStoreIdempotent:
         assert key1 == key2
 
         # Index should have exactly one entry for this text
-        import json
+        from wheeler_memory.storage import _load_index
 
-        index_path = tmp_path / "chunks" / "general" / "index.json"
-        index = json.loads(index_path.read_text())
+        index = _load_index(tmp_path / "chunks" / "general")
         assert len(index) == 1
         assert text in [v["text"] for v in index.values()]
