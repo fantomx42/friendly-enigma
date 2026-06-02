@@ -7,6 +7,26 @@ A cellular-automaton associative memory engine. Memory is reconstruction under p
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
+> ## ⏸️ Project status — paused (2026-05)
+>
+> Active development is on hold. A focused ablation of the cellular automaton's contribution
+> found it does **not** improve recall over a plain embedding baseline:
+>
+> - **Retrieval:** across a 3,000-fact MMLU sweep to N=2,000 (well past the classical Hopfield
+>   capacity wall) plus hard-negative and minimal-pair crosstalk, embedding + centered-cosine
+>   never underperforms, and CA-evolve-then-search is mildly *detrimental* under load
+>   (−0.2% to −2.2%).
+> - **Decode-path geometry:** the CA's pairwise correlation structure is *less* semantically
+>   faithful than the raw frame's (Spearman vs MiniLM: 0.167 vs 0.193, Wilcoxon p=0.017) — it
+>   distorts rather than sharpens.
+>
+> **Scope:** these tests ablate the single-grid *evolve-vs-raw* path — the foundational
+> "reconstruction beats lookup" premise. They do **not** directly evaluate the three-grid SCM
+> interference recall described below, which remains untested rather than disproven. The
+> `[BUILT]` tags mean "exists and runs," not "validated as beneficial." Ablation harnesses live
+> on the unmerged branch `feat/basin-id-and-embedding-encoder`
+> (`scripts/bench/bench_ablation.py`, `bench_geometry.py`).
+
 > **Architectural source-of-truth lives in [CANON.md](CANON.md).** This README is the public-facing introduction. When canon and this README disagree, canon wins on architecture; this file wins on framing for new readers.
 
 Project also called **Project Darman** and **Project Ralph** — three names for the same repository (canon §14.1). Solo project; pure-Python core; no LLM in the loop.
