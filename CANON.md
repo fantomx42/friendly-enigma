@@ -157,20 +157,131 @@ outputs as SYNTHESIS / NOVEL / HALLUCINATION. Different object,
 same acronym. See §3.5 for the disambiguation; this section is the
 **Map**, that one is the **Measure**.
 
-### 3.3.5 SCM feedback loop `[BUILT]`
+### 3.3.5 SCM feedback loop `[PARTIAL]`
 
-(Was: "sleeping giant problem" — closed in v0.3.4.)
+(Was: `[BUILT]`, "sleeping giant problem — closed in v0.3.4." That
+close-out was premature: the loop shipped but did not actually run on
+recall paths. The SCM is a separate **unknown**, not a failure — it was
+never switched on, so its benefit was never measured. Downgraded to
+`[PARTIAL]` on branch `audit/scm-gate-and-ablation`.)
 
-Earlier canon framed SCM topology as not participating in learning
-because no feedback loop ran from recall outcomes back into the
-grid. That framing was wrong: the recall-driven `κ` feedback path
-**is** the closed loop. It shipped in:
+The recall-driven `κ` feedback path was wired in v0.3.4:
 
 - `72d05d5f` Recall-driven SCM feedback: outcome quality (κ) adjusts gate topology
 - `b05d6a8e` SCM feedback loop: cold-start bootstrap, docstring fix, test coverage
 - `fdd47bb9` v0.3.4: SCM telemetry, gradient sanity test, closed-loop A/B eval
 
-Gradient direction is verified by `tests/test_scm_gradient_direction.py`.
+**But the loop was inert on every recall path — null by construction, in
+three interlocking ways** (diagnosed and partially fixed on
+`audit/scm-gate-and-ablation`):
+
+1. **`κ_base` cold-start.** `κ_base` initialised to `0`, so a fresh
+   recall had `advantage = κ − 0 > 0`, while the cold-start seed in
+   `update_from_recall` only fired on `advantage < 0`. A fresh grid
+   therefore never planted opinions on a clean recall.
+2. **Homeostasis short-circuit.** Even with (1) addressed, the guard
+   `openness() ≥ SCM_OPEN_FRACTION_CEIL and advantage > 0 → return 0`
+   ran *before* the seed. Because `SCM_HARDENING_FLOOR` (0.001) sits far
+   below `SCM_GAP_THRESHOLD` (0.3), seeded cells still read as "open," so
+   `openness()` stays ≈ 1.0 and the guard never releases.
+3. **Harness credit ≡ 0.** `bench_scm_ablation.py` stored every fact
+   corpus-only, so the recall path left `stored_exp = None`; the
+   experiential arg to `update_from_recall` fell back to zeros and
+   `credit = |C·X| = 0` everywhere. The waveguide had nothing to gate
+   regardless of (1) and (2).
+
+**Fix (this branch):** Option B — unconditional first-recall seed,
+reordered ahead of the homeostasis guard, so a fresh grid plants opinions
+on tick one (`wheeler_memory/scm_grid.py`, `update_from_recall`). Gradient
+direction stays verified by `tests/test_scm_gradient_direction.py`; a new
+`tests/test_scm_grid.py::...::test_first_recall_seeds_on_successful_sequence`
+asserts the loop now touches > 0 cells on a clean successful sequence (the
+case that was impossible before). The bench gained an opt-in
+`--with-experiential` flag that populates experiential attractors so the
+gate can fire (default off preserves the original corpus-only harness).
+
+**Measured state after the fix** (`scm_ablation.tsv`, host CPU, 10 physics
++ 10 history, corruption 0.30, warmup 1):
+
+- As-is harness (corpus-only): `scm_nonzero_cells = 0`, verdict
+  `FAIL_INERT_SCM` — the gate still cannot fire (cause 3).
+- `--with-experiential`: `scm_nonzero_cells = 1025/4096` — **the gate now
+  fires** — but the SCM gap is `+0.0%` with bootstrapped 95% CI `[+0.0%,
+  +0.0%]`, verdict `FAIL_NULL`, because all three conditions saturate at
+  100% recall (no headroom on this easy task).
+
+So the loop now **fires but is unmeasured** on that easy waveguide bench.
+
+**Measured appropriately (2026-06-03, `scripts/bench/bench_scm_proper.py`,
+`scm_proper.jsonl`, 3 seeds).** A purpose-built harness sculpts the gate via the
+designed self-consistency loop (`self_consistency_check` over the stored corpus —
+the path neither prior bench used), then gates the A/B on two manipulation
+checks (gate has *teeth*; task has *headroom*) and includes a maximally-
+differentiated **sensitivity-ceiling control**. Findings, robust across seeds and
+corpora (minimal / mmlu / mixed):
+
+1. **The sculpting signal is degenerate.** Feeding each memory its *own* text to
+   `self_consistency_check` re-evolves to its own basin → `consistent` **every
+   time** (800/800), so the gate only ever receives `direction = −1` and hardens
+   **uniformly** (`|M|` p50=p90=max, `std ≈ 0.001`). A spatially uniform gate is
+   the `TEETH` check's failure mode `UNIFORM_GATE_NO_DIFFERENTIATION`.
+2. **Corpus attractors are saturated** (`|cell| > 0.9` for ~100% of cells, peak
+   threshold 0.5), so the SCM update mask `c_peak & e_peak` is **all cells,
+   identical for every memory** (pairwise Jaccard ≈ 1.0). The gate cannot localise
+   even in principle from this signal.
+3. **Consequence:** the sculpted gate equals a frozen-open (zeros) gate
+   *exactly* — Recall@1/@3/MRR identical, bootstrap gap `+0.0` CI `[0,0]`. The
+   ranking score is a `(1−|M|)`-weighted Pearson; a uniform weight is a global
+   scale that cannot reorder candidates.
+4. **Sensitivity control:** a hand-built half-open/half-closed gate *can* perturb
+   ranks (so the harness is not blind), but **never improves Recall@1** — on these
+   tasks the correct memory's correlation margin is too large for per-cell
+   reweighting to overturn; arbitrary differentiation only reshuffles the tail or
+   mildly hurts.
+
+**Gate-utility ceiling — the premise itself is refuted (2026-06-04,
+`bench_scm_proper.py --phase d`, `scm_proper.jsonl`, 3 seeds).** Rather than test
+any particular sculpting rule, Phase D tests the SCM's *founding premise*
+directly and in the most favourable possible setting: a per-cell trust map that
+downweights cells which "let noise through" should improve associative recall. We
+measure reconstruction fidelity (weighted correlation of a perturbed
+reconstruction to its true basin) under a uniform gate vs a trust gate built from
+each cell's *own* reconstruction reliability (gate fit on the eval data — optimistic,
+i.e. conservative for refutation). Result, robust across seeds:
+
+| gate | fidelity (seed 42) |
+|------|------|
+| uniform (no gate) | **0.3735** ← best |
+| premise: keep sign-stable ("reliable") cells | 0.3241 ← **worst** |
+| opposite: keep unstable cells | 0.3561 |
+| soft w = reliability | 0.3732 |
+
+`premise − uniform = −0.05`, bootstrap 95% CI `[−0.051, −0.048]` (excludes zero on
+the **negative** side; verdict `REFUTED_GATE_HURTS` on every seed). **Mechanism:**
+cells that stay sign-stable under cue perturbation are the *least* discriminative
+(shared across memories); the cells that flip are the *content-bearing* ones that
+distinguish memories. A trust gate that downweights unstable cells removes exactly
+the discriminative signal — so the premise direction is not merely unhelpful, it is
+the single worst configuration tested. Per-cell reliability is also
+*memory-specific* (cross-memory flip-pattern correlation ≈ 0.06), so a single
+shared grid has no consistent structure to learn even in principle.
+
+**Status.** Across the directly testable role — a learned spatial trust topology
+that improves recall/reconstruction — the SCM is **falsified with mechanism**, not
+merely unmeasured: uniform weighting is optimal and the premise direction is
+actively harmful. The only role not directly falsified is the SCM as a
+decode-time hallucination *classifier* (flagging divergent output without gating
+recall), which is a different and much weaker claim and remains untested. Tag held
+at `[PARTIAL]` pending maintainer review of the downgrade below.
+
+<!-- REVIEW (audit/scm-gate-and-ablation, 2026-06-04): Phase D refutes the SCM
+     gating premise (REFUTED_GATE_HURTS, CI-backed, 3 seeds). Recommend downgrading
+     §3.3 SCM from [BUILT]/[PARTIAL] toward [REJECTED] ("tried, discarded, with
+     mechanical reason") for the recall-gating role specifically, and deciding
+     whether to retire the §3.3 waveguide scaffolding or repurpose the SCM as a
+     decode-time hallucination classifier (the one untested role). Not actioned —
+     maintainer call. -->
+
 
 ## 3.5 Cortex — three-tier semantic scoring `[BUILT]`
 

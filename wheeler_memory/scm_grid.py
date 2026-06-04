@@ -187,25 +187,33 @@ class SCMGrid:
             1 - SCM_KAPPA_EMA_RATE
         ) * self.kappa_base + SCM_KAPPA_EMA_RATE * kappa
 
-        # Homeostasis: if grid is too open, only allow closing (advantage < 0)
-        if self.openness() >= SCM_OPEN_FRACTION_CEIL and advantage > 0:
-            self._emit_telemetry("recall_gradient", pre_grid)
-            return 0
-
         # Credit assignment: |C_i · X_i| — only cells in the interference path
         credit = np.abs(corpus_att * experiential_att)
 
         # Direction: sign(M_i) — fresh cells (M=0) get sign=0 → no update by default
         m_sign = np.sign(self.grid)
 
-        # Cold-start: if no opinions exist yet and recall is poor, seed closing opinions
-        # at high-credit cells so subsequent feedback has opinions to adjust.
-        # (Positive-advantage seeding is unreachable: homeostasis blocks it for fresh grids.)
-        if not np.any(m_sign != 0) and advantage < 0 and (credit > 0).any():
+        # Cold-start (Option B — unconditional first-recall seed): on a fresh
+        # grid (no opinions yet), seed closing opinions at high-credit cells on
+        # the FIRST recall regardless of advantage sign, so the grid has
+        # opinions to adjust from tick one (docstring intent: "learn from every
+        # recall"). Seeding IS the tick-one learning event, and it must run
+        # BEFORE the homeostasis guard below — a fresh grid has openness ≈ 1.0
+        # and first-recall advantage > 0 (kappa_base starts at 0), so that guard
+        # would otherwise short-circuit the function before any opinion is ever
+        # planted. Subsequent recalls (grid now non-empty) skip this branch and
+        # flow through the homeostasis + gradient path unchanged.
+        if not np.any(m_sign != 0) and (credit > 0).any():
             threshold = float(np.percentile(credit[credit > 0], 75))
             seed_mask = credit >= threshold
             self.grid[seed_mask] = SCM_HARDENING_FLOOR
-            m_sign = np.sign(self.grid)
+            self._emit_telemetry("recall_gradient", pre_grid)
+            return int(seed_mask.sum())
+
+        # Homeostasis: if grid is too open, only allow closing (advantage < 0)
+        if self.openness() >= SCM_OPEN_FRACTION_CEIL and advantage > 0:
+            self._emit_telemetry("recall_gradient", pre_grid)
+            return 0
 
         # Mask: cells with existing opinion AND nonzero credit
         mask = (m_sign != 0) & (credit > 0)
