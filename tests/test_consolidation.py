@@ -300,7 +300,8 @@ class TestConsolidationDryRun:
                 "metadata": {"hit_count": 0, "last_accessed": past},
             }
         }
-        (chunk_dir / "index.json").write_text(json.dumps(index))
+        from wheeler_memory import db
+        db.save_index(chunk_dir, index)
 
         frames_before = len(brick.evolution_history)
         assert frames_before >= CONSOLIDATION_MIN_HISTORY, (

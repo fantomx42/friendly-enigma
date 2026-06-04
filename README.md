@@ -7,25 +7,43 @@ A cellular-automaton associative memory engine. Memory is reconstruction under p
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-> ## ⏸️ Project status — paused (2026-05)
+> ## 🗄️ Archived — premise falsified (2026-06)
 >
-> Active development is on hold. A focused ablation of the cellular automaton's contribution
-> found it does **not** improve recall over a plain embedding baseline:
+> **This repository is archived (read-only).** It is preserved as a documented
+> **negative-result** research project: the two core premises were tested and
+> **falsified with mechanism**, not merely shelved. All figures below were
+> independently reproduced on host CPU (2026-06-03/04); harnesses and raw results
+> are in-tree (`scripts/bench/`, `scm_ablation.tsv`, `scm_proper.jsonl`).
 >
-> - **Retrieval:** across a 3,000-fact MMLU sweep to N=2,000 (well past the classical Hopfield
->   capacity wall) plus hard-negative and minimal-pair crosstalk, embedding + centered-cosine
->   never underperforms, and CA-evolve-then-search is mildly *detrimental* under load
->   (−0.2% to −2.2%).
-> - **Decode-path geometry:** the CA's pairwise correlation structure is *less* semantically
->   faithful than the raw frame's (Spearman vs MiniLM: 0.167 vs 0.193, Wilcoxon p=0.017) — it
->   distorts rather than sharpens.
+> **1. "Reconstruction beats lookup" (CA retrieval) — falsified.** Across a
+> 3,000-fact MMLU sweep to N=2,000 (past the Hopfield wall) plus hard-negative and
+> minimal-pair crosstalk, embedding + centered-cosine never underperforms and
+> CA-evolve-then-search is mildly *detrimental*: capacity −0.2%, crosstalk −1.0%,
+> minimal pairs −1.3% (worst −2.2% at N=500), overall **−0.5%** (the **−0.2% to
+> −2.2%** band). Decode-path geometry: the CA's pairwise structure is *less*
+> semantically faithful than raw frames — Spearman vs MiniLM **RAW +0.1927 vs CA
+> +0.1673**, Wilcoxon **p=0.01747**. It distorts rather than sharpens.
+> (`bench_ablation.py`, `bench_geometry.py`.)
 >
-> **Scope:** these tests ablate the single-grid *evolve-vs-raw* path — the foundational
-> "reconstruction beats lookup" premise. They do **not** directly evaluate the three-grid SCM
-> interference recall described below, which remains untested rather than disproven. The
-> `[BUILT]` tags mean "exists and runs," not "validated as beneficial." Ablation harnesses live
-> on the unmerged branch `feat/basin-id-and-embedding-encoder`
-> (`scripts/bench/bench_ablation.py`, `bench_geometry.py`).
+> **2. SCM "trust waveguide" (the learning layer) — falsified premise.** The SCM
+> feedback loop, once tagged `[BUILT]`/"closed in v0.3.4," was first found **inert
+> by construction** (κ_base cold-start + homeostasis short-circuit + a corpus-only
+> bench with credit ≡ 0). A gate fix makes it *fire*, but a purpose-built test
+> (`bench_scm_proper.py`, sculpt → teeth/headroom checks → A/B with a sensitivity
+> control, 3 seeds) shows the gating **premise itself is wrong**: weighting recall
+> by per-cell "trust" does not help even with an oracle gate — the premise
+> direction (downweight noise-prone cells) is the *worst* configuration tested
+> (fidelity 0.32 vs **0.37 for no gate**, premise−uniform −0.05, 95% CI excluding
+> zero, `REFUTED_GATE_HURTS`). Mechanism: sign-stable cells are the *least*
+> discriminative; gating them away deletes the content signal. See CANON §3.3.5.
+>
+> **What still stands:** the engineering — the custom CA + hand-written ROCm
+> kernel, CPU/GPU parity, storage/warming plumbing, and the test/bench suite — is
+> real and reproducible. What is falsified is the *claim that any of it beats a
+> plain embedding baseline at associative memory.* The one role not directly
+> tested is the SCM as a decode-time hallucination *classifier* (flagging
+> divergence without gating recall).
+
 
 > **Architectural source-of-truth lives in [CANON.md](CANON.md).** This README is the public-facing introduction. When canon and this README disagree, canon wins on architecture; this file wins on framing for new readers.
 

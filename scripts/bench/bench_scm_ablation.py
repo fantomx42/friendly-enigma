@@ -86,11 +86,41 @@ def _corrupt(text: str, fraction: float, rng: random.Random) -> str:
     return " ".join(keep) if keep else words[0]
 
 
-def _store_fact(text: str, data_dir: Path, chunk: str) -> None:
+def _store_experiential(text: str, data_dir: Path, chunk: str) -> None:
+    """Write an experiential attractor npy without touching the corpus index.
+
+    Mirrors ``scm_ab_eval._store_experiential``. store_memory(grid='experiential')
+    overwrites the corpus index entry (recall then skips it, storage.py:305-306),
+    so we write the npy directly. Without this the SCM has nothing to gate: the
+    recall path leaves ``stored_exp = None`` -> the experiential arg to
+    ``update_from_recall`` falls back to zeros -> credit = |corpus*exp| = 0
+    everywhere -> the gate never fires regardless of the kappa_base/homeostasis
+    logic. This is the harness gap the --with-experiential flag closes.
+    """
+    from wheeler_memory.constants import EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW
+    from wheeler_memory.dynamics import evolve_with_params
+    from wheeler_memory.experiential import experiential_dir
+    from wheeler_memory.hashing import text_to_hex
+    from wheeler_memory.storage import get_chunk_dir
+
+    frame = hippocampus_to_frame(text)
+    result = evolve_with_params(frame, EXPERIENTIAL_MAX_PUSH, EXPERIENTIAL_SLOPE_FLOW)
+    if result["state"] != "CONVERGED":
+        return
+    chunk_dir = get_chunk_dir(data_dir, chunk)
+    exp_dir = experiential_dir(chunk_dir)
+    np.save(exp_dir / f"{text_to_hex(text)}.npy", result["attractor"])
+
+
+def _store_fact(
+    text: str, data_dir: Path, chunk: str, with_experiential: bool = False
+) -> None:
     frame = hippocampus_to_frame(text)
     result = evolve_and_interpret(frame)
     brick = MemoryBrick.from_evolution_result(result)
     store_memory(text, result, brick, data_dir=data_dir, chunk=chunk, auto_evict=False)
+    if with_experiential:
+        _store_experiential(text, data_dir, chunk)
 
 
 def _query_top1_hit(
@@ -153,6 +183,7 @@ def run_ablation(
     bootstrap_n: int = 1000,
     seed: int = 42,
     warmup_epochs: int = 1,
+    with_experiential: bool = False,
 ) -> dict:
     t0 = time.time()
     rng = random.Random(seed)
@@ -164,7 +195,7 @@ def run_ablation(
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         for f in PHYSICS_FACTS:
-            _store_fact(f, d, chunk="science")
+            _store_fact(f, d, chunk="science", with_experiential=with_experiential)
         for _ in range(warmup_epochs):
             for cue, _expected in queries:
                 _query_top1_hit(cue, d, apply_learning=True, force_scm_zero=False)
@@ -174,9 +205,9 @@ def run_ablation(
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         for f in PHYSICS_FACTS:
-            _store_fact(f, d, chunk="science")
+            _store_fact(f, d, chunk="science", with_experiential=with_experiential)
         for f in HISTORY_FACTS:
-            _store_fact(f, d, chunk="general")
+            _store_fact(f, d, chunk="general", with_experiential=with_experiential)
         for _ in range(warmup_epochs):
             for cue, _expected in queries:
                 _query_top1_hit(cue, d, apply_learning=True, force_scm_zero=False)
@@ -192,9 +223,9 @@ def run_ablation(
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         for f in PHYSICS_FACTS:
-            _store_fact(f, d, chunk="science")
+            _store_fact(f, d, chunk="science", with_experiential=with_experiential)
         for f in HISTORY_FACTS:
-            _store_fact(f, d, chunk="general")
+            _store_fact(f, d, chunk="general", with_experiential=with_experiential)
         # No warmup -- and we force-zero on every query for total isolation.
         mixed_frozen_hits = _accuracy(
             queries, d, apply_learning=False, force_scm_zero=True
@@ -338,6 +369,15 @@ def main() -> None:
     p.add_argument("--bootstrap-n", type=int, default=1000)
     p.add_argument("--warmup-epochs", type=int, default=1)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--with-experiential",
+        action="store_true",
+        help=(
+            "Also store experiential attractors so the SCM has interference to "
+            "gate (credit>0). Default off keeps the original corpus-only harness "
+            "byte-for-byte; with this flag the gate can actually fire."
+        ),
+    )
     p.add_argument("--notes", default="")
     args = p.parse_args()
 
@@ -349,6 +389,7 @@ def main() -> None:
         bootstrap_n=args.bootstrap_n,
         seed=args.seed,
         warmup_epochs=args.warmup_epochs,
+        with_experiential=args.with_experiential,
     )
 
     if args.json:

@@ -1,6 +1,5 @@
 """Shared pytest fixtures for the Wheeler Memory test suite."""
 
-import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -10,7 +9,7 @@ import pytest
 from wheeler_memory.brick import MemoryBrick
 from wheeler_memory.dynamics import evolve_and_interpret
 from wheeler_memory.hashing import hash_to_frame
-from wheeler_memory.storage import _load_index, store_memory
+from wheeler_memory.storage import _load_index, _save_index, store_memory
 
 
 @pytest.fixture
@@ -55,7 +54,7 @@ def age_memory(data_dir: Path, chunk: str, hex_key: str, days: float) -> None:
     past = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     index[hex_key]["timestamp"] = past
     index[hex_key]["metadata"]["last_accessed"] = past
-    (chunk_dir / "index.json").write_text(json.dumps(index, indent=2))
+    _save_index(chunk_dir, index)
 
 
 def make_synthetic_history(

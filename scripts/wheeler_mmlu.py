@@ -444,6 +444,13 @@ def _get_encoder_fns(encoder: str = "hippocampus"):
             return [_hippo_word(t, size) for t in texts]
 
         return _hippo_word, _hippo_word_batch
+    elif encoder == "embedding":
+        # MiniLM sentence-embedding encoder. Required for an embedding-populated
+        # corpus to be consumable end-to-end via `wheeler-mmlu --mode semantic
+        # --encoder embedding` (closes CANON §8.2 follow-up).
+        from wheeler_memory.embedding import embed_to_frame, embed_to_frame_batch
+
+        return embed_to_frame, embed_to_frame_batch
     else:  # "hippocampus" (default)
         from wheeler_memory.hippocampus import (
             hippocampus_to_frame,
@@ -1803,7 +1810,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--encoder",
-        choices=["hippocampus", "word", "word-blended", "hippo-word"],
+        choices=["hippocampus", "word", "word-blended", "hippo-word", "embedding"],
         default="hippocampus",
         help="Encoder for frame generation: 'hippocampus' (char n-grams, default), "
         "'word' (word-level random indexing), 'word-blended' (word + language wheeler).",

@@ -14,13 +14,12 @@ EMA when learning_enabled=True.
 from __future__ import annotations
 
 import heapq
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from scipy.stats import pearsonr
 
+from . import db
 from .chunking import list_existing_chunks, select_recall_chunks, touch_chunk_metadata
 from .constants import (
     RECOGNITION_THRESHOLD,
@@ -112,24 +111,16 @@ def _frame_fn(use_embedding: bool, encoder: str | None):
 
 
 def _load_index(chunk_dir: Path) -> dict:
-    from .cache import cached_load_json
+    from . import db
 
-    return cached_load_json(chunk_dir / "index.json", default={})
+    return db.load_index(chunk_dir)
 
 
 def _save_index_with_lock(chunk_dir: Path, index: dict) -> None:
-    """Atomic write of index.json with cache invalidation.
+    """Reconcile a chunk's catalog rows to match *index* (SQLite-backed)."""
+    from . import db
 
-    Caller is responsible for holding the chunk's index.json.lock file lock
-    via fcntl. Mirrors storage._save_index without importing it.
-    """
-    from .cache import invalidate
-
-    index_path = chunk_dir / "index.json"
-    tmp_path = index_path.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(index, indent=2))
-    tmp_path.replace(index_path)
-    invalidate(index_path)
+    db.save_index(chunk_dir, index)
 
 
 def _basin_stability(stored: np.ndarray, one_step: np.ndarray) -> float:
@@ -146,23 +137,10 @@ def _basin_stability(stored: np.ndarray, one_step: np.ndarray) -> float:
     return float(np.clip(1.0 - p99 / 2.0, 0.0, 1.0))
 
 
-def _pearson_fast(
-    query_flat: np.ndarray,
-    query_centered: np.ndarray,
-    query_std: float,
-    att_flat: np.ndarray,
-    att_mean: float | None,
-    att_std: float | None,
-) -> float:
-    n = len(att_flat)
-    if att_mean is not None and att_std is not None and att_std > 0 and query_std > 0:
-        att_centered = att_flat - att_mean
-        return float(np.dot(query_centered, att_centered) / (n * query_std * att_std))
-    try:
-        corr, _ = pearsonr(query_flat, att_flat)
-    except Exception:
-        return 0.0
-    return float(corr) if not np.isnan(corr) else 0.0
+# Candidate pool size for the recognize path's vector KNN.  Callers take the
+# top-1 (recognize) or top-k (recognize_top_k) from this pool; oversized so
+# any reasonable k is covered.
+_RECOGNIZE_POOL = 128
 
 
 def _scan_chunks(
@@ -170,52 +148,27 @@ def _scan_chunks(
     chunks_to_search: list[str],
     query_frame: np.ndarray,
 ) -> list[tuple[float, str, str, dict]]:
-    """Return [(similarity, hex_key, chunk_name, meta), ...] over all candidates.
+    """Return [(similarity, hex_key, chunk_name, meta), ...] for top candidates.
 
-    Skips polar/avoidance/experiential entries to mirror recall_memory.
-    Does NOT call evolve_and_interpret. Pearson is computed against the raw
-    query frame, not an evolved query attractor.
+    Uses the vector index (cosine of mean-centered grids == Pearson) against
+    the raw query frame — no evolve_and_interpret, matching the recognize
+    contract. Polar/avoidance/experiential entries are absent from the vector
+    index by construction, so the old per-item skips are unnecessary.
     """
-    query_flat = query_frame.flatten()
-    query_mean = query_flat.mean()
-    query_centered = query_flat - query_mean
-    query_std = query_flat.std()
-
-    scored: list[tuple[float, str, str, dict]] = []
     for c in chunks_to_search:
         chunk_dir = d / "chunks" / c
-        if not chunk_dir.exists():
+        if chunk_dir.exists():
+            touch_chunk_metadata(chunk_dir)
+
+    candidates = db.vector_topk(d, query_frame, chunks_to_search, _RECOGNIZE_POOL)
+    entries = db.get_entries(d, [key for key, _, _ in candidates])
+
+    scored: list[tuple[float, str, str, dict]] = []
+    for hex_key, chunk_name, sim in candidates:
+        meta = entries.get(hex_key)
+        if meta is None:
             continue
-        index = _load_index(chunk_dir)
-        if not index:
-            continue
-        touch_chunk_metadata(chunk_dir)
-        for hex_key, meta in index.items():
-            md = meta.get("metadata", {})
-            if md.get("memory_type") in ("avoidance", "polar"):
-                continue
-            if meta.get("grid") == "experiential":
-                continue
-            attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
-            if not attractor_path.exists():
-                continue
-            try:
-                attractor = np.load(attractor_path, mmap_mode="r")
-            except Exception:
-                continue
-            if attractor.shape != (64, 64):
-                continue
-            sim = _pearson_fast(
-                query_flat,
-                query_centered,
-                query_std,
-                attractor.flatten(),
-                md.get("att_mean"),
-                md.get("att_std"),
-            )
-            if np.isnan(sim):
-                sim = 0.0
-            scored.append((sim, hex_key, c, meta))
+        scored.append((float(sim), hex_key, chunk_name, meta))
     return scored
 
 

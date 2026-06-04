@@ -1,3 +1,5 @@
 iteration	timestamp	corruption	warmup_epochs	phys_only_acc	mixed_full_acc	mixed_frozen_acc	scm_gap	ci_lo	ci_hi	scm_nonzero_cells	scm_max_abs	scm_kappa_base	verdict	elapsed_s	notes
 1	2026-05-29T13:23:52.647638+00:00	0.30	1	1.0000	1.0000	1.0000	+0.0000	+0.0000	+0.0000	0	0	+0.2791	FAIL_INERT_SCM	9.24	pre-registered default corruption=0.3, warmup=1 [env: np=2.4.6 py=3.11.15]
 2	2026-05-29T13:24:15.057527+00:00	0.70	3	1.0000	1.0000	1.0000	+0.0000	+0.0000	+0.0000	0	0	+0.1907	FAIL_INERT_SCM	13.72	stress: corruption=0.7, warmup=3 epochs [env: np=2.4.6 py=3.11.15]
+3	2026-06-03T14:43:45.347425+00:00	0.30	1	1.0000	1.0000	1.0000	+0.0000	+0.0000	+0.0000	0	0	+0.2791	FAIL_INERT_SCM	2.25	post-gate-fix, corpus-only harness (credit=0): gate cannot fire [env: np=2.4.4 py=3.14.5]
+4	2026-06-03T17:44:13.027492+00:00	0.30	1	1.0000	1.0000	1.0000	+0.0000	+0.0000	+0.0000	1025	0.001482	+0.5654	FAIL_NULL	2.64	EXTENDED harness: experiential attractors stored so SCM gate fires [env: np=2.4.4 py=3.14.5]

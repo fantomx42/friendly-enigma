@@ -17,6 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 embed = ["sentence-transformers>=3.0"]
 train = ["scikit-learn>=1.0"]
+rerank = ["ir-datasets>=0.5", "ir-measures>=0.3"]
+judge = ["anthropic>=0.40"]
 
 [project.scripts]
 wheeler-store = "scripts.wheeler_store:main"
@@ -31,6 +33,8 @@ wheeler-scrub = "scripts.scrub_brick:main"
 wheeler-crystallize = "scripts.wheeler_crystallize:main"
 wheeler-primary = "scripts.wheeler_primary:main"
 wheeler-bench = "scripts.bench_quality:main"
+wheeler-baseline = "scripts.wheeler_baseline:main"
+wheeler-rerank = "scripts.wheeler_rerank:main"
 wheeler-recon-bench = "scripts.bench_reconstruction:main"
 wheeler-generate = "scripts.wheeler_generate:main"
 wheeler-mmlu = "scripts.wheeler_mmlu:main"

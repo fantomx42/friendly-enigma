@@ -19,8 +19,6 @@ sweep_and_evict() runs all three phases:
   3. capacity — if over MAX_ATTRACTORS, remove bottom 10% cold memories
 """
 
-import fcntl
-import json
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -50,26 +48,15 @@ class EvictionResult:
 
 
 def _load_index(chunk_dir: Path) -> dict:
-    index_path = chunk_dir / "index.json"
-    if index_path.exists():
-        try:
-            return json.loads(index_path.read_text())
-        except (json.JSONDecodeError, ValueError):
-            import sys
+    from . import db
 
-            print(
-                f"Warning: corrupted index at {index_path}, treating as empty",
-                file=sys.stderr,
-            )
-            return {}
-    return {}
+    return db.load_index(chunk_dir)
 
 
 def _save_index(chunk_dir: Path, index: dict) -> None:
-    index_path = chunk_dir / "index.json"
-    tmp_path = index_path.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(index, indent=2))
-    tmp_path.replace(index_path)  # atomic on POSIX
+    from . import db
+
+    db.save_index(chunk_dir, index)
 
 
 def score_memories(data_dir: str | Path) -> list[dict]:
@@ -135,15 +122,12 @@ def _delete_memory_files(data_dir: Path, chunk: str, hex_key: str) -> None:
     Deletion order: index entry first (prevents half-deleted recall),
     then .npy, then .npz, then association cleanup.
     """
+    from . import db
+
     chunk_dir = data_dir / "chunks" / chunk
 
-    # 1. Remove from index (locked + atomic write)
-    lock_path = chunk_dir / "index.json.lock"
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        index = _load_index(chunk_dir)
-        index.pop(hex_key, None)
-        _save_index(chunk_dir, index)
+    # 1. Remove from catalog + vector index (targeted delete)
+    db.delete_memory(chunk_dir, hex_key)
 
     # 2. Remove attractor
     att_path = chunk_dir / "attractors" / f"{hex_key}.npy"

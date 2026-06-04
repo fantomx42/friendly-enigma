@@ -1,14 +1,11 @@
 """Attractor storage, indexing, and recall by Pearson correlation."""
 
-import fcntl
 import heapq
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-from scipy.stats import pearsonr
 
 from .brick import MemoryBrick
 from .chunking import (
@@ -24,8 +21,6 @@ from .dynamics import compute_attractor_features, evolve_and_interpret
 from .hashing import hash_to_frame, text_to_hex
 from .temperature import (
     SALIENCE_DEFAULT,
-    bump_access,
-    compute_temperature,
     effective_temperature,
     ensure_access_fields,
     temperature_tier,
@@ -66,19 +61,16 @@ def _get_data_dir(data_dir: str | Path | None = None) -> Path:
 
 
 def _load_index(chunk_dir: Path) -> dict:
-    from .cache import cached_load_json
+    from . import db
 
-    return cached_load_json(chunk_dir / "index.json", default={})
+    return db.load_index(chunk_dir)
 
 
 def _save_index(chunk_dir: Path, index: dict) -> None:
-    from .cache import invalidate
+    """Reconcile a whole chunk's catalog rows to match *index* (cold paths)."""
+    from . import db
 
-    index_path = chunk_dir / "index.json"
-    tmp_path = index_path.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(index, indent=2))
-    tmp_path.replace(index_path)  # atomic on POSIX
-    invalidate(index_path)
+    db.save_index(chunk_dir, index)
 
 
 def batch_store_memories(
@@ -105,38 +97,34 @@ def batch_store_memories(
     for text, result, brick, chunk in entries:
         by_chunk.setdefault(chunk, []).append((text, result, brick))
 
+    from . import db
+
     stored = 0
     for chunk, items in by_chunk.items():
         chunk_dir = get_chunk_dir(d, chunk)
-        lock_path = chunk_dir / "index.json.lock"
-        with open(lock_path, "w") as lock_fd:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            index = _load_index(chunk_dir)
-            for text, result, brick in items:
-                hex_key = text_to_hex(text)
-                # Write attractor + brick files (fast, outside lock in ideal world
-                # but done here for simplicity since they're independent files)
-                np.save(
-                    chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"]
-                )
-                brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
-                # Build index entry
-                meta = dict(result.get("metadata", {}))
-                meta["hit_count"] = 0
-                meta["last_accessed"] = now_iso
-                flat = result["attractor"].flatten()
-                meta["att_mean"] = float(flat.mean())
-                meta["att_std"] = float(flat.std())
-                index[hex_key] = {
-                    "text": text,
-                    "state": result["state"],
-                    "convergence_ticks": result["convergence_ticks"],
-                    "timestamp": now_iso,
-                    "metadata": meta,
-                    "chunk": chunk,
-                }
-                stored += 1
-            _save_index(chunk_dir, index)
+        for text, result, brick in items:
+            hex_key = text_to_hex(text)
+            np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
+            brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
+            # Build index entry
+            meta = dict(result.get("metadata", {}))
+            meta["hit_count"] = 0
+            meta["last_accessed"] = now_iso
+            flat = result["attractor"].flatten()
+            meta["att_mean"] = float(flat.mean())
+            meta["att_std"] = float(flat.std())
+            entry = {
+                "text": text,
+                "state": result["state"],
+                "convergence_ticks": result["convergence_ticks"],
+                "timestamp": now_iso,
+                "metadata": meta,
+                "chunk": chunk,
+            }
+            db.upsert_memory(chunk_dir, hex_key, entry)
+            # Corpus attractors are recall-eligible -> index for vector search.
+            db.upsert_vector(chunk_dir, hex_key, result["attractor"])
+            stored += 1
         touch_chunk_metadata(chunk_dir, stored=True)
 
     return stored
@@ -188,32 +176,35 @@ def store_memory(
         np.save(chunk_dir / "attractors" / f"{hex_key}.npy", result["attractor"])
         brick.save(chunk_dir / "bricks" / f"{hex_key}.npz")
 
-    lock_path = chunk_dir / "index.json.lock"
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        index = _load_index(chunk_dir)
-        now_iso = datetime.now(timezone.utc).isoformat()
-        base_metadata = result.get("metadata", {})
-        base_metadata["hit_count"] = 0
-        base_metadata["last_accessed"] = now_iso
-        # Cache attractor norm for faster Pearson during recall
-        flat = result["attractor"].flatten()
-        base_metadata["att_mean"] = float(flat.mean())
-        base_metadata["att_std"] = float(flat.std())
-        if memory_type is not None:
-            base_metadata["memory_type"] = memory_type
-        entry = {
-            "text": text,
-            "state": result["state"],
-            "convergence_ticks": result["convergence_ticks"],
-            "timestamp": now_iso,
-            "metadata": base_metadata,
-            "chunk": chunk,
-        }
-        if grid == "experiential":
-            entry["grid"] = "experiential"
-        index[hex_key] = entry
-        _save_index(chunk_dir, index)
+    from . import db
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    base_metadata = result.get("metadata", {})
+    base_metadata["hit_count"] = 0
+    base_metadata["last_accessed"] = now_iso
+    # Cache attractor norm for faster Pearson during recall
+    flat = result["attractor"].flatten()
+    base_metadata["att_mean"] = float(flat.mean())
+    base_metadata["att_std"] = float(flat.std())
+    if memory_type is not None:
+        base_metadata["memory_type"] = memory_type
+    entry = {
+        "text": text,
+        "state": result["state"],
+        "convergence_ticks": result["convergence_ticks"],
+        "timestamp": now_iso,
+        "metadata": base_metadata,
+        "chunk": chunk,
+    }
+    if grid == "experiential":
+        entry["grid"] = "experiential"
+    db.upsert_memory(chunk_dir, hex_key, entry)
+    # Only recall-eligible corpus attractors are indexed for vector search.
+    # Polar/avoidance companions and experiential grids are excluded (they are
+    # never surfaced as independent recall results).
+    if grid != "experiential" and memory_type not in ("polar", "avoidance"):
+        db.upsert_vector(chunk_dir, hex_key, result["attractor"])
+
     touch_chunk_metadata(chunk_dir, stored=True)
     build_store_associations(chunk_dir, hex_key)
 
@@ -283,92 +274,59 @@ def recall_memory(
         max_iters=budget.max_iters,
         stability_threshold=budget.stability_threshold,
     )
-    query_flat = query_result["attractor"].flatten()
+    from . import db
 
-    # Collect work items across all chunks, then score in parallel
-    work_items = []  # (hex_key, meta, attractor_path, warmth_entry, chunk_name)
+    # Vector KNN: cosine over mean-centered attractors == Pearson correlation.
+    # The vector index holds only recall-eligible corpus attractors (polar and
+    # experiential grids are excluded at store time), so the filtering the old
+    # full scan did per-item is already baked into the candidate set.
+    #
+    # When temperature_boost > 0 the final ranking is by similarity + boost*temp,
+    # so over-fetch a candidate pool and re-rank; otherwise top_k by similarity
+    # is exact.
+    fetch_n = top_k if temperature_boost <= 0 else max(top_k * 8, 64)
+
+    # Keep chunk metadata access timestamps fresh, as the old scan did.
     for c in chunks_to_search:
         chunk_dir = d / "chunks" / c
-        if not chunk_dir.exists():
+        if chunk_dir.exists():
+            touch_chunk_metadata(chunk_dir)
+
+    candidates = db.vector_topk(
+        d, query_result["attractor"], chunks_to_search, fetch_n
+    )
+    entries = db.get_entries(d, [key for key, _, _ in candidates])
+
+    warmth_by_chunk: dict[str, dict] = {}
+    results = []
+    for hex_key, chunk_name, sim in candidates:
+        meta = entries.get(hex_key)
+        if meta is None:
             continue
-        index = _load_index(chunk_dir)
-        if not index:
-            continue
-
-        touch_chunk_metadata(chunk_dir)
-        warmth_data = load_warmth(chunk_dir)
-
-        for hex_key, meta in index.items():
-            if meta.get("metadata", {}).get("memory_type") in ("avoidance", "polar"):
-                continue
-            # Default recall skips experiential entries (use interference=True for those)
-            if meta.get("grid") == "experiential":
-                continue
-            attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
-            if not attractor_path.exists():
-                continue
-            ensure_access_fields(meta, meta["timestamp"])
-            w = warmth_data.get(hex_key, {})
-            work_items.append((hex_key, meta, attractor_path, w, c))
-
-    # Pre-compute query norm for fast Pearson
-    query_mean = query_flat.mean()
-    query_centered = query_flat - query_mean
-    query_std = query_flat.std()
-
-    def _score_item(item):
-        hex_key, meta, attractor_path, w, chunk_name = item
-        attractor = np.load(attractor_path, mmap_mode="r")
-        if attractor.shape != (64, 64):
-            return None
-        att_flat = attractor.flatten()
-        md = meta.get("metadata", {})
-        att_mean = md.get("att_mean")
-        att_std = md.get("att_std")
-        try:
-            if (
-                att_mean is not None
-                and att_std is not None
-                and att_std > 0
-                and query_std > 0
-            ):
-                att_centered = att_flat - att_mean
-                sim = float(
-                    np.dot(query_centered, att_centered)
-                    / (len(query_flat) * query_std * att_std)
-                )
-            else:
-                corr, _ = pearsonr(query_flat, att_flat)
-                sim = float(corr)
-        except Exception:
-            return None
-        if np.isnan(sim):
-            sim = 0.0
+        ensure_access_fields(meta, meta["timestamp"])
+        if chunk_name not in warmth_by_chunk:
+            warmth_by_chunk[chunk_name] = load_warmth(d / "chunks" / chunk_name)
+        w = warmth_by_chunk[chunk_name].get(hex_key, {})
         temp = effective_temperature(
             meta["metadata"]["hit_count"],
             meta["metadata"]["last_accessed"],
             warmth_boost=w.get("boost", 0.0),
             warmth_applied_at=w.get("applied_at"),
         )
-        tier = temperature_tier(temp)
-        effective = sim + temperature_boost * temp
-        return {
-            "hex_key": hex_key,
-            "text": meta["text"],
-            "similarity": sim,
-            "temperature": temp,
-            "temperature_tier": tier,
-            "effective_similarity": effective,
-            "state": meta["state"],
-            "convergence_ticks": meta["convergence_ticks"],
-            "timestamp": meta["timestamp"],
-            "chunk": chunk_name,
-        }
-
-    from concurrent.futures import ThreadPoolExecutor
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        results = [r for r in executor.map(_score_item, work_items) if r is not None]
+        results.append(
+            {
+                "hex_key": hex_key,
+                "text": meta["text"],
+                "similarity": sim,
+                "temperature": temp,
+                "temperature_tier": temperature_tier(temp),
+                "effective_similarity": sim + temperature_boost * temp,
+                "state": meta["state"],
+                "convergence_ticks": meta["convergence_ticks"],
+                "timestamp": meta["timestamp"],
+                "chunk": chunk_name,
+            }
+        )
 
     top_results = heapq.nlargest(
         top_k,
@@ -453,19 +411,12 @@ def _bump_recalled_memories(data_dir: Path, results: list[dict]) -> None:
     for r in results:
         by_chunk.setdefault(r["chunk"], []).append(r["hex_key"])
 
+    from . import db
+
     for chunk_name, hex_keys in by_chunk.items():
         chunk_dir = data_dir / "chunks" / chunk_name
-        lock_path = chunk_dir / "index.json.lock"
-        with open(lock_path, "w") as lock_fd:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            index = _load_index(chunk_dir)
-            changed = False
-            for hk in hex_keys:
-                if hk in index:
-                    bump_access(index[hk])
-                    changed = True
-            if changed:
-                _save_index(chunk_dir, index)
+        # Targeted counter bump — no whole-chunk rewrite.
+        db.bump_access(chunk_dir, hex_keys)
         propagate_warmth(chunk_dir, hex_keys)
         if len(hex_keys) >= 2:
             build_co_recall_associations(chunk_dir, hex_keys)

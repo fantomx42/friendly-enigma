@@ -257,10 +257,9 @@ def update_chunk_centroid(chunk_dir: Path) -> None:
     except ImportError:
         return
 
-    index_path = chunk_dir / "index.json"
-    if not index_path.exists():
-        return
-    index = json.loads(index_path.read_text())
+    from . import db
+
+    index = db.load_index(chunk_dir)
     if not index:
         return
 
@@ -294,15 +293,10 @@ def get_chunk_dir(data_dir: Path, chunk: str) -> Path:
 
 
 def list_existing_chunks(data_dir: Path) -> list[str]:
-    """Scan disk for populated chunk directories."""
-    chunks_root = data_dir / "chunks"
-    if not chunks_root.exists():
-        return []
-    return sorted(
-        d.name
-        for d in chunks_root.iterdir()
-        if d.is_dir() and (d / "index.json").exists()
-    )
+    """Return chunks that hold at least one stored memory (from SQLite)."""
+    from . import db
+
+    return db.existing_chunks(data_dir)
 
 
 def find_brick_across_chunks(hex_key: str, data_dir: Path) -> Path | None:

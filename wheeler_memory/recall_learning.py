@@ -26,7 +26,6 @@ byte-equivalent to the legacy implementation.
 
 from __future__ import annotations
 
-import fcntl
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -104,48 +103,48 @@ def apply_recall_learning(
     With ``drift_basin=True`` and no SCM kwargs, this function is
     byte-equivalent to the legacy ``recall_api._apply_recall_learning``.
     """
-    from .recall_api import _save_index_with_lock, _load_index
+    from . import db
 
-    lock_path = chunk_dir / "index.json.lock"
-    with open(lock_path, "w") as lock_fd:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
-        index = _load_index(chunk_dir)
-        if hex_key not in index:
-            return
-        entry = index[hex_key]
-        ensure_t_fields(entry)
-        ensure_access_fields(entry, entry["timestamp"])
+    entry = db.get_entries(chunk_dir.parent.parent, [hex_key]).get(hex_key)
+    if entry is None:
+        return
+    ensure_t_fields(entry)
+    ensure_access_fields(entry, entry["timestamp"])
 
-        attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
-        stored = np.load(attractor_path)
+    attractor_path = chunk_dir / "attractors" / f"{hex_key}.npy"
+    stored = np.load(attractor_path)
 
-        one_step = apply_ca_dynamics(stored)
-        observed_stability = _basin_stability_weighted(
-            stored, one_step, scm_grid=scm.grid if scm is not None else None
-        )
+    one_step = apply_ca_dynamics(stored)
+    observed_stability = _basin_stability_weighted(
+        stored, one_step, scm_grid=scm.grid if scm is not None else None
+    )
 
-        old_t = float(entry["metadata"]["t_stability"])
-        new_t = update_t_stability(old_t, observed_stability, T_EMA_RATE)
-        entry["metadata"]["t_stability"] = new_t
-        entry["metadata"]["t_recall_count"] = (
-            int(entry["metadata"].get("t_recall_count", 0)) + 1
-        )
+    old_t = float(entry["metadata"]["t_stability"])
+    new_t = update_t_stability(old_t, observed_stability, T_EMA_RATE)
+    entry["metadata"]["t_stability"] = new_t
+    entry["metadata"]["t_recall_count"] = (
+        int(entry["metadata"].get("t_recall_count", 0)) + 1
+    )
 
-        if drift_basin:
-            observed = apply_ca_dynamics(query_frame.astype(np.float32))
-            plasticity = (1.0 - old_t) * BASIN_DRIFT_BASE_RATE
-            new_attractor = (
-                stored.astype(np.float32)
-                + plasticity * (observed - stored.astype(np.float32))
-            ).astype(stored.dtype)
+    new_attractor = None
+    if drift_basin:
+        observed = apply_ca_dynamics(query_frame.astype(np.float32))
+        plasticity = (1.0 - old_t) * BASIN_DRIFT_BASE_RATE
+        new_attractor = (
+            stored.astype(np.float32)
+            + plasticity * (observed - stored.astype(np.float32))
+        ).astype(stored.dtype)
 
-            np.save(attractor_path, new_attractor)
-            flat = new_attractor.flatten()
-            entry["metadata"]["att_mean"] = float(flat.mean())
-            entry["metadata"]["att_std"] = float(flat.std())
+        np.save(attractor_path, new_attractor)
+        flat = new_attractor.flatten()
+        entry["metadata"]["att_mean"] = float(flat.mean())
+        entry["metadata"]["att_std"] = float(flat.std())
 
-        bump_access(entry)
-        _save_index_with_lock(chunk_dir, index)
+    bump_access(entry)
+    db.upsert_memory(chunk_dir, hex_key, entry)
+    if new_attractor is not None:
+        # Basin drift rewrote the stored .npy — keep the vector index in sync.
+        db.upsert_vector(chunk_dir, hex_key, new_attractor)
 
     if scm is not None and scm_top_corpus is not None and scm_top_kappa is not None:
         top_exp_safe = (

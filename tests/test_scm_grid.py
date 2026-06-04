@@ -245,10 +245,18 @@ class TestSCMGridRecallFeedback:
 
         assert np.abs(scm.grid).mean() > original_abs
 
-    def test_fresh_grid_no_update(self, tmp_path):
-        """M_i = 0 everywhere → sign(0) = 0 → no cells updated."""
+    def test_fresh_grid_no_credit_no_update(self, tmp_path):
+        """Fresh grid + zero credit (|C·X| = 0) → still a no-op.
+
+        Note: with Option B (unconditional first-recall seed) a fresh grid that
+        receives *real* credit now seeds on tick one — see
+        ``test_first_recall_seeds_on_successful_sequence``. The remaining inert
+        path is the genuinely creditless one: no interference signal, nothing to
+        plant an opinion on, so the grid stays at zero.
+        """
         scm = SCMGrid.load_or_create(tmp_path)  # all zeros
-        c, x = self._peaked_attractors()
+        c = np.zeros((64, 64), dtype=np.float32)
+        x = np.zeros((64, 64), dtype=np.float32)
 
         count = scm.update_from_recall(c, x, kappa=0.5)
 
@@ -442,6 +450,38 @@ class TestSCMGridRecallFeedback:
             "seeded cells must align to credit ≥ p75 region, not elsewhere"
         )
 
+    def test_first_recall_seeds_on_successful_sequence(self, tmp_path):
+        """Option B: a fresh grid learns on the FIRST *successful* recall.
+
+        Pre-fix this was impossible by construction: kappa_base started at 0, so
+        a clean recall had advantage = kappa - 0 > 0; the cold-start seed
+        required advantage < 0; and the homeostasis guard short-circuited the
+        fresh grid (openness ≈ 1.0, advantage > 0) before any opinion was
+        planted. update_from_recall therefore returned 0 for every tick of a
+        normal (advantage ≥ 0) recall sequence. The unconditional first-recall
+        seed must now touch > 0 cells on tick one — the case that was previously
+        unreachable.
+        """
+        scm = SCMGrid.load_or_create(tmp_path)  # fresh grid, kappa_base = 0.0
+        assert not np.any(scm.grid != 0)
+        c, x = self._peaked_attractors()
+
+        # A normal, *successful* recall: advantage = 0.9 - 0.0 = +0.9 > 0 — the
+        # sign that pre-fix guaranteed a no-op on a fresh grid.
+        updated = scm.update_from_recall(c, x, kappa=0.9)
+
+        assert updated > 0, (
+            "fresh grid must learn (seed) on the first successful recall"
+        )
+        assert np.any(scm.grid != 0), "first recall must plant opinions"
+
+        # Over the rest of a clean, above-baseline sequence the total stays > 0
+        # — i.e. the SCM is no longer null-by-construction on success paths.
+        total = updated
+        for k in (0.92, 0.94, 0.96):
+            total += scm.update_from_recall(c, x, kappa=k)
+        assert total > 0
+
 
 class TestSCMGridRepr:
     """__repr__() formatting."""
@@ -529,9 +569,11 @@ class TestSCMTelemetry:
         empty_mask = np.zeros((64, 64), dtype=bool)
         scm.update(empty_mask, np.float32(1.0))
 
-        # Fresh grid → sign(M)=0 everywhere → mask empty → recall no-op
-        c = np.full((64, 64), 0.8, dtype=np.float32)
-        x = np.full((64, 64), 0.8, dtype=np.float32)
+        # Fresh grid + zero credit → seed skipped, homeostasis-ceiling skip →
+        # recall no-op that still emits a zero-delta row. (A fresh grid WITH
+        # credit now seeds under Option B, so it is no longer a no-op path.)
+        c = np.zeros((64, 64), dtype=np.float32)
+        x = np.zeros((64, 64), dtype=np.float32)
         scm.update_from_recall(c, x, kappa=0.5)
 
         rows = self._read_rows(tmp_path)
